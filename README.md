@@ -15,7 +15,7 @@
 ## 目录
 
 - Java
-  - Java 基础
+  - [Java 基础](https://github.com/ideolty/Interview/blob/master/Java基础.md)
   - JDK
   - JVM
   - 设计模式
