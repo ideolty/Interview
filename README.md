@@ -16,7 +16,7 @@
 
 - Java
   - [Java 基础](https://github.com/ideolty/Interview/blob/master/Java基础.md)
-  - JDK
+  - [JDK](https://github.com/ideolty/Interview/blob/master/JDK.md)
   - JVM
   - 设计模式
 - 算法
