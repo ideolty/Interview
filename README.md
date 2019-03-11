@@ -9,6 +9,7 @@
 - 文档目的是为了知识的总结与分享。
 - 我所做的工作很大程度是收集并且把引用的文章用自己的语言再重新表达一遍，以达到一个知识梳理的目的。
 - 非商业用途，如果需要引用，请注明原文地址就可以了，其中引用部分的版权归原版权作者所属。
+- 持续更新中。。
 
 
 
@@ -18,7 +19,7 @@
   - [Java 基础](https://github.com/ideolty/Interview/blob/master/Java基础.md)
   - [JDK](https://github.com/ideolty/Interview/blob/master/JDK.md)
   - [JVM](https://github.com/ideolty/Interview/blob/master/JVM.md)
-  - 设计模式
+  - [设计模式](https://github.com/ideolty/Interview/blob/master/设计模式.md)
 - 算法
 - Spring Framework
 - Spring Boot
