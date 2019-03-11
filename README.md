@@ -32,7 +32,7 @@
 - [Maven](https://github.com/ideolty/Interview/blob/master/Maven.md)
 - [Git](https://github.com/ideolty/Interview/blob/master/Git.md)
 - Docker
-- Nginx
+- [Nginx](https://github.com/ideolty/Interview/blob/master/Nginx.md)
 - Zookeeper
 - 消息中间件
   - RabbitMQ
