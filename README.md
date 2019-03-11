@@ -20,7 +20,7 @@
   - [JDK](https://github.com/ideolty/Interview/blob/master/JDK.md)
   - [JVM](https://github.com/ideolty/Interview/blob/master/JVM.md)
   - [设计模式](https://github.com/ideolty/Interview/blob/master/设计模式.md)
-- 算法
+- [算法](https://github.com/ideolty/Interview/blob/master/算法.md)
 - Spring Framework
 - Spring Boot
 - Spring Cloud
