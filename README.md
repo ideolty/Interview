@@ -9,6 +9,7 @@
 - 文档目的是为了知识的总结与分享。
 - 我所做的工作很大程度是收集并且把引用的文章用自己的语言再重新表达一遍，以达到一个知识梳理的目的。
 - 非商业用途，如果需要引用，请注明原文地址就可以了，其中引用部分的版权归原版权作者所属。
+- MD格式的文档，我是使用Typora方便的进行编辑和查看。
 - 持续更新中。。
 
 
@@ -28,7 +29,7 @@
 - Spring Security
 - Netty
 - [Mybatis](https://github.com/ideolty/Interview/blob/master/Mybatis.md)
-- Maven
+- [Maven](https://github.com/ideolty/Interview/blob/master/Maven.md)
 - Git
 - Docker
 - Nginx
