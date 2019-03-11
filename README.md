@@ -17,7 +17,7 @@
 - Java
   - [Java 基础](https://github.com/ideolty/Interview/blob/master/Java基础.md)
   - [JDK](https://github.com/ideolty/Interview/blob/master/JDK.md)
-  - JVM
+  - [JVM](https://github.com/ideolty/Interview/blob/master/JVM.md)
   - 设计模式
 - 算法
 - Spring Framework
