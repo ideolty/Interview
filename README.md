@@ -30,7 +30,7 @@
 - Netty
 - [Mybatis](https://github.com/ideolty/Interview/blob/master/Mybatis.md)
 - [Maven](https://github.com/ideolty/Interview/blob/master/Maven.md)
-- Git
+- [Git](https://github.com/ideolty/Interview/blob/master/Git.md)
 - Docker
 - Nginx
 - Zookeeper
@@ -39,4 +39,5 @@
   - Kafka
 - 数据库
   - Redis
+- Elasticsearch
 - 面试题
