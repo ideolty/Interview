@@ -27,7 +27,7 @@
 - Spring Data JPA
 - Spring Security
 - Netty
-- Mybatis
+- [Mybatis](https://github.com/ideolty/Interview/blob/master/Mybatis.md)
 - Maven
 - Git
 - Docker
