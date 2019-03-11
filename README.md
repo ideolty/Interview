@@ -33,7 +33,7 @@
 - [Git](https://github.com/ideolty/Interview/blob/master/Git.md)
 - Docker
 - [Nginx](https://github.com/ideolty/Interview/blob/master/Nginx.md)
-- Zookeeper
+- [Zookeeper](https://github.com/ideolty/Interview/blob/master/Zookeeper.md)
 - 消息中间件
   - RabbitMQ
   - Kafka
