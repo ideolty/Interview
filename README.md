@@ -38,7 +38,8 @@
   - [RabbitMQ](https://github.com/ideolty/Interview/blob/master/RabbitMQ.md)
   - [Kafka](https://github.com/ideolty/Interview/blob/master/Kafka.md)
 - [数据库](https://github.com/ideolty/Interview/blob/master/数据库.md)
-  - Redis
+  - [Redis](https://github.com/ideolty/Interview/blob/master/Redis.md)
   - [Mysql](https://github.com/ideolty/Interview/blob/master/Mysql.md)
 - Elasticsearch
 - 面试题
+
