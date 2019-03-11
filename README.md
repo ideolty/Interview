@@ -22,7 +22,7 @@
   - [设计模式](https://github.com/ideolty/Interview/blob/master/设计模式.md)
 - [算法](https://github.com/ideolty/Interview/blob/master/算法.md)
 - [Spring Framework](https://github.com/ideolty/Interview/blob/master/SpringCore.md)
-- Spring Boot
+- [Spring Boot](https://github.com/ideolty/Interview/blob/master/SpringBoot.md)
 - Spring Cloud
 - Spring Data JPA
 - Spring Security
