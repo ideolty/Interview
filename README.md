@@ -42,4 +42,5 @@
   - [Redis](https://github.com/ideolty/Interview/blob/master/Redis.md)
   - [Mysql](https://github.com/ideolty/Interview/blob/master/Mysql.md)
 - Elasticsearch
+- [分布式](https://github.com/ideolty/Interview/blob/master/分布式.md)
 - 面试题
