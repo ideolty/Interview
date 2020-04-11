@@ -3,11 +3,11 @@
 1. archaius使用的版本为0.7.6，maven依赖如下
 
    ```xml
-   				<dependency>
-               <groupId>com.netflix.archaius</groupId>
-               <artifactId>archaius-core</artifactId>
-               <version>0.7.6</version>
-           </dependency>
+   <dependency>
+     	<groupId>com.netflix.archaius</groupId>
+     	<artifactId>archaius-core</artifactId>
+     	<version>0.7.6</version>
+   </dependency>
    ```
 
 2. 为了与Spring更好的结合，引入了spring-cloud-starter-netflix-archaius包，在这个包中有官方的使用案例，为了配合Spring，官方扩展了一些数据源类型。
