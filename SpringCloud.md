@@ -24,6 +24,12 @@
 
 # Eureka
 
+
+
+
+
+先从细节的问题来看
+
 1. Eureka注册中心使用什么样的方式来储存各个服务注册时发送过来的机器地址和端口号？
 
    `private final CocurrentHashMap<String, Map<String, Lease<InstanceInfo>>> registry = new  CocurrentHashMap<String, Map<String, Lease<InstanceInfo>>>();`
@@ -31,11 +37,18 @@
    从代码中可以看到，Eureka Server的注册表直接基于**纯内存**，即在内存里维护了一个数据结构。各个服务的注册、服务下线、服务故障，全部会在内存里维护和更新这个注册表。各个服务每隔30秒拉取注册表的时候，Eureka Server就是直接提供内存里存储的有变化的注册表数据给他们就可以了。
 
    - 这个ConcurrentHashMap的key就是服务名称，比如“inventory-service”，就是一个服务名称。
+
    - value则代表了一个服务的多个服务实例。举例：比如“inventory-service”是可以有3个服务实例的，每个服务实例部署在一台机器上。
+
    - 里面这个Map的key就是**服务实例的id**。
+
    - value是一个叫做**Lease**的类，它的泛型是一个InstanceInfo。
+
    - InstanceInfo就代表了**服务实例的具体信息**，比如机器的ip地址、hostname以及端口号。
+
    - Lease，里面则会维护每个服务**最近一次发送心跳的时间**
+
+     
 
 2. 服务注册，client如何向server进行注册的？
 
@@ -43,7 +56,13 @@
 
    比如IP地址、端口，service ID，运行状况指示符URL，主页等。
 
-3. 各个服务找Eureka Server拉取注册表的时候，是什么样的频率？
+   
+
+3. 服务注册时提交的元数据的数据结构
+
+   
+   
+4. 各个服务找Eureka Server拉取注册表的时候，是什么样的频率？
 
    - 各个服务内的Eureka Client组件，默认情况下，每隔30秒会发送一个请求到Eureka Server，来拉取最近有变化的服务信息。
    - 除此之外，Eureka还有一个心跳机制，各个Eureka Client每隔30秒会发送一次心跳到Eureka Server。（服务续约）
@@ -52,7 +71,7 @@
 
 
 
-3. 各个服务是如何拉取注册表的？
+4. 各个服务是如何拉取注册表的？
 
    - 在拉取注册表的时候：
 
@@ -65,10 +84,16 @@
    - 在注册表发生变更的时候：
 
    - - 会在内存中更新变更的注册表数据，同时**过期掉ReadWriteCacheMap**。
+     
      - 此过程不会影响**ReadOnlyCacheMap**提供人家查询注册表。
+     
      - 一段时间内（默认30秒），各服务拉取注册表会直接读**ReadOnlyCacheMap**
+     
      - 30秒过后，Eureka Server的后台线程发现**ReadWriteCacheMap**已经清空了，也会清空**ReadOnlyCacheMap**中的缓存
+     
      - 下次有服务拉取注册表，又会从内存中获取最新的数据了，同时填充各个缓存。
+     
+       
 
 4. 服务下线
 
@@ -91,9 +116,33 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+## 引用
+
+
+
+https://blog.csdn.net/majinan3456/article/details/99563501?utm_medium=distribute.pc_aggpage_search_result.none-task-blog-2~all~top_click~default-1-99563501.nonecase
+
+
+
+
+
+
+
 [【双11狂欢的背后】微服务注册中心如何承载大型系统的千万级访问？](https://juejin.im/post/5be3f8dcf265da613a5382ca)
 
 [深入理解Eureka之源码解析](https://blog.csdn.net/forezp/article/details/73017664)
+
+
 
 
 
