@@ -7,7 +7,7 @@
 结合springcloud框架一起看更加贴合实际情况，使用的版本为
 
 ```pom
-		<properties>
+    <properties>
         <java.version>1.8</java.version>
         <spring-cloud.version>Hoxton.SR6</spring-cloud.version>
     </properties>
