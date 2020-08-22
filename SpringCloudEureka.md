@@ -82,20 +82,20 @@ com.netflix.discovery.shared.Applications
 `org.springframework.cloud.netflix.eureka.server.EurekaServerInitializerConfiguration#start`
 
 ```java
-@Override
+  @Override
 	public void start() {
 		new Thread(() -> {
 			try {
 				// TODO: is this class even needed now?
-        // eureka 上下文初始化
+				// eureka 上下文初始化
 				eurekaServerBootstrap.contextInitialized(
 						EurekaServerInitializerConfiguration.this.servletContext);
 				log.info("Started Eureka Server");
 
-        //发布Eureka注册成功事件
+				//发布Eureka注册成功事件
 				publish(new EurekaRegistryAvailableEvent(getEurekaServerConfig()));
 				EurekaServerInitializerConfiguration.this.running = true;
-        //发布Eureka启动成功事件
+				//发布Eureka启动成功事件
 				publish(new EurekaServerStartedEvent(getEurekaServerConfig()));
 			}
 			catch (Exception ex) {
@@ -115,9 +115,9 @@ com.netflix.discovery.shared.Applications
 ```java
 	public void contextInitialized(ServletContext context) {
 		try {
-      //初始化配置参数 单纯就是一些赋值操作
+			//初始化配置参数 单纯就是一些赋值操作
 			initEurekaEnvironment();
-      //初始化上下文
+			//初始化上下文
 			initEurekaServerContext();
 
 			context.setAttribute(EurekaServerContext.class.getName(), this.serverContext);
@@ -138,29 +138,29 @@ com.netflix.discovery.shared.Applications
 ```java
 protected void initEurekaServerContext() throws Exception {
 		// For backward compatibility
-    // 注册json格式的转换器
+		// 注册json格式的转换器
 		JsonXStream.getInstance().registerConverter(new V1AwareInstanceInfoConverter(),
 				XStream.PRIORITY_VERY_HIGH);
-    // 注册xml格式的转换器
+		// 注册xml格式的转换器
 		XmlXStream.getInstance().registerConverter(new V1AwareInstanceInfoConverter(),
 				XStream.PRIORITY_VERY_HIGH);
-    //判断是否是亚马逊云
+		//判断是否是亚马逊云
 		if (isAws(this.applicationInfoManager.getInfo())) {
 			this.awsBinder = new AwsBinderDelegate(this.eurekaServerConfig,
 					this.eurekaClientConfig, this.registry, this.applicationInfoManager);
 			this.awsBinder.start();
 		}
 
-    //创建了一个EurekaServerContextHolder对象用来保存serverContext上下文
-    //以提供给非spring容器内部的类使用 
+		//创建了一个EurekaServerContextHolder对象用来保存serverContext上下文
+		//以提供给非spring容器内部的类使用 
 		EurekaServerContextHolder.initialize(this.serverContext);
 
 		log.info("Initialized server context");
 
 		// Copy registry from neighboring eureka node
-    // 从相邻的节点中同步注册信息
+		// 从相邻的节点中同步注册信息
 		int registryCount = this.registry.syncUp();
-    // 服务状态检查，剔除失效的注册信息
+		// 服务状态检查，剔除失效的注册信息
 		this.registry.openForTraffic(this.applicationInfoManager, registryCount);
 
 		// Register all monitoring statistics.
