@@ -47,19 +47,127 @@
 
 ## 类介绍
 
-//todo 
+`com.netflix.appinfo.InstanceInfo`
 
-com.netflix.eureka.lease.Lease
+实例信息，每一个eureka对应一个InstanceInfo。
 
-com.netflix.appinfo.LeaseInfo
-
-com.netflix.appinfo.InstanceInfo
-
-com.netflix.discovery.shared.Applications
+> 在Guice下注入该实例时由`EurekaConfigBasedInstanceInfoProvider`负责创建；
+>
+> 但是在`Spring Cloud`下该实例由自己提供的`InstanceInfoFactory`完成创建的。
 
 
 
-region
+`com.netflix.appinfo.LeaseInfo`
+
+租约信息，当client向server注册后会生成一个租约，成员变量如下
+
+```java
+    public static final int DEFAULT_LEASE_RENEWAL_INTERVAL = 30;
+    public static final int DEFAULT_LEASE_DURATION = 90;
+
+    // Client settings
+		// 续租间隔时间（多长时间续约一次），默认是30s
+    private int renewalIntervalInSecs = DEFAULT_LEASE_RENEWAL_INTERVAL;
+		// 续约持续时间（过期时间），默认是90s
+    private int durationInSecs = DEFAULT_LEASE_DURATION;
+
+    // Server populated
+		// 租约的注册时间
+    private long registrationTimestamp;
+		// 最近一次的续约时间
+    private long lastRenewalTimestamp;
+		// 下线时间
+    private long evictionTimestamp;
+		// 上线时间
+    private long serviceUpTimestamp;
+```
+
+
+
+
+
+`com.netflix.eureka.lease.Lease`
+
+一个包装类，`Lease<InstanceInfo>`用来简单记录一个实例的租约信息
+
+```java
+    enum Action {
+        Register, Cancel, Renew
+    };
+
+    public static final int DEFAULT_DURATION_IN_SECS = 90;
+
+    private T holder;
+    private long evictionTimestamp;
+    private long registrationTimestamp;
+    private long serviceUpTimestamp;
+    // Make it volatile so that the expiration task would see this quicker
+    private volatile long lastUpdateTimestamp;
+    private long duration;
+```
+
+
+
+
+
+`com.netflix.discovery.shared.Application`
+
+应用信息。在微服务下，同一个应用会有很多的实例，用来保证服务的高可用。换着花样存储了3份`instance`信息
+
+```java
+    @XStreamOmitField
+    private volatile boolean isDirty = false;
+
+    @XStreamImplicit
+    private final Set<InstanceInfo> instances;
+
+    private final AtomicReference<List<InstanceInfo>> shuffledInstances;
+
+    private final Map<String, InstanceInfo> instancesMap;
+```
+
+
+
+
+
+`com.netflix.discovery.shared.Applications`
+
+应用集合。包装了从`eureka server`返回的应用信息
+
+
+> The class that wraps all the registry information returned by eureka server.
+
+```java
+public class Applications {		
+		private static class VipIndexSupport {
+        final AbstractQueue<InstanceInfo> instances = new ConcurrentLinkedQueue<>();
+        final AtomicLong roundRobinIndex = new AtomicLong(0);
+        final AtomicReference<List<InstanceInfo>> vipList = new AtomicReference<List<InstanceInfo>>(Collections.emptyList());
+
+        public AtomicLong getRoundRobinIndex() {
+            return roundRobinIndex;
+        }
+
+        public AtomicReference<List<InstanceInfo>> getVipList() {
+            return vipList;
+        }
+    }
+
+    private static final String STATUS_DELIMITER = "_";
+
+    private String appsHashCode;
+    private Long versionDelta;
+    @XStreamImplicit
+    private final AbstractQueue<Application> applications;
+    private final Map<String, Application> appNameApplicationMap;
+    private final Map<String, VipIndexSupport> virtualHostNameAppMap;
+    private final Map<String, VipIndexSupport> secureVirtualHostNameAppMap;
+  	……
+}
+```
+
+
+
 
 
 
@@ -68,6 +176,14 @@ region
 他是一个接口，定义了一些值得get方法。一般使用EurekaServerConfigBean作为具体实现类，用来读取配置文件中eureka.server开头的配置
 
 
+
+
+
+`region`、`zone` 
+
+这是两个逻辑概念，可以把`region`简单的理解为地区，而`zone`理解为一个机房。一个`region`可以有多个`zone`，一个`zone`内有多个`eureka server`
+
+[eureka分区的深入讲解](https://www.cnblogs.com/itplay/p/9973977.html)
 
 
 
@@ -337,7 +453,7 @@ org.springframework.cloud.netflix.eureka.config.EurekaConfigServerBootstrapConfi
 - `EurekaServiceRegistry`： Eureka服务注册器
 - `EurekaAutoServiceRegistration`： Eureka服务自动注册器，实现了SmartLifecycle，会在Spring容器的refresh的最后阶段被调用，通过`EurekaServiceRegistry`注册器注册`EurekaRegistration`信息
 - 两个内部的Configuration配置类，按照是否可以刷新分类，两个类初始化二选一。但是其实创建的内容完全相同，只是多了一个刷新配置的能力。
-  - 创建了`EurekaClient`对象，这是我们主要分析的对象，他是负责与`EurekaServer`交互的客户端。
+  - **创建了`EurekaClient`对象，这是我们主要分析的对象，他是负责与`EurekaServer`交互的客户端**。
   - 创建了`ApplicationInfoManager`对象，用来初始化一些向Eureka Server注册时需要的信息
   - 创建了`EurekaRegistration`对象，Eureka专用的注册器，一个包装类，内部有`EurekaClient`、`ApplicationInfoManager`、`CloudEurekaInstanceConfig`对象，通过他可以拿到当前实例的相关信息。
 
@@ -396,7 +512,7 @@ org.springframework.cloud.netflix.eureka.config.EurekaConfigServerBootstrapConfi
             this.registryStalenessMonitor = ThresholdLevelsMetric.NO_OP_METRIC;
         }
 
-      	//如果要想eureka server注册则定义一下心跳频率
+      	//如果要向eureka server注册则定义一下心跳频率
         if (config.shouldRegisterWithEureka()) {
             this.heartbeatStalenessMonitor = new ThresholdLevelsMetric(this, METRIC_REGISTRATION_PREFIX + "lastHeartbeatSec_", new long[]{15L, 30L, 60L, 120L, 240L, 480L});
         } else {
