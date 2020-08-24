@@ -37,7 +37,7 @@
 **Client**
 
 - eureka client启动：服务实例
-- 服务注册：map数据结构
+- 服务注册：系统启动时，状态改变监听器触发。定时任务，状态改变触发
 - 全量拉取注册表：多级缓存机制
 - 增量拉取注册表：一致性hash比对机制
 - 心跳机制：服务续约，renew
@@ -674,6 +674,7 @@ org.springframework.cloud.netflix.eureka.config.EurekaConfigServerBootstrapConfi
                     } else {
                         logger.info("Saw local status change event {}", statusChangeEvent);
                     }
+                  	// 状态变化
                     instanceInfoReplicator.onDemandUpdate();
                 }
             };
@@ -683,7 +684,7 @@ org.springframework.cloud.netflix.eureka.config.EurekaConfigServerBootstrapConfi
                 applicationInfoManager.registerStatusChangeListener(statusChangeListener);
             }
 
-          	//启动InstanceInfo复制器
+          	//启动InstanceInfo复制器 周期性的把自身信息上报
             instanceInfoReplicator.start(clientConfig.getInitialInstanceInfoReplicationIntervalSeconds());
         } else {
             logger.info("Not registering with Eureka server per configuration");
@@ -697,7 +698,7 @@ org.springframework.cloud.netflix.eureka.config.EurekaConfigServerBootstrapConfi
 
 
 
-### cacheRefreshTask
+#### cacheRefreshTask
 
 服务器信息拉取任务 `cacheRefreshTask`
 
@@ -911,3 +912,165 @@ org.springframework.cloud.netflix.eureka.config.EurekaConfigServerBootstrapConfi
 1. 从server端拿到相关信息后，更新本地缓存。
 2. 返回的信息中已经标注了一些服务器的状态，分为新增、修改、删除3种类型，按类型更新缓存
 
+
+
+
+
+#### heartbeatTask
+
+心跳任务`heartbeatTask`，他是`DiscoveryClient`类的一个内部类。`run（）`方法的实际内容是写在`DiscoveryClient`中的，不知道为啥这样写。
+
+`com.netflix.discovery.DiscoveryClient.HeartbeatThread`
+
+```java
+		private class HeartbeatThread implements Runnable {
+
+        public void run() {
+            if (renew()) {
+                lastSuccessfulHeartbeatTimestamp = System.currentTimeMillis();
+            }
+        }
+    }
+
+		// client需要往服务端发送appName id status lastDirtyTimestamp
+    boolean renew() {
+        EurekaHttpResponse<InstanceInfo> httpResponse;
+        try {
+          	// 发送心跳 
+          	// 这个参数为什么要这样设计 真是参不透啊
+            httpResponse = eurekaTransport.registrationClient.sendHeartBeat(instanceInfo.getAppName(), instanceInfo.getId(), instanceInfo, null);
+            logger.debug(PREFIX + "{} - Heartbeat status: {}", appPathIdentifier, httpResponse.getStatusCode());
+            if (httpResponse.getStatusCode() == Status.NOT_FOUND.getStatusCode()) {
+                REREGISTER_COUNTER.increment();
+                logger.info(PREFIX + "{} - Re-registering apps/{}", appPathIdentifier, instanceInfo.getAppName());
+                long timestamp = instanceInfo.setIsDirtyWithTime();
+                boolean success = register();
+                if (success) {
+                    instanceInfo.unsetIsDirty(timestamp);
+                }
+                return success;
+            }
+            return httpResponse.getStatusCode() == Status.OK.getStatusCode();
+        } catch (Throwable e) {
+            logger.error(PREFIX + "{} - was unable to send heartbeat!", appPathIdentifier, e);
+            return false;
+        }
+    }
+```
+
+简单的一个定时任务，从instanceInfo中拿出相应的值，向server发送心跳。
+
+
+
+
+
+#### instanceInfoReplicator
+
+InstanceInfo复制器
+
+`com.netflix.discovery.InstanceInfoReplicator`
+
+```java
+    public void run() {
+        try {
+          	// 更新信息，用于稍后的注册
+            discoveryClient.refreshInstanceInfo();
+
+            Long dirtyTimestamp = instanceInfo.isDirtyWithTime();
+            if (dirtyTimestamp != null) {
+              	// 注册自身
+                discoveryClient.register();
+                instanceInfo.unsetIsDirty(dirtyTimestamp);
+            }
+        } catch (Throwable t) {
+            logger.warn("There was a problem with the instance info replicator", t);
+        } finally {
+            // 每次执行完毕都会创建一个延时执行的任务，就这样实现了周期性执行的逻辑
+            Future next = scheduler.schedule(this, replicationIntervalSeconds, TimeUnit.SECONDS);
+          	// 留一个对结果的引用 方便外部对象查询结果
+            scheduledPeriodicRef.set(next);
+        }
+    }
+```
+
+1. instanceInfoReplicator周期性的运行，不断的手动创建延时任务。思路与Netflix自己封装的`TimedSupervisorTask`类一致，那么为什么不直接用呢？
+2. 当自身状态发送变化时，也会触发消息上报。
+3. 上报信息是直接把自身的`instanceInfo`对象整个传给server端。
+
+
+
+
+
+## 注销
+
+注销方法通过标签`@PreDestroy`触发
+
+`com.netflix.discovery.DiscoveryClient`
+
+```java
+    @PreDestroy
+    @Override
+    public synchronized void shutdown() {
+        if (isShutdown.compareAndSet(false, true)) {
+            logger.info("Shutting down DiscoveryClient ...");
+
+            if (statusChangeListener != null && applicationInfoManager != null) {
+              	// 从map中移除状态变化监听器
+                applicationInfoManager.unregisterStatusChangeListener(statusChangeListener.getId());
+            }
+
+          	// 取消之前创建的3个task 与 3个线程池
+            cancelScheduledTasks();
+
+            // If APPINFO was registered
+            if (applicationInfoManager != null
+                    && clientConfig.shouldRegisterWithEureka()
+                    && clientConfig.shouldUnregisterOnShutdown()) {
+                applicationInfoManager.setInstanceStatus(InstanceStatus.DOWN);
+              	// 发送下线消息给server端
+                unregister();
+            }
+
+            if (eurekaTransport != null) {
+                eurekaTransport.shutdown();
+            }
+
+            heartbeatStalenessMonitor.shutdown();
+            registryStalenessMonitor.shutdown();
+
+            Monitors.unregisterObject(this);
+
+            logger.info("Completed shut down of DiscoveryClient");
+        }
+    }
+```
+
+
+
+
+
+
+
+## 总结
+
+1. 从入口`EurekaClientAutoConfiguration`开始流程，创建eureka客户端。
+2. 客户端中创建了3个周期运行的定时任务
+   1. 默认每隔30秒从服务器定时拉取注册信息。
+   2. 默认每隔30秒给服务器发送心跳信息
+   3. 默认每隔30秒检查自身的信息是否变化，有变化则上报给服务器
+
+3. 注销的时候，关闭各种线程池，取消各种监听器，向服务器发一条下线消息。
+
+
+
+
+
+
+
+## 参考
+
+[【SpringCloud Eureka源码】从Eureka Client发起注册请求到Eureka Server处理的整个服务注册过程（上）](https://www.jianshu.com/p/d4cfd73e47e5)
+
+[Eureka客户端源码流程梳理](https://www.cnblogs.com/nijunyang/p/10805759.html)
+
+[Spring Cloud Eureka 全解 （4） - 核心流程-服务与实例列表获取详解](https://zhuanlan.zhihu.com/p/34976352)
