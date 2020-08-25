@@ -1,6 +1,6 @@
 # 综述
 
-本文大量引用[Eureka服务端源码流程梳理](https://www.cnblogs.com/nijunyang/p/10745730.html)此文章，特此感谢。
+本文大量引用[Eureka服务端源码流程梳理](https://www.cnblogs.com/nijunyang/p/10745730.html)此文章，感谢！
 
 
 
@@ -26,22 +26,134 @@
 
 **Server**
 
-- eureka server启动：注册中心
-- eureka server集群：注册表的同步，多级队列的任务批处理机制
+- [x] eureka server启动：注册中心
+- [ ] eureka server集群：注册表的同步，多级队列的任务批处理机制 
 
-- 服务故障：expiration，eviction
-- 自我保护：自动识别eureka server出现网络故障了
+- [ ] 服务故障：expiration，eviction 
+- [ ] 自我保护：自动识别eureka server出现网络故障了 
 
 
 
 **Client**
 
-- eureka client启动：服务实例
-- 服务注册：系统启动时，状态改变监听器触发。定时任务，状态改变触发
-- 全量拉取注册表：多级缓存机制
-- 增量拉取注册表：一致性hash比对机制
-- 心跳机制：服务续约，renew
-- 服务下线：cancel
+- [x] eureka client启动：服务实例
+- [x] 服务注册：系统启动时，状态改变监听器触发。定时任务，状态改变触发
+- [x] 全量拉取注册表：多级缓存机制
+- [x] 增量拉取注册表：一致性hash比对机制
+- [x] 心跳机制：服务续约，renew
+- [x] 服务下线：cancel
+
+
+
+## 引入问题
+
+1. Eureka注册中心使用什么样的方式来储存各个服务注册时发送过来的机器地址和端口号？
+
+   `private final CocurrentHashMap<String, Map<String, Lease<InstanceInfo>>> registry = new  CocurrentHashMap<String, Map<String, Lease<InstanceInfo>>>();`
+
+   从代码中可以看到，Eureka Server的注册表直接基于**纯内存**，即在内存里维护了一个数据结构。各个服务的注册、服务下线、服务故障，全部会在内存里维护和更新这个注册表。各个服务每隔30秒拉取注册表的时候，Eureka Server就是直接提供内存里存储的有变化的注册表数据给他们就可以了。
+
+   - 这个ConcurrentHashMap的key就是服务名称，比如“inventory-service”，就是一个服务名称。
+
+   - value则代表了一个服务的多个服务实例。举例：比如“inventory-service”是可以有3个服务实例的，每个服务实例部署在一台机器上。
+
+   - 里面这个Map的key就是**服务实例的id**。
+
+   - value是一个叫做**Lease**的类，它的泛型是一个InstanceInfo。
+
+   - InstanceInfo就代表了**服务实例的具体信息**，比如机器的ip地址、hostname以及端口号。
+
+   - Lease，里面则会维护每个服务**最近一次发送心跳的时间**
+
+   
+
+2. 服务注册，client如何向server进行注册的？
+
+   当Eureka客户端向Eureka Server注册时，它提供自身的元数据。
+   
+   比如IP地址、端口，service ID，运行状况指示符URL，主页等。
+
+   
+
+3. 服务注册时提交的元数据的数据结构
+
+   >OST **/eureka/apps/应用名** HTTP/1.1
+   >Accept-Encoding: gzip
+   >Content-Type: application/json
+   > Accept: application/json
+   > DiscoveryIdentity-Name: DefaultClient
+   > DiscoveryIdentity-Version: 1.4
+   > DiscoveryIdentity-Id: 192.168.70.132
+   > Transfer-Encoding: chunked
+   > Host: localhost:8001
+   > Connection: Keep-Alive
+   > User-Agent: Java-EurekaClient/v1.6.2
+   > 
+   > 1a0
+   >{"instance":{
+   >​    "instanceId":"192.168.70.132:应用名:10001",
+   > ​    "hostName":"192.168.70.132",
+   > ​    "app":"应用名",
+   > ​    "ipAddr":"192.168.70.132",
+   > ​    "status":"UP",
+   > ​    "overriddenstatus":"UNKNOWN",
+   > ​    "port": { "":443, "@enabled" : "false"},
+   > ​    "countryId":1,
+   > ​    "dataCenterInfo":{"@class":"com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo",
+   > ​    "name":"MyOwn"
+   > }
+   
+   
+   
+4. 各个服务找Eureka Server拉取注册表的时候，是什么样的频率？
+
+   - 各个服务内的Eureka Client组件，默认情况下，每隔30秒会发送一个请求到Eureka Server，来拉取最近有变化的服务信息。
+   - 除此之外，Eureka还有一个心跳机制，各个Eureka Client每隔30秒会发送一次心跳到Eureka Server。（服务续约）
+   - 正常情况下，如果Eureka Server在90秒没有收到Eureka客户的续约，它会将实例从其注册表中删除。 建议不要更改续约间隔。
+   - 可以保证一个大规模的系统每秒请求Eureka Server的次数在几百次。
+
+
+
+4. 各个服务是如何拉取注册表的？
+
+   - 在拉取注册表的时候：
+
+   - - 首先从**ReadOnlyCacheMap**里查缓存的注册表。
+     - 若没有，就找**ReadWriteCacheMap**里缓存的注册表。
+     - 如果还没有，就从**内存中获取实际的注册表数据。**
+
+   
+
+   - 在注册表发生变更的时候：
+
+   - - 会在内存中更新变更的注册表数据，同时**过期掉ReadWriteCacheMap**。
+
+     - 此过程不会影响**ReadOnlyCacheMap**提供人家查询注册表。
+
+     - 一段时间内（默认30秒），各服务拉取注册表会直接读**ReadOnlyCacheMap**
+
+     - 30秒过后，Eureka Server的后台线程发现**ReadWriteCacheMap**已经清空了，也会清空**ReadOnlyCacheMap**中的缓存
+
+     - 下次有服务拉取注册表，又会从内存中获取最新的数据了，同时填充各个缓存。
+
+       
+
+4. 服务下线
+
+   Eureka客户端在程序关闭时向Eureka服务器发送取消请求。 发送请求后，该客户端实例信息将从服务器的实例注册表中删除。该下线请求不会自动完成，它需要调用以下内容：
+   `DiscoveryManager.getInstance().shutdownComponent()；`
+
+
+
+5. 一个有几百个服务，部署了上千台机器的大型分布式系统，会对Eureka Server造成多大的访问压力？
+
+   一共100个服务，每个服务部署在20台机器上，1分钟4次请求，2000个服务实例每分钟请求8000次，换算到每秒，则是8000 / 60 = 133次左右，一天的话，就是8000 * 60 * 24 = 1152万。
+
+
+
+6. Eureka Server从技术层面是如何抗住日千万级访问量的？
+   - 维护注册表、拉取注册表、更新心跳时间，全部发生在内存里！这是Eureka Server非常核心的一个点。
+   - 采用了**多级缓存机制**来进一步提升服务请求的响应速度，确保了不会针对内存数据结构发生频繁的读写并发冲突操作，进一步提升性能。
 
 
 
@@ -197,9 +309,11 @@ public class Applications {
 
 一切的起点是从主类上的标签`@EnableEurekaServer`开始，但是spring cloud中基本上都是一样的逻辑，所以依照惯例，找到`spring-cloud-netflix-eureka-server-2.2.3.RELEASE.jar`包中的`spring.factories`文件，找到server启动流程的入口类`org.springframework.cloud.netflix.eureka.server.EurekaServerAutoConfiguration`。观察到类的上方通过`@Import(EurekaServerInitializerConfiguration.class)`标签注入了一个类，这个配置类实现了`ServletContextAware, SmartLifecycle`两个接口，所以主要看一下start方法中的内容。
 
-初始化主要的内容是在`EurekaServerInitializerConfiguration.class`中。`EurekaServerAutoConfiguration`类中定义了大量的bean，加载了各种地方的参数到上下文中。
+初始化主要的内容是在`EurekaServerInitializerConfiguration`中。`EurekaServerAutoConfiguration`类中定义了大量的bean，加载了各种地方的参数到上下文中。
 
 
+
+### EurekaServerInitializerConfiguration
 
 `org.springframework.cloud.netflix.eureka.server.EurekaServerInitializerConfiguration#start`
 
@@ -228,9 +342,11 @@ public class Applications {
 	}
 ```
 
+1. 初始化上下文。
+2. 成功后发布2个事件，方便spring环境中其他组件使用
+3. 修改一下状态
 
 
-启动流程主要完成2件事，①把配置文件中的配置读到相应的数据结构中，②初始化上下文
 
 `org.springframework.cloud.netflix.eureka.server.EurekaServerBootstrap#contextInitialized`
 
@@ -251,9 +367,14 @@ public class Applications {
 	}
 ```
 
+启动流程主要完成2件事
+
+1. 把配置文件中的配置读到相应的数据结构中
+2. 初始化上下文
+
+主要看初始化上下文做了什么操作
 
 
-初始化上下文主要也是两件事①从相邻节点中读取客户端的注册信息，②剔除失效的客户端
 
 `org.springframework.cloud.netflix.eureka.server.EurekaServerBootstrap#initEurekaServerContext`
 
@@ -290,7 +411,14 @@ protected void initEurekaServerContext() throws Exception {
 	}
 ```
 
+初始化上下文主要也是两件事
 
+1. 从相邻节点中读取客户端的注册信息
+2. 剔除失效的客户端
+
+
+
+### syncUp（相邻节点同步注册信息）
 
 好奇他是怎么读取的
 
@@ -316,7 +444,7 @@ protected void initEurekaServerContext() throws Exception {
             //从eureka客户端获取到所有的服务器注册信息
             Applications apps = eurekaClient.getApplications();
             for (Application app : apps.getRegisteredApplications()) {
-                //便利各个服务器上注册的节点
+                //遍历各个服务器上注册的节点
                 for (InstanceInfo instance : app.getInstances()) {
                     try {
                         if (isRegisterable(instance)) {
@@ -334,11 +462,17 @@ protected void initEurekaServerContext() throws Exception {
     }
 ```
 
+`register(instance, instance.getLeaseInfo().getDurationInSecs(), true);`是一个注册方法，其实很重要的，与后面客户端注册方法一起说。
 
 
-`register(instance, instance.getLeaseInfo().getDurationInSecs(), true);`是一个注册方法，其实顶重要的，与后面客户端注册方法一起说。
+
+// todo 注册代码
+
+
 
 再来看一下他是如何失效服务的
+
+### openForTraffic（过期服务）
 
 `com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl#openForTraffic`
 
@@ -386,6 +520,40 @@ protected void initEurekaServerContext() throws Exception {
                 serverConfig.getEvictionIntervalTimerInMs());
     }
 ```
+
+这段代码的重点是创建了一个定时器，默认60s执行一次，延迟60s执行。
+
+
+
+
+
+往下看一下定时器中到底是如何清理过期的实例的。
+
+`com.netflix.eureka.registry.AbstractInstanceRegistry#evict(long)`
+
+
+
+
+
+
+
+## 注册接口
+
+// 数据注册的数据结构，注册流程
+
+
+
+## 获取服务接口
+
+// todo 双缓存，双缓存数据同步
+
+
+
+
+
+
+
+
 
 
 
@@ -1055,9 +1223,9 @@ InstanceInfo复制器
 
 1. 从入口`EurekaClientAutoConfiguration`开始流程，创建eureka客户端。
 2. 客户端中创建了3个周期运行的定时任务
-   1. 默认每隔30秒从服务器定时拉取注册信息。
-   2. 默认每隔30秒给服务器发送心跳信息
-   3. 默认每隔30秒检查自身的信息是否变化，有变化则上报给服务器
+   1. 默认每隔30秒从服务器定时拉取注册信息，从server端获取到一个`com.netflix.discovery.shared.Applications`对象。
+   2. 默认每隔30秒给服务器发送心跳信息。
+   3. 默认每隔30秒检查自身的信息是否变化，有变化则上报给服务器，上报时会把自身`com.netflix.appinfo.InstanceInfo`对象传递过去。
 
 3. 注销的时候，关闭各种线程池，取消各种监听器，向服务器发一条下线消息。
 
@@ -1074,3 +1242,12 @@ InstanceInfo复制器
 [Eureka客户端源码流程梳理](https://www.cnblogs.com/nijunyang/p/10805759.html)
 
 [Spring Cloud Eureka 全解 （4） - 核心流程-服务与实例列表获取详解](https://zhuanlan.zhihu.com/p/34976352)
+
+
+
+[eureka服务注册于发现流程](https://blog.csdn.net/majinan3456/article/details/99563501?utm_medium=distribute.pc_aggpage_search_result.none-task-blog-2~all~top_click~default-1-99563501.nonecase)
+
+[【双11狂欢的背后】微服务注册中心如何承载大型系统的千万级访问？](https://juejin.im/post/5be3f8dcf265da613a5382ca)
+
+[深入理解Eureka之源码解析](https://blog.csdn.net/forezp/article/details/73017664)
+

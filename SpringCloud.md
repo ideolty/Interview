@@ -30,90 +30,7 @@
 
 先从细节的问题来看
 
-1. Eureka注册中心使用什么样的方式来储存各个服务注册时发送过来的机器地址和端口号？
-
-   `private final CocurrentHashMap<String, Map<String, Lease<InstanceInfo>>> registry = new  CocurrentHashMap<String, Map<String, Lease<InstanceInfo>>>();`
-
-   从代码中可以看到，Eureka Server的注册表直接基于**纯内存**，即在内存里维护了一个数据结构。各个服务的注册、服务下线、服务故障，全部会在内存里维护和更新这个注册表。各个服务每隔30秒拉取注册表的时候，Eureka Server就是直接提供内存里存储的有变化的注册表数据给他们就可以了。
-
-   - 这个ConcurrentHashMap的key就是服务名称，比如“inventory-service”，就是一个服务名称。
-
-   - value则代表了一个服务的多个服务实例。举例：比如“inventory-service”是可以有3个服务实例的，每个服务实例部署在一台机器上。
-
-   - 里面这个Map的key就是**服务实例的id**。
-
-   - value是一个叫做**Lease**的类，它的泛型是一个InstanceInfo。
-
-   - InstanceInfo就代表了**服务实例的具体信息**，比如机器的ip地址、hostname以及端口号。
-
-   - Lease，里面则会维护每个服务**最近一次发送心跳的时间**
-
-     
-
-2. 服务注册，client如何向server进行注册的？
-
-   当Eureka客户端向Eureka Server注册时，它提供自身的元数据。
-
-   比如IP地址、端口，service ID，运行状况指示符URL，主页等。
-
-   
-
-3. 服务注册时提交的元数据的数据结构
-
-   
-   
-4. 各个服务找Eureka Server拉取注册表的时候，是什么样的频率？
-
-   - 各个服务内的Eureka Client组件，默认情况下，每隔30秒会发送一个请求到Eureka Server，来拉取最近有变化的服务信息。
-   - 除此之外，Eureka还有一个心跳机制，各个Eureka Client每隔30秒会发送一次心跳到Eureka Server。（服务续约）
-   - 正常情况下，如果Eureka Server在90秒没有收到Eureka客户的续约，它会将实例从其注册表中删除。 建议不要更改续约间隔。
-   - 可以保证一个大规模的系统每秒请求Eureka Server的次数在几百次。
-
-
-
-4. 各个服务是如何拉取注册表的？
-
-   - 在拉取注册表的时候：
-
-   - - 首先从**ReadOnlyCacheMap**里查缓存的注册表。
-     - 若没有，就找**ReadWriteCacheMap**里缓存的注册表。
-     - 如果还没有，就从**内存中获取实际的注册表数据。**
-
-   
-
-   - 在注册表发生变更的时候：
-
-   - - 会在内存中更新变更的注册表数据，同时**过期掉ReadWriteCacheMap**。
-     
-     - 此过程不会影响**ReadOnlyCacheMap**提供人家查询注册表。
-     
-     - 一段时间内（默认30秒），各服务拉取注册表会直接读**ReadOnlyCacheMap**
-     
-     - 30秒过后，Eureka Server的后台线程发现**ReadWriteCacheMap**已经清空了，也会清空**ReadOnlyCacheMap**中的缓存
-     
-     - 下次有服务拉取注册表，又会从内存中获取最新的数据了，同时填充各个缓存。
-     
-       
-
-4. 服务下线
-
-   Eureka客户端在程序关闭时向Eureka服务器发送取消请求。 发送请求后，该客户端实例信息将从服务器的实例注册表中删除。该下线请求不会自动完成，它需要调用以下内容：
-   `DiscoveryManager.getInstance().shutdownComponent()；`
-
-
-
-5. 一个有几百个服务，部署了上千台机器的大型分布式系统，会对Eureka Server造成多大的访问压力？
-
-   一共100个服务，每个服务部署在20台机器上，1分钟4次请求，2000个服务实例每分钟请求8000次，换算到每秒，则是8000 / 60 = 133次左右，一天的话，就是8000 * 60 * 24 = 1152万。
-
-
-
-6. Eureka Server从技术层面是如何抗住日千万级访问量的？
-   - 维护注册表、拉取注册表、更新心跳时间，全部发生在内存里！这是Eureka Server非常核心的一个点。
-   - 采用了**多级缓存机制**来进一步提升服务请求的响应速度，确保了不会针对内存数据结构发生频繁的读写并发冲突操作，进一步提升性能。
-
-
-
+1. 
 
 
 
@@ -129,18 +46,6 @@
 ## 引用
 
 
-
-https://blog.csdn.net/majinan3456/article/details/99563501?utm_medium=distribute.pc_aggpage_search_result.none-task-blog-2~all~top_click~default-1-99563501.nonecase
-
-
-
-
-
-
-
-[【双11狂欢的背后】微服务注册中心如何承载大型系统的千万级访问？](https://juejin.im/post/5be3f8dcf265da613a5382ca)
-
-[深入理解Eureka之源码解析](https://blog.csdn.net/forezp/article/details/73017664)
 
 
 
