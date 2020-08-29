@@ -541,6 +541,25 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 
 
 
+| **Operation**                                                | **HTTP action**                                              | **Description**                                              |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Register new application instance                            | POST /eureka/v2/apps/**appID**                               | Input: JSON/XML payload HTTP Code: 204 on success            |
+| De-register application instance                             | DELETE /eureka/v2/apps/**appID**/**instanceID**              | HTTP Code: 200 on success                                    |
+| Send application instance heartbeat                          | PUT /eureka/v2/apps/**appID**/**instanceID**                 | HTTP Code:  * 200 on success  * 404 if **instanceID** doesn’t exist |
+| Query for all instances                                      | GET /eureka/v2/apps                                          | HTTP Code: 200 on success Output: JSON/XML                   |
+| Query for all **appID** instances                            | GET /eureka/v2/apps/**appID**                                | HTTP Code: 200 on success Output: JSON/XML                   |
+| Query for a specific **appID**/**instanceID**                | GET /eureka/v2/apps/**appID**/**instanceID**                 | HTTP Code: 200 on success Output: JSON/XML                   |
+| Query for a specific **instanceID**                          | GET /eureka/v2/instances/**instanceID**                      | HTTP Code: 200 on success Output: JSON/XML                   |
+| Take instance out of service                                 | PUT /eureka/v2/apps/**appID**/**instanceID**/status?value=OUT_OF_SERVICE | HTTP Code:  * 200 on success  * 500 on failure               |
+| Move instance back into service (remove override)            | DELETE /eureka/v2/apps/**appID**/**instanceID**/status?value=UP  (The value=UP is optional, it is used as a suggestion for the fallback status due to removal of the override) | HTTP Code:  * 200 on success  * 500 on failure               |
+| Update metadata                                              | PUT /eureka/v2/apps/**appID**/**instanceID**/metadata?key=value | HTTP Code:  * 200 on success  * 500 on failure               |
+| Query for all instances under a particular **vip address**   | GET /eureka/v2/vips/**vipAddress**                           | * HTTP Code: 200 on success Output: JSON/XML   * 404 if the **vipAddress** does not exist. |
+| Query for all instances under a particular **secure vip address** | GET /eureka/v2/svips/**svipAddress**                         | * HTTP Code: 200 on success Output: JSON/XML   * 404 if the **svipAddress** does not exist. |
+
+
+
+
+
 ### 注册接口
 
 根据官网给的接口路径前缀名称定位到`com.netflix.eureka.resources.ApplicationsResource`类上方的`@Path("/{version}/apps")`标签，从而发现位于`com.netflix.eureka.resources.ApplicationResource#addInstance`方法是注册接口，此接口除了供client注册外，集群间的client信息同步也是调用它。
@@ -921,6 +940,130 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 
 ### 获取服务接口
 
+数据拉取分为一次性全量拉取与单个服务信息拉取。请求地址分别是`/eureka/v2/apps` ，`/eureka/v2/apps/{appID}` ，对应的方法为`com.netflix.eureka.resources.ApplicationsResource#getContainers`、`com.netflix.eureka.resources.ApplicationsResource#getApplicationResource`
+
+
+
+先看**全量拉取**的内容
+
+`com.netflix.eureka.resources.ApplicationsResource#getContainers`
+
+```java
+    @GET
+    public Response getContainers(@PathParam("version") String version,
+                                  @HeaderParam(HEADER_ACCEPT) String acceptHeader,
+                                  @HeaderParam(HEADER_ACCEPT_ENCODING) String acceptEncoding,
+                                  @HeaderParam(EurekaAccept.HTTP_X_EUREKA_ACCEPT) String eurekaAccept,
+                                  @Context UriInfo uriInfo,
+                                  @Nullable @QueryParam("regions") String regionsStr) {
+				// 检查请求的来源 统计记数
+        boolean isRemoteRegionRequested = null != regionsStr && !regionsStr.isEmpty();
+        String[] regions = null;
+        if (!isRemoteRegionRequested) {
+            EurekaMonitors.GET_ALL.increment();
+        } else {
+            regions = regionsStr.toLowerCase().split(",");
+            Arrays.sort(regions); // So we don't have different caches for same regions queried in different order.
+            EurekaMonitors.GET_ALL_WITH_REMOTE_REGIONS.increment();
+        }
+
+        // Check if the server allows the access to the registry. The server can
+        // restrict access if it is not
+        // ready to serve traffic depending on various reasons.
+        if (!registry.shouldAllowAccess(isRemoteRegionRequested)) {
+            return Response.status(Status.FORBIDDEN).build();
+        }
+      	// 设置返回格式 其实也可以返回xml的
+        CurrentRequestVersion.set(Version.toEnum(version));
+        KeyType keyType = Key.KeyType.JSON;
+        String returnMediaType = MediaType.APPLICATION_JSON;
+        if (acceptHeader == null || !acceptHeader.contains(HEADER_JSON_VALUE)) {
+            keyType = Key.KeyType.XML;
+            returnMediaType = MediaType.APPLICATION_XML;
+        }
+
+      	// 生成缓存key
+        Key cacheKey = new Key(Key.EntityType.Application,
+                ResponseCacheImpl.ALL_APPS,
+                keyType, CurrentRequestVersion.get(), EurekaAccept.fromString(eurekaAccept), regions
+        );
+
+      	// 从缓存拿取客户端信息内容
+        Response response;
+        if (acceptEncoding != null && acceptEncoding.contains(HEADER_GZIP_VALUE)) {
+            response = Response.ok(responseCache.getGZIP(cacheKey))
+                    .header(HEADER_CONTENT_ENCODING, HEADER_GZIP_VALUE)
+                    .header(HEADER_CONTENT_TYPE, returnMediaType)
+                    .build();
+        } else {
+            response = Response.ok(responseCache.get(cacheKey))
+                    .build();
+        }
+        CurrentRequestVersion.remove();
+        return response;
+    }
+```
+
+至于这个`responseCache`是什么，里面的数据是怎么样维护的，放在后面多级缓存章中说明。
+
+1. 检查请求来源，统计记数
+2. 设置返回格式
+3. 创建缓存key，从缓存中拿取全量的客户端信息。
+
+
+
+获取**指定appId**的客户端信息
+
+`com.netflix.eureka.resources.ApplicationResource#getApplication`
+
+```java
+    @GET
+    public Response getApplication(@PathParam("version") String version,
+                                   @HeaderParam("Accept") final String acceptHeader,
+                                   @HeaderParam(EurekaAccept.HTTP_X_EUREKA_ACCEPT) String eurekaAccept) {
+      	// 判断是否允许
+        if (!registry.shouldAllowAccess(false)) {
+            return Response.status(Status.FORBIDDEN).build();
+        }
+
+        EurekaMonitors.GET_APPLICATION.increment();
+
+        CurrentRequestVersion.set(Version.toEnum(version));
+      	// 设置返回类型
+        KeyType keyType = Key.KeyType.JSON;
+        if (acceptHeader == null || !acceptHeader.contains("json")) {
+            keyType = Key.KeyType.XML;
+        }
+
+        Key cacheKey = new Key(
+                Key.EntityType.Application,
+          			// 这个是请求url后面的appId
+                appName,
+                keyType,
+                CurrentRequestVersion.get(),
+                EurekaAccept.fromString(eurekaAccept)
+        );
+
+      	// 从缓存中拿取指定的客户端信息
+        String payLoad = responseCache.get(cacheKey);
+        CurrentRequestVersion.remove();
+
+        if (payLoad != null) {
+            logger.debug("Found: {}", appName);
+            return Response.ok(payLoad).build();
+        } else {
+            logger.debug("Not Found: {}", appName);
+            return Response.status(Status.NOT_FOUND).build();
+        }
+    }
+```
+
+与全量获取是相同的流程，从缓存中拿
+
+
+
+
+
 // todo 双缓存，双缓存数据同步
 
 
@@ -972,6 +1115,10 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 [Spring Cloud Eureka源代码解析（1）Eureka启动，原生启动与SpringCloudEureka启动异同](https://my.oschina.net/u/3747772/blog/1588933)(学习如何写胶水代码，也就是autoConfig类，把servlet项目合并到springcloud中)
 
 [eureka rest api](https://www.jianshu.com/p/c24e622f3f45)
+
+
+
+[eureka(三)-注册中心之多级缓存机制](https://www.jianshu.com/p/22219408b382)
 
 
 
