@@ -597,7 +597,7 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
     }
 ```
 
-由于使用的cloud框架所以`PeerAwareInstanceRegistry`的具体实现类是`org.springframework.cloud.netflix.eureka.server.InstanceRegistry`，但是这个类继承自eureka的原生实现类`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl`，在此基础上只增加了一个往消息总线中发布消息的操作。
+由于使用的cloud框架所以`PeerAwareInstanceRegistry`的具体实现类是`org.springframework.cloud.netflix.eureka.server.InstanceRegistry`，但是这个类继承自eureka的原生实现类`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl`，spring在此基础上只增加了一个发布消息的功能。
 
 
 
@@ -642,7 +642,7 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
     }
 ```
 
-1. 调用注册方法，这个注册方法就和上面启动流程中，从相邻server节点拉取到注册信息后，调用的注册方法是同一个方法了。
+1. 调用注册方法。这个`register`注册方法就和启动流程中，从相邻server节点拉取到客户端信息后调用的注册方法是同一个方法了。
 2. 注册成功后，把InstanceInfo信息同步给相邻server节点。
 
 
@@ -750,26 +750,26 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 
 1. 首先尝试从缓存中取出目标对象，如果不存在则认为是新注册的对象，初始化一个新的。
 2. 如果缓存中存在则与客户端的对比一下，看看哪边的最新，取最新的`InstanceInfo`
-3. 计算各种时间，之后更新`InstanceInfo`对象，并重新存入缓存中。
-4. 把当前实例加入`recentRegisteredQueue`队列中同时也加入`recentlyChangedQueue`队列中
+3. 各种计算时间，之后更新`InstanceInfo`对象，并重新存入缓存中。
+4. 把当前实例加入`recentRegisteredQueue`队列中，同时也加入`recentlyChangedQueue`队列中
 5. 失效缓存，这也是重点方法
 
 
 
-此处涉及到一个核心的容器，定义在本类中
+此处涉及到一个定义在本类中的**核心容器**，
 
 ```java
     private final ConcurrentHashMap<String, Map<String, Lease<InstanceInfo>>> registry
             = new ConcurrentHashMap<String, Map<String, Lease<InstanceInfo>>>();
 ```
 
-此容器是eureka用来存储注册信息的容器，一个双层ConcurrentHashMap，外层的key为appName，内层的key为InstanceInfo对象的id。
+这个Map是eureka用来存储注册信息的容器，一个双层ConcurrentHashMap，外层的key为appName，内层的key为InstanceInfo对象的id。
 
 
 
 
 
-接下来就是重点的双层缓存的失效操作。
+接下来就是缓存的失效操作。
 
 `com.netflix.eureka.registry.ResponseCacheImpl#invalidate`
 
@@ -825,15 +825,97 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
     }
 ```
 
-这里缓存对象使用了google guava工具包中的缓存对象。
+1. 按照类型，分别失效缓存
+2. 这里缓存对象使用了google guava工具包中的缓存对象。
 
 
 
-//todo 同步readWriteCacheMap到readOnlyCacheMap
+到此，注册操作的前半段就结束了，后半段是把注册信息同步到相邻节点，回到之前的`replicateToPeers`方法。
+
+`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl#replicateToPeers`
+
+```java
+    private void replicateToPeers(Action action, String appName, String id,
+                                  InstanceInfo info /* optional */,
+                                  InstanceStatus newStatus /* optional */, boolean isReplication) {
+        Stopwatch tracer = action.getTimer().start();
+        try {
+          	// 判断这是别的server同步过来，还是client注册的
+            if (isReplication) {
+                numberOfReplicationsLastMin.increment();
+            }
+            // If it is a replication already, do not replicate again as this will create a poison replication
+          	// 如果是单机则不用同步了
+            if (peerEurekaNodes == Collections.EMPTY_LIST || isReplication) {
+                return;
+            }
+
+          	// 从peerEurekaNodes对象中取出相邻节点列表 遍历同步
+            for (final PeerEurekaNode node : peerEurekaNodes.getPeerEurekaNodes()) {
+                // If the url represents this host, do not replicate to yourself.
+                if (peerEurekaNodes.isThisMyUrl(node.getServiceUrl())) {
+                    continue;
+                }
+              	// 调用同步方法
+                replicateInstanceActionsToPeers(action, appName, id, info, newStatus, node);
+            }
+        } finally {
+            tracer.stop();
+        }
+    }
+
+
+		// 同步方法 一个复合方法 所有需要同步给相邻节点的操作都在此方法中实现
+		// 例如注册、心跳等
+    private void replicateInstanceActionsToPeers(Action action, String appName,
+                                                 String id, InstanceInfo info, InstanceStatus newStatus,
+                                                 PeerEurekaNode node) {
+        try {
+            InstanceInfo infoFromRegistry;
+            CurrentRequestVersion.set(Version.V2);
+            switch (action) {
+                case Cancel:
+                    node.cancel(appName, id);
+                    break;
+                case Heartbeat:
+                    InstanceStatus overriddenStatus = overriddenInstanceStatusMap.get(id);
+                    infoFromRegistry = getInstanceByAppAndId(appName, id, false);
+                    node.heartbeat(appName, id, infoFromRegistry, overriddenStatus, false);
+                    break;
+                case Register:
+                    node.register(info);
+                    break;
+                case StatusUpdate:
+                    infoFromRegistry = getInstanceByAppAndId(appName, id, false);
+                    node.statusUpdate(appName, id, newStatus, infoFromRegistry);
+                    break;
+                case DeleteStatusOverride:
+                    infoFromRegistry = getInstanceByAppAndId(appName, id, false);
+                    node.deleteStatusOverride(appName, id, infoFromRegistry);
+                    break;
+            }
+        } catch (Throwable t) {
+            logger.error("Cannot replicate information to {} for action {}", node.getServiceUrl(), action.name(), t);
+        } finally {
+            CurrentRequestVersion.remove();
+        }
+    }
+```
+
+从缓存中取出所有的相邻节点列表，循环列表，给每个服务发送消息，发送消息的代码被单独抽取出来了，多个地方复用。
 
 
 
+总结一下注册接口做了哪些操作
 
+- 接口参数校验
+- 进行注册流程
+  - 从核心容器中取出对应客户端对象，没有则新建
+  - 重新计算各种超时时间
+  - 把客户端对象对象重新保存到容器中去
+  - 把客户端对象加入最近注册队列、变更队列中去
+  - 失效缓存
+- 把注册好的信息同步给相邻的服务节点
 
 
 
@@ -854,6 +936,14 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 ### 下线
 
 // todo
+
+
+
+
+
+## 多级缓存
+
+//todo 同步readWriteCacheMap到readOnlyCacheMap
 
 
 
