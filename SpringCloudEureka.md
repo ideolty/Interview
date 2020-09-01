@@ -1107,7 +1107,7 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
     }
 ```
 
-续约，成功续约后判断一下是否要重新更新客户端。
+续约，成功续约后判断一下是否要重新更新客户端状态。
 
 
 
@@ -1209,13 +1209,22 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
                 }
             }
             renewsLastMin.increment();
+          	// renew的操作其实就是更新一下最后update时间戳
+          	// lastUpdateTimestamp = System.currentTimeMillis() + duration;
             leaseToRenew.renew();
             return true;
         }
     }
 ```
 
+1. 从缓存中取出对应instance的租约信息，如果没有就新建。
+2. 判断目标租约的状态（没看懂这状态是怎么取的，干什么用的）。
+3. 更新核心容器中租约信息。
+4. 更新租约中的最近更新时间戳。
 
+
+
+看完了`com.netflix.eureka.registry.AbstractInstanceRegistry#renew`方法的实现细节，回到`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl#renew`方法，如果续租成功，则还需要调用`replicateToPeers`方法，通知相邻的节点。`replicateToPeers`方法大家都是共用一个，与注册接口时调用的是同一个方法`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl#replicateToPeers`。
 
 
 
