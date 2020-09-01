@@ -1062,17 +1062,160 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 
 
 
-
-
-// todo 双缓存，双缓存数据同步
-
-
-
-
-
 ### 服务续约
 
-//todo 
+根据官方提供的url定位到`InstanceResource`类
+
+`com.netflix.eureka.resources.InstanceResource#renewLease`
+
+```java
+		@PUT
+    public Response renewLease(
+            @HeaderParam(PeerEurekaNode.HEADER_REPLICATION) String isReplication,
+            @QueryParam("overriddenstatus") String overriddenStatus,
+            @QueryParam("status") String status,
+            @QueryParam("lastDirtyTimestamp") String lastDirtyTimestamp) {
+      	// 判断消息是client发的还是相邻的server发的
+        boolean isFromReplicaNode = "true".equals(isReplication);
+      	// 续约
+        boolean isSuccess = registry.renew(app.getName(), id, isFromReplicaNode);
+
+        // Not found in the registry, immediately ask for a register
+        if (!isSuccess) {
+            logger.warn("Not Found (Renew): {} - {}", app.getName(), id);
+            return Response.status(Status.NOT_FOUND).build();
+        }
+        // Check if we need to sync based on dirty time stamp, the client
+        // instance might have changed some value
+      	// 翻译一下 判断是否需要同步客户端的信息，在脏时间的范围内，客户端信息有可能会变
+        Response response;
+        if (lastDirtyTimestamp != null && serverConfig.shouldSyncWhenTimestampDiffers()) {
+            response = this.validateDirtyTimestamp(Long.valueOf(lastDirtyTimestamp), isFromReplicaNode);
+            // Store the overridden status since the validation found out the node that replicates wins
+            if (response.getStatus() == Response.Status.NOT_FOUND.getStatusCode()
+                    && (overriddenStatus != null)
+                    && !(InstanceStatus.UNKNOWN.name().equals(overriddenStatus))
+                    && isFromReplicaNode) {
+              	// 保存更新客户端状态
+                registry.storeOverriddenStatusIfRequired(app.getAppName(), id, InstanceStatus.valueOf(overriddenStatus));
+            }
+        } else {
+            response = Response.ok().build();
+        }
+        logger.debug("Found (Renew): {} - {}; reply status={}", app.getName(), id, response.getStatus());
+        return response;
+    }
+```
+
+续约，成功续约后判断一下是否要重新更新客户端。
+
+
+
+还是重点关注`renew`方法。
+
+`org.springframework.cloud.netflix.eureka.server.InstanceRegistry#renew`
+
+```java
+	@Override
+	public boolean renew(final String appName, final String serverId,
+			boolean isReplication) {
+		log("renew " + appName + " serverId " + serverId + ", isReplication {}"
+				+ isReplication);
+    //从缓存中拿到所有的服务信息
+		List<Application> applications = getSortedApplications();
+		for (Application input : applications) {
+      // 判断心跳是从哪个服务发来的
+			if (input.getName().equals(appName)) {
+				InstanceInfo instance = null;
+				for (InstanceInfo info : input.getInstances()) {
+          // 判断心跳是服务中的哪台实例发来的
+					if (info.getId().equals(serverId)) {
+						instance = info;
+						break;
+					}
+				}
+        // 往消息总线中发条消息
+				publishEvent(new EurekaInstanceRenewedEvent(this, appName, serverId,
+						instance, isReplication));
+				break;
+			}
+		}
+    // 调用Netflix原生的实现
+		return super.renew(appName, serverId, isReplication);
+	}
+```
+
+1. 拿到本地缓存的所有应用信息。
+2. 判断是缓存中的哪一个应用、哪一个实例发的心跳。
+3. 往spring cloud消息总线中发一条消息
+4. 调用父类Netflix原生的方法实现
+
+
+
+`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl#renew`
+
+```java
+    public boolean renew(final String appName, final String id, final boolean isReplication) {
+      	// 调用父类抽象类中的具体实现
+        if (super.renew(appName, id, isReplication)) {
+          	// 如果本地续约成功，则通知集群中相邻的节点
+            replicateToPeers(Action.Heartbeat, appName, id, null, null, isReplication);
+            return true;
+        }
+        return false;
+    }
+```
+
+
+
+父类中的方法才是最终本地续约的实现
+
+`com.netflix.eureka.registry.AbstractInstanceRegistry#renew`
+
+```java
+    public boolean renew(String appName, String id, boolean isReplication) {
+      	// 续约次数自增
+        RENEW.increment(isReplication);
+      	// 从核心的缓存容器中取出对应的instance
+        Map<String, Lease<InstanceInfo>> gMap = registry.get(appName);
+        Lease<InstanceInfo> leaseToRenew = null;
+        if (gMap != null) {
+            leaseToRenew = gMap.get(id);
+        }
+        if (leaseToRenew == null) {
+            RENEW_NOT_FOUND.increment(isReplication);
+            logger.warn("DS: Registry: lease doesn't exist, registering resource: {} - {}", appName, id);
+            return false;
+        } else {
+            InstanceInfo instanceInfo = leaseToRenew.getHolder();
+            if (instanceInfo != null) {
+                // touchASGCache(instanceInfo.getASGName());
+                InstanceStatus overriddenInstanceStatus = this.getOverriddenInstanceStatus(
+                        instanceInfo, leaseToRenew, isReplication);
+                if (overriddenInstanceStatus == InstanceStatus.UNKNOWN) {
+                    logger.info("Instance status UNKNOWN possibly due to deleted override for instance {}"
+                            + "; re-register required", instanceInfo.getId());
+                    RENEW_NOT_FOUND.increment(isReplication);
+                    return false;
+                }
+                if (!instanceInfo.getStatus().equals(overriddenInstanceStatus)) {
+                    logger.info(
+                            "The instance status {} is different from overridden instance status {} for instance {}. "
+                                    + "Hence setting the status to overridden status", instanceInfo.getStatus().name(),
+                                    instanceInfo.getOverriddenStatus().name(),
+                                    instanceInfo.getId());
+                    instanceInfo.setStatusWithoutDirty(overriddenInstanceStatus);
+
+                }
+            }
+            renewsLastMin.increment();
+            leaseToRenew.renew();
+            return true;
+        }
+    }
+```
+
+
 
 
 
