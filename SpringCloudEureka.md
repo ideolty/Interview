@@ -26,11 +26,11 @@
 
 **Server**
 
-- [x] eureka server启动：注册中心
-- [ ] eureka server集群：注册表的同步，多级队列的任务批处理机制 
+- eureka server启动：注册中心
+- eureka server集群：注册表的同步，多级队列的任务批处理机制 
 
-- [ ] 服务故障：expiration，eviction 
-- [ ] 自我保护：自动识别eureka server出现网络故障了 
+- 服务故障：expiration，eviction 
+- 自我保护：自动识别eureka server出现网络故障了 
 
 
 
@@ -1477,7 +1477,9 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 
 ## 多级缓存
 
-//todo 同步readWriteCacheMap到readOnlyCacheMap
+通常我们说有三级缓存，数据的流向是`registry` -> `readWriteCacheMap` ->`readOnlyCacheMap`，`registry`也就是常说的核心容器，eureka把所有的注册信息都保存在这个Map中了
+
+同步readWriteCacheMap到readOnlyCacheMap
 
 
 
@@ -1511,7 +1513,7 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 
 [eureka(三)-注册中心之多级缓存机制](https://www.jianshu.com/p/22219408b382)
 
-
+[详解Eureka 缓存机制](https://www.cnblogs.com/shihaiming/p/11590748.html) 		
 
 
 
@@ -2146,10 +2148,6 @@ InstanceInfo复制器
         }
     }
 ```
-
-
-
-
 
 
 
