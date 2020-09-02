@@ -36,12 +36,12 @@
 
 **Client**
 
-- [x] eureka client启动：服务实例
-- [x] 服务注册：系统启动时，状态改变监听器触发。定时任务，状态改变触发
-- [x] 全量拉取注册表：多级缓存机制
-- [x] 增量拉取注册表：一致性hash比对机制
-- [x] 心跳机制：服务续约，renew
-- [x] 服务下线：cancel
+- eureka client启动：服务实例
+- 服务注册：系统启动时，状态改变监听器触发。定时任务，状态改变触发
+- 全量拉取注册表：多级缓存机制
+- 增量拉取注册表：一致性hash比对机制
+- 心跳机制：服务续约，renew
+- 服务下线：cancel
 
 
 
@@ -281,13 +281,9 @@ public class Applications {
 
 
 
-
-
 `com.netflix.eureka.EurekaServerConfig`
 
 他是一个接口，定义了一些值得get方法。一般使用EurekaServerConfigBean作为具体实现类，用来读取配置文件中eureka.server开头的配置
-
-
 
 
 
@@ -296,6 +292,37 @@ public class Applications {
 这是两个逻辑概念，可以把`region`简单的理解为地区，而`zone`理解为一个机房。一个`region`可以有多个`zone`，一个`zone`内有多个`eureka server`
 
 [eureka分区的深入讲解](https://www.cnblogs.com/itplay/p/9973977.html)
+
+
+
+`com.netflix.appinfo.InstanceInfo.InstanceStatus`
+
+```java
+    public enum InstanceStatus {
+        UP, // Ready to receive traffic
+        DOWN, // Do not send traffic- healthcheck callback failed
+        STARTING, // Just about starting- initializations to be done - do not
+        // send traffic
+        OUT_OF_SERVICE, // Intentionally shutdown for traffic
+        UNKNOWN;
+
+        public static InstanceStatus toEnum(String s) {
+            if (s != null) {
+                try {
+                    return InstanceStatus.valueOf(s.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    // ignore and fall through to unknown
+                    logger.debug("illegal argument supplied to InstanceStatus.valueOf: {}, defaulting to {}", s, UNKNOWN);
+                }
+            }
+            return UNKNOWN;
+        }
+    }
+```
+
+用于外部的一些操作，例如用于red/black部署的时候，先把指定服务设置为OUT_OF_SERVICE来故意关闭请求流量。
+
+
 
 
 
@@ -525,11 +552,74 @@ protected void initEurekaServerContext() throws Exception {
 
 往下看一下定时器中到底是如何清理过期的实例的。
 
-//todo
+`new EvictionTask()`方法中具体是现实
 
 `com.netflix.eureka.registry.AbstractInstanceRegistry#evict(long)`
 
+```java
+    public void evict(long additionalLeaseMs) {
+        logger.debug("Running the evict task");
 
+      	// 设置了开关 还可以关闭自动过期功能的
+        if (!isLeaseExpirationEnabled()) {
+            logger.debug("DS: lease expiration is currently disabled.");
+            return;
+        }
+
+        // We collect first all expired items, to evict them in random order. For large eviction sets,
+        // if we do not that, we might wipe out whole apps before self preservation kicks in. By randomizing it,
+        // the impact should be evenly distributed across all applications.
+        List<Lease<InstanceInfo>> expiredLeases = new ArrayList<>();
+      	// 遍历核心容器中的每个租约
+        for (Entry<String, Map<String, Lease<InstanceInfo>>> groupEntry : registry.entrySet()) {
+            Map<String, Lease<InstanceInfo>> leaseMap = groupEntry.getValue();
+            if (leaseMap != null) {
+                for (Entry<String, Lease<InstanceInfo>> leaseEntry : leaseMap.entrySet()) {
+                    Lease<InstanceInfo> lease = leaseEntry.getValue();
+                  	// 判断每个租约是否还有效
+                    if (lease.isExpired(additionalLeaseMs) && lease.getHolder() != null) {
+                        expiredLeases.add(lease);
+                    }
+                }
+            }
+        }
+
+        // To compensate for GC pauses or drifting local time, we need to use current registry size as a base for
+        // triggering self-preservation. Without that we would wipe out full registry.
+      	// 计算需要剔除的最小限制
+        int registrySize = (int) getLocalRegistrySize();
+        int registrySizeThreshold = (int) (registrySize * serverConfig.getRenewalPercentThreshold());
+        int evictionLimit = registrySize - registrySizeThreshold;
+
+      	// 并不是把所有需要剔除的实例一口气全部剔除，而是有一个最小阈值
+        int toEvict = Math.min(expiredLeases.size(), evictionLimit);
+        if (toEvict > 0) {
+            logger.info("Evicting {} items (expired={}, evictionLimit={})", toEvict, expiredLeases.size(), evictionLimit);
+
+            Random random = new Random(System.currentTimeMillis());
+            for (int i = 0; i < toEvict; i++) {
+                // Pick a random item (Knuth shuffle algorithm)
+              	// 随机混淆待T除的集合
+                int next = i + random.nextInt(expiredLeases.size() - i);
+                Collections.swap(expiredLeases, i, next);
+                Lease<InstanceInfo> lease = expiredLeases.get(i);
+
+                String appName = lease.getHolder().getAppName();
+                String id = lease.getHolder().getId();
+                EXPIRED.increment();
+                logger.warn("DS: Registry: expired lease for {}/{}", appName, id);
+              	// 调用下线方法
+                internalCancel(appName, id, false);
+            }
+        }
+    }
+```
+
+1. 检查下线开关是否打开
+2. 遍历核心容器中的每个租约，检查是否过期，标准是`(evictionTimestamp > 0 || System.currentTimeMillis() > (lastUpdateTimestamp + duration + additionalLeaseMs));`当前时间 > 最后更新时间 + 更新周期 + 额外的补偿时间。这个补偿时间是用来补偿类似与gc用时之类的。
+3. 把需要剔除的租约加入一个临时集合中。
+4. 计算剔除最大阈值，为了安全期间不会一次性把所有的租约都剔除了，因为可能是server服务器自己的网络出现了抖动之类的问题。
+5. 把待剔除集合随机打乱，取出随机的一个租约，把它踢下线。
 
 
 
@@ -1230,7 +1320,156 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 
 ### 下线
 
-// todo
+根据官方提供的url定位到`InstanceResource`类
+
+`com.netflix.eureka.resources.InstanceResource#cancelLease`
+
+```java
+    @DELETE
+    public Response cancelLease(
+            @HeaderParam(PeerEurekaNode.HEADER_REPLICATION) String isReplication) {
+        try {
+          	// 调用registry的下线方法
+            boolean isSuccess = registry.cancel(app.getName(), id,
+                "true".equals(isReplication));
+
+            if (isSuccess) {
+                logger.debug("Found (Cancel): {} - {}", app.getName(), id);
+                return Response.ok().build();
+            } else {
+                logger.info("Not Found (Cancel): {} - {}", app.getName(), id);
+                return Response.status(Status.NOT_FOUND).build();
+            }
+        } catch (Throwable e) {
+            logger.error("Error (cancel): {} - {}", app.getName(), id, e);
+            return Response.serverError().build();
+        }
+
+    }
+```
+
+调用`registry`方法的下线功能，后面又是老一套了。
+
+
+
+先调用spring cloud自己的包装类
+
+`org.springframework.cloud.netflix.eureka.server.InstanceRegistry#cancel`
+
+```java
+	@Override
+	public boolean cancel(String appName, String serverId, boolean isReplication) {
+    // 发送总线消息
+		handleCancelation(appName, serverId, isReplication);
+    // 调用父类的具体方法
+		return super.cancel(appName, serverId, isReplication);
+	}
+
+	private void handleCancelation(String appName, String id, boolean isReplication) {
+		log("cancel " + appName + ", serverId " + id + ", isReplication "
+				+ isReplication);
+		publishEvent(new EurekaInstanceCanceledEvent(this, appName, id, isReplication));
+	}
+```
+
+还是spring cloud自己加了个包装类，在下线操作之前，往消息总线中发送消息，之后调用原生的实现方法。
+
+
+
+`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl#cancel`
+
+```java
+    @Override
+    public boolean cancel(final String appName, final String id,
+                          final boolean isReplication) {
+      	// 调用抽象类中下线方法
+        if (super.cancel(appName, id, isReplication)) {
+          	// 同步给相邻节点
+            replicateToPeers(Action.Cancel, appName, id, null, null, isReplication);
+
+            return true;
+        }
+        return false;
+    }
+```
+
+与之前的套路完全相同，先调用抽象类中下线方法，如果没有报错则把下线的消息同步给相邻的server节点，`replicateToPeers`方法也是用的同一个。
+
+
+
+`com.netflix.eureka.registry.AbstractInstanceRegistry#cancel`
+
+```java
+    @Override
+    public boolean cancel(String appName, String id, boolean isReplication) {
+        return internalCancel(appName, id, isReplication);
+    }
+
+    protected boolean internalCancel(String appName, String id, boolean isReplication) {
+        try {
+          	// 加读锁
+            read.lock();
+            CANCEL.increment(isReplication);
+          	// 从核心容器中拿到相应的租约信息 
+            Map<String, Lease<InstanceInfo>> gMap = registry.get(appName);
+            Lease<InstanceInfo> leaseToCancel = null;
+            if (gMap != null) {
+              	// 移除指定instance的租约信息
+                leaseToCancel = gMap.remove(id);
+            }
+          	// 往最近下线的队列中添加消息
+            recentCanceledQueue.add(new Pair<Long, String>(System.currentTimeMillis(), appName + "(" + id + ")"));
+          	// 从实例状态缓存容器中移除
+            InstanceStatus instanceStatus = overriddenInstanceStatusMap.remove(id);
+            if (instanceStatus != null) {
+                logger.debug("Removed instance id {} from the overridden map which has value {}", id, instanceStatus.name());
+            }
+            if (leaseToCancel == null) {
+                CANCEL_NOT_FOUND.increment(isReplication);
+                logger.warn("DS: Registry: cancel failed because Lease is not registered for: {}/{}", appName, id);
+                return false;
+            } else {
+              	// 更新evictionTimestamp字段
+                leaseToCancel.cancel();
+                InstanceInfo instanceInfo = leaseToCancel.getHolder();
+                String vip = null;
+                String svip = null;
+                if (instanceInfo != null) {
+                  	// 维护实例状态 现在还在维护状态还有什么意义吗？
+                    instanceInfo.setActionType(ActionType.DELETED);
+                    recentlyChangedQueue.add(new RecentlyChangedItem(leaseToCancel));
+                    instanceInfo.setLastUpdatedTimestamp();
+                    vip = instanceInfo.getVIPAddress();
+                    svip = instanceInfo.getSecureVipAddress();
+                }
+              	// 失效缓存
+                invalidateCache(appName, vip, svip);
+                logger.info("Cancelled instance {}/{} (replication={})", appName, id, isReplication);
+            }
+        } finally {
+            read.unlock();
+        }
+
+      	// 更新一下每分钟心跳的阈值 这其实是属于自我保护机制的一部分 防止一个服务反复的上下线
+        synchronized (lock) {
+            if (this.expectedNumberOfClientsSendingRenews > 0) {
+                // Since the client wants to cancel it, reduce the number of clients to send renews.
+                this.expectedNumberOfClientsSendingRenews = this.expectedNumberOfClientsSendingRenews - 1;
+                updateRenewsPerMinThreshold();
+            }
+        }
+
+        return true;
+    }
+```
+
+其实下线的流程与注册的流程高度相似。
+
+1. 首先尝试从缓存中取出目标对象
+2. 从`registry`、`overriddenInstanceStatusMap`各种容器中移除。
+3. 把当前实例加入`recentCanceledQueue`队列中，同时也加入`recentlyChangedQueue`队列中
+4. 失效缓存，这也是重点方法，与接口注册时调用的同一个失效方法。
+5. 更新每分钟心跳的阈值，实现eureka相关自我保护功能。
 
 
 
@@ -1864,7 +2103,7 @@ InstanceInfo复制器
 
 
 
-## 注销
+## 下线
 
 注销方法通过标签`@PreDestroy`触发
 
