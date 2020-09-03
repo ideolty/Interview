@@ -4,7 +4,7 @@
 
 
 
-结合springcloud框架一起看更加贴合实际情况，使用的版本为
+结合springcloud框架一起看，更加贴合实际情况，使用的版本为
 
 ```pom
     <properties>
@@ -196,8 +196,6 @@
 
 
 
-
-
 `com.netflix.eureka.lease.Lease`
 
 一个包装类，`Lease<InstanceInfo>`用来简单记录一个实例的租约信息
@@ -220,8 +218,6 @@
 
 
 
-
-
 `com.netflix.discovery.shared.Application`
 
 应用信息。在微服务下，同一个应用会有很多的实例，用来保证服务的高可用。换着花样存储了3份`instance`信息
@@ -237,8 +233,6 @@
 
     private final Map<String, InstanceInfo> instancesMap;
 ```
-
-
 
 
 
@@ -336,7 +330,7 @@ public class Applications {
 
 一切的起点是从主类上的标签`@EnableEurekaServer`开始，但是spring cloud中基本上都是一样的逻辑，所以依照惯例，找到`spring-cloud-netflix-eureka-server-2.2.3.RELEASE.jar`包中的`spring.factories`文件，找到server启动流程的入口类`org.springframework.cloud.netflix.eureka.server.EurekaServerAutoConfiguration`。观察到类的上方通过`@Import(EurekaServerInitializerConfiguration.class)`标签注入了一个类，这个配置类实现了`ServletContextAware, SmartLifecycle`两个接口，所以主要看一下start方法中的内容。
 
-初始化主要的内容是在`EurekaServerInitializerConfiguration`中。`EurekaServerAutoConfiguration`类中定义了大量的bean，加载了各种地方的参数到上下文中。
+初始化主要的内容是在`EurekaServerInitializerConfiguration`中。`EurekaServerAutoConfiguration`类中定义了大量的bean，加载了各种参数到上下文中。
 
 
 
@@ -548,11 +542,9 @@ protected void initEurekaServerContext() throws Exception {
 
 
 
-
-
 往下看一下定时器中到底是如何清理过期的实例的。
 
-`new EvictionTask()`方法中具体是现实
+`new EvictionTask()`方法中是具体现实
 
 `com.netflix.eureka.registry.AbstractInstanceRegistry#evict(long)`
 
@@ -620,6 +612,21 @@ protected void initEurekaServerContext() throws Exception {
 3. 把需要剔除的租约加入一个临时集合中。
 4. 计算剔除最大阈值，为了安全期间不会一次性把所有的租约都剔除了，因为可能是server服务器自己的网络出现了抖动之类的问题。
 5. 把待剔除集合随机打乱，取出随机的一个租约，把它踢下线。
+6. 下线方法`internalCancel`与后面api接口中的下线是调用的同一个方法。
+
+
+
+###  总结
+
+1. 在启动的过程中使用@import标签引入了一个主要干活的类`EurekaServerInitializerConfiguration.class`
+
+2. 类中首先从各种地方读取参数，配置文件，环境变量等等。
+
+3. 从集群相邻节点中拉取客户端信息，注册到本地。
+
+4. 修改eureka状态为up。创建定时任务，用于清理 60秒没有心跳的客户端，自动下线。同时默认每30秒发送心跳， 
+
+
 
 
 
@@ -645,8 +652,6 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 | Update metadata                                              | PUT /eureka/v2/apps/**appID**/**instanceID**/metadata?key=value | HTTP Code:  * 200 on success  * 500 on failure               |
 | Query for all instances under a particular **vip address**   | GET /eureka/v2/vips/**vipAddress**                           | * HTTP Code: 200 on success Output: JSON/XML   * 404 if the **vipAddress** does not exist. |
 | Query for all instances under a particular **secure vip address** | GET /eureka/v2/svips/**svipAddress**                         | * HTTP Code: 200 on success Output: JSON/XML   * 404 if the **svipAddress** does not exist. |
-
-
 
 
 
@@ -706,7 +711,7 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
     }
 ```
 
-由于使用的cloud框架所以`PeerAwareInstanceRegistry`的具体实现类是`org.springframework.cloud.netflix.eureka.server.InstanceRegistry`，但是这个类继承自eureka的原生实现类`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl`，spring在此基础上只增加了一个发布消息的功能。
+由于使用的cloud框架所以`PeerAwareInstanceRegistry`的具体实现类是`org.springframework.cloud.netflix.eureka.server.InstanceRegistry`，但是这个类继承自eureka的原生实现类`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl`，spring cloud在此基础上只增加了一个发布消息的功能。
 
 
 
@@ -724,6 +729,7 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 		log("register " + info.getAppName() + ", vip " + info.getVIPAddress()
 				+ ", leaseDuration " + leaseDuration + ", isReplication "
 				+ isReplication);
+    // 往消息总线中发条消息
 		publishEvent(new EurekaInstanceRegisteredEvent(this, info, leaseDuration,
 				isReplication));
 	}
@@ -1651,22 +1657,6 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 
 
 
-
-
-## 总结
-
-1. 在启动的过程中使用@import标签引入了一个主要干活的类`EurekaServerInitializerConfiguration.class`
-
-2. 类中首先从各种地方读取参数，配置文件，环境变量等等。
-
-3. 从集群相邻节点中拉取客户端信息，注册到本地。
-
-4. 修改eureka状态为up。创建定时任务，用于清理 60秒没有心跳的客户端，自动下线。同时默认每30秒发送心跳， 
-
-   
-
-
-
 ## 参考
 
 [Eureka服务端源码流程梳理](https://www.cnblogs.com/nijunyang/p/10745730.html)
@@ -1676,8 +1666,6 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 [Spring Cloud Eureka源代码解析（1）Eureka启动，原生启动与SpringCloudEureka启动异同](https://my.oschina.net/u/3747772/blog/1588933)(学习如何写胶水代码，也就是autoConfig类，把servlet项目合并到springcloud中)
 
 [eureka rest api](https://www.jianshu.com/p/c24e622f3f45)
-
-
 
 [eureka(三)-注册中心之多级缓存机制](https://www.jianshu.com/p/22219408b382)
 
@@ -1853,8 +1841,6 @@ org.springframework.cloud.netflix.eureka.config.EurekaConfigServerBootstrapConfi
 
 ```
 
-
-
 要记住的主要工作有2个：
 
 1. 定义了发送心跳的定时任务，定义了刷新本地缓存的定时任务
@@ -1963,8 +1949,6 @@ org.springframework.cloud.netflix.eureka.config.EurekaConfigServerBootstrapConfi
         }
     }
 ```
-
-
 
 到此为止，client端的启动流程主体就完成了，一般的面试也就问到这种程度就过了，但是架不住就是有一些面试官喜欢一条路问到底的。所以针对3个主要逻辑，看看一下他的具体实现。
 
@@ -2234,8 +2218,6 @@ org.springframework.cloud.netflix.eureka.config.EurekaConfigServerBootstrapConfi
 
 
 
-
-
 #### instanceInfoReplicator
 
 InstanceInfo复制器
@@ -2270,6 +2252,16 @@ InstanceInfo复制器
 3. 上报信息是直接把自身的`instanceInfo`对象整个传给server端。
 
 
+
+### 总结
+
+1. 从入口`EurekaClientAutoConfiguration`开始流程，创建eureka客户端。
+2. 客户端中创建了3个周期运行的定时任务
+   1. 默认每隔30秒从服务器定时拉取注册信息，从server端获取到一个`com.netflix.discovery.shared.Applications`对象。
+   2. 默认每隔30秒给服务器发送心跳信息。
+   3. 默认每隔30秒检查自身的信息是否变化，有变化则上报给服务器，上报时会把自身`com.netflix.appinfo.InstanceInfo`对象传递过去。
+
+3. 注销的时候，关闭各种线程池，取消各种监听器，向服务器发一条下线消息。
 
 
 
@@ -2317,21 +2309,9 @@ InstanceInfo复制器
     }
 ```
 
-
-
-## 总结
-
-1. 从入口`EurekaClientAutoConfiguration`开始流程，创建eureka客户端。
-2. 客户端中创建了3个周期运行的定时任务
-   1. 默认每隔30秒从服务器定时拉取注册信息，从server端获取到一个`com.netflix.discovery.shared.Applications`对象。
-   2. 默认每隔30秒给服务器发送心跳信息。
-   3. 默认每隔30秒检查自身的信息是否变化，有变化则上报给服务器，上报时会把自身`com.netflix.appinfo.InstanceInfo`对象传递过去。
-
-3. 注销的时候，关闭各种线程池，取消各种监听器，向服务器发一条下线消息。
-
-
-
-
+1. 从容器map中移除状态变化监听器。
+2. 取消之前创建的几个线程池，关闭定时任务。
+3. 向server端发送下线消息。
 
 
 
@@ -2342,8 +2322,6 @@ InstanceInfo复制器
 [Eureka客户端源码流程梳理](https://www.cnblogs.com/nijunyang/p/10805759.html)
 
 [Spring Cloud Eureka 全解 （4） - 核心流程-服务与实例列表获取详解](https://zhuanlan.zhihu.com/p/34976352)
-
-
 
 [eureka服务注册于发现流程](https://blog.csdn.net/majinan3456/article/details/99563501?utm_medium=distribute.pc_aggpage_search_result.none-task-blog-2~all~top_click~default-1-99563501.nonecase)
 
