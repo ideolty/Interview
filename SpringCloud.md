@@ -1,5 +1,15 @@
 # 综述
 
+在日常的工作中，一般都是使用springcloud整合好的框架，但是这些组件肯定是可以单独部署使用的。
+
+Eureka一开始本来就是基于jersey容器来提供api接口的。
+
+如果不打算引入spring，OpenFegin完全不需要用，压根就不需要支持那些标签，直接写fegin原生就行了。
+
+但是，目前来说使用spring全家桶是业内常态了，面试与日常工作中最常接触到的也就是这种了，所以后续的分析都是基于全家桶来展开。
+
+
+
 大量参考了↓
 
 [史上最简单的 SpringCloud 教程 | 终章](https://blog.csdn.net/forezp/article/details/70148833)
