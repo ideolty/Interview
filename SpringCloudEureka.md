@@ -1477,9 +1477,177 @@ Eureka 使用Jersey作为servlet容器，提供rest服务，使用了`javax.ws.r
 
 ## 多级缓存
 
-通常我们说有三级缓存，数据的流向是`registry` -> `readWriteCacheMap` ->`readOnlyCacheMap`，`registry`也就是常说的核心容器，eureka把所有的注册信息都保存在这个Map中了
+通常我们说有三级缓存，数据的流向是`registry` -> `readWriteCacheMap` ->`readOnlyCacheMap`，`registry`也就是常说的核心容器，eureka把所有的注册信息都保存在这个Map中了。
 
-同步readWriteCacheMap到readOnlyCacheMap
+默认情况下定时任务每**30s**将readWriteCacheMap同步至readOnlyCacheMap，每**60s**清理超过**90s**未续约的节点，Eureka Client每**30s**从readOnlyCacheMap更新服务注册信息，而UI则从registry更新服务注册信息。
+
+如果没有使用亚马逊的数据源的话，缓存初始化流程由`@PostConstruct`标签自动触发
+
+`com.netflix.eureka.DefaultEurekaServerContext#initialize`
+
+```java
+    @PostConstruct
+    @Override
+    public void initialize() {
+        logger.info("Initializing ...");
+      	// 创建定时任务去更新相邻节点
+        peerEurekaNodes.start();
+        try {
+          	// 开始初始化操作
+            registry.init(peerEurekaNodes);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        logger.info("Initialized");
+    }
+```
+
+1. 创建定时任务去更新相邻节点的方法不打算去看了，基本上也用不上。
+2. 第二步调用`PeerAwareInstanceRegistryImpl`类的初始化方法。
+
+
+
+`com.netflix.eureka.registry.PeerAwareInstanceRegistryImpl#init`
+
+```java
+    @Override
+    public void init(PeerEurekaNodes peerEurekaNodes) throws Exception {
+      	// 启动一个定时任务 用来在最近几毫秒中得到一个count
+        this.numberOfReplicationsLastMin.start();
+        this.peerEurekaNodes = peerEurekaNodes;
+      	// 初始化缓存
+        initializedResponseCache();
+      	// 开启一个定时刷新 心跳阈值 的定时任务
+        scheduleRenewalThresholdUpdateTask();
+      	// 初始化RemoteRegion
+        initRemoteRegionRegistry();
+
+        try {
+            Monitors.registerObject(this);
+        } catch (Throwable e) {
+            logger.warn("Cannot register the JMX monitor for the InstanceRegistry :", e);
+        }
+    }
+
+```
+
+1. 首先启动一个定时任务，初始化一个工具。
+2. 正式的初始化那2个缓存容器。
+3. 开启一个定时刷新 心跳阈值 的定时任务。
+4. 初始化了2个容器，没去深究这是干嘛用的。
+
+这里的重点是缓存容器的初始化，其他的就不细究了。
+
+
+
+`com.netflix.eureka.registry.AbstractInstanceRegistry#initializedResponseCache`
+
+```java
+    @Override
+    public synchronized void initializedResponseCache() {
+        if (responseCache == null) {
+            responseCache = new ResponseCacheImpl(serverConfig, serverCodecs, this);
+        }
+    }
+```
+
+调用了父类中的初始化方法，new了一个`ResponseCacheImpl`对象。
+
+重点关注一下构造方法。
+
+
+
+`com.netflix.eureka.registry.ResponseCacheImpl#ResponseCacheImpl`
+
+```java
+    private final ConcurrentMap<Key, Value> readOnlyCacheMap = new ConcurrentHashMap<Key, Value>();
+
+    private final LoadingCache<Key, Value> readWriteCacheMap;
+
+		ResponseCacheImpl(EurekaServerConfig serverConfig, ServerCodecs serverCodecs, AbstractInstanceRegistry registry) {
+        this.serverConfig = serverConfig;
+        this.serverCodecs = serverCodecs;
+        this.shouldUseReadOnlyResponseCache = serverConfig.shouldUseReadOnlyResponseCache();
+        this.registry = registry;
+
+      	// 缓存更新间隔 默认30s
+        long responseCacheUpdateIntervalMs = serverConfig.getResponseCacheUpdateIntervalMs();
+        this.readWriteCacheMap =
+                CacheBuilder.newBuilder().initialCapacity(serverConfig.getInitialCapacityOfResponseCache())
+          							// 默认180s后过期
+                        .expireAfterWrite(serverConfig.getResponseCacheAutoExpirationInSeconds(), TimeUnit.SECONDS)
+                        .removalListener(new RemovalListener<Key, Value>() {
+                            @Override
+                            public void onRemoval(RemovalNotification<Key, Value> notification) {
+                                Key removedKey = notification.getKey();
+                                if (removedKey.hasRegions()) {
+                                    Key cloneWithNoRegions = removedKey.cloneWithoutRegions();
+                                    regionSpecificKeys.remove(cloneWithNoRegions, removedKey);
+                                }
+                            }
+                        })
+                        .build(new CacheLoader<Key, Value>() {
+                            @Override
+                            public Value load(Key key) throws Exception {
+                                if (key.hasRegions()) {
+                                    Key cloneWithNoRegions = key.cloneWithoutRegions();
+                                    regionSpecificKeys.put(cloneWithNoRegions, key);
+                                }
+                              	// 加载value值
+                                Value value = generatePayload(key);
+                                return value;
+                            }
+                        });
+				// 如果启用三级缓存
+        if (shouldUseReadOnlyResponseCache) {
+          	// 启动一个定时任务 定时同步两个缓存
+            timer.schedule(getCacheUpdateTask(),
+                    new Date(((System.currentTimeMillis() / responseCacheUpdateIntervalMs) * responseCacheUpdateIntervalMs)
+                            + responseCacheUpdateIntervalMs),
+                    responseCacheUpdateIntervalMs);
+        }
+
+        try {
+            Monitors.registerObject(this);
+        } catch (Throwable e) {
+            logger.warn("Cannot register the JMX monitor for the InstanceRegistry", e);
+        }
+    }
+
+		// 定时同步两个缓存
+    private TimerTask getCacheUpdateTask() {
+        return new TimerTask() {
+            @Override
+            public void run() {
+                logger.debug("Updating the client cache from response cache");
+              	// 遍历readOnlyCacheMap
+                for (Key key : readOnlyCacheMap.keySet()) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Updating the client cache from response cache for key : {} {} {} {}",
+                                key.getEntityType(), key.getName(), key.getVersion(), key.getType());
+                    }
+                    try {
+                      	// 比较两个缓存容器中的value是否相同 如果不同则把readOnlyCacheMap中的覆盖了
+                        CurrentRequestVersion.set(key.getVersion());
+                        Value cacheValue = readWriteCacheMap.get(key);
+                        Value currentCacheValue = readOnlyCacheMap.get(key);
+                        if (cacheValue != currentCacheValue) {
+                            readOnlyCacheMap.put(key, cacheValue);
+                        }
+                    } catch (Throwable th) {
+                        logger.error("Error while updating the client cache from response cache for key {}", key.toStringCompact(), th);
+                    } finally {
+                        CurrentRequestVersion.remove();
+                    }
+                }
+            }
+        };
+    }
+```
+
+1. `readWriteCacheMap`用的是google gauva的缓存，过期时间为**180s**。而`readOnlyCacheMap`只读缓存只是一个ConcurrentMap。
+2. `readWriteCacheMap`的数据加载是调用的`generatePayload`方法，这个方法按照获取的条件把`Applications`对象给序列化了。
+3. 启动一个定时任务 定时同步两个缓存，默认时间30s，同步的规则是一个个key去对比。
 
 
 
