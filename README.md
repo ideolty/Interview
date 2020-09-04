@@ -28,7 +28,7 @@
 - [Spring Boot](https://github.com/ideolty/Interview/blob/master/SpringBoot.md)
 - [Spring Cloud](https://github.com/ideolty/Interview/blob/master/SpringCloud.md)
   - [Eureka](https://github.com/ideolty/Interview/blob/master/SpringCloudEureka.md)
-  - OpenFeign
+  - [OpenFeign](https://github.com/ideolty/Interview/blob/master/OpenFeign.md)
   - Hystrix
   - Ribbon
 - Spring Data JPA
