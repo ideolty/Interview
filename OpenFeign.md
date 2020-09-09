@@ -21,14 +21,30 @@
 在了解了基本的用法之后，还是先提出一些问题
 
 - 在接口上方加注解之后就能调用了，这是如何实现的。
+
+  原来类似与mybatis，在程序启动时生成代理对象，注入的实际是代理类。
+
+  
+
 - 与hystrix是如何适配的。
+
+  通过`org.springframework.cloud.openfeign.HystrixTargeter`类，绑定了`fallback`方法。并且重写了后续的方法增强类。
+
+  
+
 - 如何与ribbon适配，实现了请求重试、动态路由与负载均衡。
+
+  在加载client请求客户端的时候，如果有ribbon相关的包，则请求的是ribbon的具体实现`LoadBalancerFeignClient`，此类负责走ribbon相关的请求。
+
+  
+
+- openFeign是如何支撑spring原生的注解的
 
 
 
 # 启动流程
 
-//todo 看情况 是否需要一张流程图
+//todo 需要一张流程图 体现hystrix 与 ribbon
 
 
 
@@ -411,10 +427,13 @@ class DefaultTargeter implements Targeter {
 
 ```java
     public <T> T target(Target<T> target) {
+      // 这里其实是2个步，新实例化一个Feign实例，然后调用实例的newInstance方法 创建一个代理对象
       return build().newInstance(target);
     }
 
+		// 创建一个Feign实例对象
     public Feign build() {
+      // 有点复杂Capability.enrich方法没看懂
       Client client = Capability.enrich(this.client, capabilities);
       Retryer retryer = Capability.enrich(this.retryer, capabilities);
       List<RequestInterceptor> requestInterceptors = this.requestInterceptors.stream()
@@ -429,6 +448,7 @@ class DefaultTargeter implements Targeter {
           Capability.enrich(this.invocationHandlerFactory, capabilities);
       QueryMapEncoder queryMapEncoder = Capability.enrich(this.queryMapEncoder, capabilities);
 
+      // 动态代理的方法增强类
       SynchronousMethodHandler.Factory synchronousMethodHandlerFactory =
           new SynchronousMethodHandler.Factory(client, retryer, requestInterceptors, logger,
               logLevel, decode404, closeAfterDecode, propagationPolicy, forceDecoding);
@@ -439,7 +459,488 @@ class DefaultTargeter implements Targeter {
     }
 ```
 
+创建一个`Feign`接口的实例，并调用`newInstance`方法创建一个代理对象。
 
+
+
+详细看一下`ReflectiveFeign`对象
+
+`feign.ReflectiveFeign`
+
+```java
+  public <T> T newInstance(Target<T> target) {
+    //为每个方法创建一个SynchronousMethodHandler对象
+    Map<String, MethodHandler> nameToHandler = targetToHandlersByName.apply(target);
+    Map<Method, MethodHandler> methodToHandler = new LinkedHashMap<Method, MethodHandler>();
+    List<DefaultMethodHandler> defaultMethodHandlers = new LinkedList<DefaultMethodHandler>();
+
+    // 遍历原接口所有的方法，为每个方法绑定一个MethodHandler
+    for (Method method : target.type().getMethods()) {
+      if (method.getDeclaringClass() == Object.class) {
+        continue;
+      } else if (Util.isDefault(method)) {
+        //如果是 default 方法，用 DefaultHandler
+        DefaultMethodHandler handler = new DefaultMethodHandler(method);
+        defaultMethodHandlers.add(handler);
+        methodToHandler.put(method, handler);
+      } else {
+        //否则就用SynchronousMethodHandler
+        methodToHandler.put(method, nameToHandler.get(Feign.configKey(target.type(), method)));
+      }
+    }
+    // 创建动态代理handler，factory 是 InvocationHandlerFactory.Default
+    // 创建出来的是 ReflectiveFeign.FeignInvocationHanlder，也就是说后续对方法的调用都会进入到该对象的 inovke 方法。
+    InvocationHandler handler = factory.create(target, methodToHandler);
+    // 创建动态代理对象
+    T proxy = (T) Proxy.newProxyInstance(target.type().getClassLoader(),
+        new Class<?>[] {target.type()}, handler);
+
+    for (DefaultMethodHandler defaultMethodHandler : defaultMethodHandlers) {
+      defaultMethodHandler.bindTo(proxy);
+    }
+    return proxy;
+  }
+```
+
+1. 为接口中的每个方法创建对应的`MethodHandler`，并保持到映射集合中，这里创建的是实现类`SynchronousMethodHandler`
+2. 通过`InvocationHandlerFatory`，创建`InvocationHandler`
+3. 绑定接口的default方法，通过`DefaultMethodHandler`绑定，`DefaultMethodHandler`方法内部是直接调用原方法，这里一般是用不上的。因为是直接调用的接口，这些接口是没有具体的实现类的。
+
+
+
+跟进去`factory.create`方法，确定一下`InvocationHandler`接口的具体实现是什么。
+
+`feign.InvocationHandlerFactory`
+
+```java
+public interface InvocationHandlerFactory {
+
+  InvocationHandler create(Target target, Map<Method, MethodHandler> dispatch);
+
+  /**
+   * Like {@link InvocationHandler#invoke(Object, java.lang.reflect.Method, Object[])}, except for a
+   * single method.
+   */
+  interface MethodHandler {
+
+    Object invoke(Object[] argv) throws Throwable;
+  }
+
+  static final class Default implements InvocationHandlerFactory {
+
+    @Override
+    public InvocationHandler create(Target target, Map<Method, MethodHandler> dispatch) {
+      return new ReflectiveFeign.FeignInvocationHandler(target, dispatch);
+    }
+  }
+}
+
+```
+
+`InvocationHandlerFactory`工厂内定义了一个内部类，这个类是工厂的默认实现，`create`方法通过new的方式创建了一个`FeignInvocationHandler`对象。
+
+
+
+## FeignInvocationHandler
+
+所以当发起请求时，会调用到InvocaHandler的invoke方法，feign里面实现类是FeignInvocationHandler，invoke代码如下：
+
+`feign.ReflectiveFeign.FeignInvocationHandler#invoke`
+
+```java
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+      // 如果是调用的Object中的几个基础方法，则不做增强了
+      if ("equals".equals(method.getName())) {
+        try {
+          Object otherHandler =
+              args.length > 0 && args[0] != null ? Proxy.getInvocationHandler(args[0]) : null;
+          return equals(otherHandler);
+        } catch (IllegalArgumentException e) {
+          return false;
+        }
+      } else if ("hashCode".equals(method.getName())) {
+        return hashCode();
+      } else if ("toString".equals(method.getName())) {
+        return toString();
+      }
+
+      // 路由分发 找到调用方法对应的增强方法
+      return dispatch.get(method).invoke(args);
+    }
+```
+
+在代理类中对调用的方法进行分发，由于feign接口不会存在具体的实现类，所以不能直接调用`method.invoke`。
+
+
+
+接下来要看看方法增强具体做了些什么事。
+
+`feign.SynchronousMethodHandler#invoke`
+
+```java
+  public Object invoke(Object[] argv) throws Throwable {
+    // 根据请求参数构建一个RequestTemplate
+    RequestTemplate template = buildTemplateFromArgs.create(argv);
+    // 关于请求的一些参数 如超时时间
+    Options options = findOptions(argv);
+    Retryer retryer = this.retryer.clone();	
+    while (true) {
+      try {
+        return executeAndDecode(template, options);
+      } catch (RetryableException e) {
+        try {
+          retryer.continueOrPropagate(e);
+        } catch (RetryableException th) {
+          Throwable cause = th.getCause();
+          if (propagationPolicy == UNWRAP && cause != null) {
+            throw cause;
+          } else {
+            throw th;
+          }
+        }
+        if (logLevel != Logger.Level.NONE) {
+          logger.logRetry(metadata.configKey(), logLevel);
+        }
+        continue;
+      }
+    }
+  }
+
+
+
+  Object executeAndDecode(RequestTemplate template, Options options) throws Throwable {
+    Request request = targetRequest(template);
+
+    if (logLevel != Logger.Level.NONE) {
+      logger.logRequest(metadata.configKey(), logLevel, request);
+    }
+
+    Response response;
+    long start = System.nanoTime();
+    try {
+      // 发送请求
+      response = client.execute(request, options);
+      // ensure the request is set. TODO: remove in Feign 12
+      response = response.toBuilder()
+          .request(request)
+          .requestTemplate(template)
+          .build();
+    } catch (IOException e) {
+      if (logLevel != Logger.Level.NONE) {
+        logger.logIOException(metadata.configKey(), logLevel, e, elapsedTime(start));
+      }
+      throw errorExecuting(request, e);
+    }
+    long elapsedTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+		// 解码
+    if (decoder != null)
+      return decoder.decode(response, metadata.returnType());
+
+    CompletableFuture<Object> resultFuture = new CompletableFuture<>();
+    asyncResponseHandler.handleResponse(resultFuture, metadata.configKey(), response,
+        metadata.returnType(),
+        elapsedTime);
+
+    try {
+      if (!resultFuture.isDone())
+        throw new IllegalStateException("Response handling not done");
+
+      return resultFuture.join();
+    } catch (CompletionException e) {
+      Throwable cause = e.getCause();
+      if (cause != null)
+        throw cause;
+      throw e;
+    }
+  }
+```
+
+
+
+## 总结
+
+在调用的时候，最终调用的是代理类的增强方法，整体思路与mybatis是一样的。
+
+1. 首先autowire的时候是通过spring进行注入的，调用了对应的beanFactory，生成的是一个接口代理类。
+2. 此代理对接口的每个方法生成了一个对应的方法增强类，保存在一个map中。
+3. 当调用接口的具体方法，调用请求传递到代理类中，代理类对方法进行了一个手动路由到相应的方法增强类。
+4. 在方法增强类发起http请求。
+
+
+
+# Hystrix
+
+在调用的时候除了原生使用，还可以与`hystrix`结合使用。
+
+与原生的区别是在`org.springframework.cloud.openfeign.Targeter`接口的实现类上，hystrix有自己的实现
+
+
+
+`org.springframework.cloud.openfeign.HystrixTargeter#target`
+
+```java
+	public <T> T target(FeignClientFactoryBean factory, Feign.Builder feign,
+			FeignContext context, Target.HardCodedTarget<T> target) {
+		if (!(feign instanceof feign.hystrix.HystrixFeign.Builder)) {
+			return feign.target(target);
+		}
+		feign.hystrix.HystrixFeign.Builder builder = (feign.hystrix.HystrixFeign.Builder) feign;
+		String name = StringUtils.isEmpty(factory.getContextId()) ? factory.getName()
+				: factory.getContextId();
+		SetterFactory setterFactory = getOptional(name, context, SetterFactory.class);
+		if (setterFactory != null) {
+			builder.setterFactory(setterFactory);
+		}
+		Class<?> fallback = factory.getFallback();
+		if (fallback != void.class) {
+      // 如果@FeignClient标签的fallback属性不为空，则创建一个hystrix自己实现的类
+			return targetWithFallback(name, context, target, builder, fallback);
+		}
+		Class<?> fallbackFactory = factory.getFallbackFactory();
+		if (fallbackFactory != void.class) {
+			return targetWithFallbackFactory(name, context, target, builder,
+					fallbackFactory);
+		}
+
+    // 如果发现没有指定 fallback 对应的类 那么还是走原生
+		return feign.target(target);
+	}
+
+```
+
+
+
+看一下如何创建的代理对象，继续跟入`targetWithFallback`方法
+
+```java
+	private <T> T targetWithFallback(String feignClientName, FeignContext context,
+			Target.HardCodedTarget<T> target, HystrixFeign.Builder builder,
+			Class<?> fallback) {
+    // 生成一个fallback对应的类的实例对象
+		T fallbackInstance = getFromContext("fallback", feignClientName, context,
+				fallback, target.type());
+		return builder.target(target, fallbackInstance);
+	}
+
+		// builder构建器创建对象
+	  public <T> T target(Target<T> target, T fallback) {
+      return build(fallback != null ? new FallbackFactory.Default<T>(fallback) : null)
+          .newInstance(target);
+    }
+
+		// 注意此处重写了invocationHandlerFactory类，覆盖了默认的create方法，方法增强类变成了HystrixInvocationHandler
+		    /** Configures components needed for hystrix integration. */
+    Feign build(final FallbackFactory<?> nullableFallbackFactory) {
+      super.invocationHandlerFactory(new InvocationHandlerFactory() {
+        @Override
+        public InvocationHandler create(Target target,
+                                        Map<Method, MethodHandler> dispatch) {
+          return new HystrixInvocationHandler(target, dispatch, setterFactory,
+              nullableFallbackFactory);
+        }
+      });
+      super.contract(new HystrixDelegatingContract(contract));
+      return super.build();
+    }
+```
+
+1. hystrix重写了了原生的`invocationHandlerFactory`类，覆盖了默认的`create`方法，方法增强类成`HystrixInvocationHandler`。
+2. 中间`target`方法还是一样的，方法路由也是相同的，只是路由调用的`dispatch.get(method).invoke(args);`是`HystrixInvocationHandler`的`invoke`了。
+
+
+
+`feign.hystrix.HystrixInvocationHandler#invoke`
+
+```java
+  public Object invoke(final Object proxy, final Method method, final Object[] args)
+      throws Throwable {
+    // early exit if the invoked method is from java.lang.Object
+    // code is the same as ReflectiveFeign.FeignInvocationHandler
+    if ("equals".equals(method.getName())) {
+      try {
+        Object otherHandler =
+            args.length > 0 && args[0] != null ? Proxy.getInvocationHandler(args[0]) : null;
+        return equals(otherHandler);
+      } catch (IllegalArgumentException e) {
+        return false;
+      }
+    } else if ("hashCode".equals(method.getName())) {
+      return hashCode();
+    } else if ("toString".equals(method.getName())) {
+      return toString();
+    }
+
+    // 构建hystrixCommand对象了，比较标准的hystrix请求流程了
+    HystrixCommand<Object> hystrixCommand =
+        new HystrixCommand<Object>(setterMethodMap.get(method)) {
+          @Override
+          protected Object run() throws Exception {
+            try {
+              // 手动路由方法的增强类
+              return HystrixInvocationHandler.this.dispatch.get(method).invoke(args);
+            } catch (Exception e) {
+              throw e;
+            } catch (Throwable t) {
+              throw (Error) t;
+            }
+          }
+
+          @Override
+          protected Object getFallback() {
+            if (fallbackFactory == null) {
+              return super.getFallback();
+            }
+            try {
+              Object fallback = fallbackFactory.create(getExecutionException());
+              Object result = fallbackMethodMap.get(method).invoke(fallback, args);
+              if (isReturnsHystrixCommand(method)) {
+                return ((HystrixCommand) result).execute();
+              } else if (isReturnsObservable(method)) {
+                // Create a cold Observable
+                return ((Observable) result).toBlocking().first();
+              } else if (isReturnsSingle(method)) {
+                // Create a cold Observable as a Single
+                return ((Single) result).toObservable().toBlocking().first();
+              } else if (isReturnsCompletable(method)) {
+                ((Completable) result).await();
+                return null;
+              } else if (isReturnsCompletableFuture(method)) {
+                return ((Future) result).get();
+              } else {
+                return result;
+              }
+            } catch (IllegalAccessException e) {
+              // shouldn't happen as method is public due to being an interface
+              throw new AssertionError(e);
+            } catch (InvocationTargetException | ExecutionException e) {
+              // Exceptions on fallback are tossed by Hystrix
+              throw new AssertionError(e.getCause());
+            } catch (InterruptedException e) {
+              // Exceptions on fallback are tossed by Hystrix
+              Thread.currentThread().interrupt();
+              throw new AssertionError(e.getCause());
+            }
+          }
+        };
+
+    if (Util.isDefault(method)) {
+      return hystrixCommand.execute();
+    } else if (isReturnsHystrixCommand(method)) {
+      return hystrixCommand;
+    } else if (isReturnsObservable(method)) {
+      // Create a cold Observable
+      return hystrixCommand.toObservable();
+    } else if (isReturnsSingle(method)) {
+      // Create a cold Observable as a Single
+      return hystrixCommand.toObservable().toSingle();
+    } else if (isReturnsCompletable(method)) {
+      return hystrixCommand.toObservable().toCompletable();
+    } else if (isReturnsCompletableFuture(method)) {
+      return new ObservableCompletableFuture<>(hystrixCommand);
+    }
+    return hystrixCommand.execute();
+  }
+```
+
+1. 使用hystrix套了一层壳，用hystrix构建请求方法，这样支持了fallback相关的代理了。
+2. `HystrixInvocationHandler.this.dispatch.get(method).invoke(args);`还是进行手动路由，里面取出的增强方法也还是`SynchronousMethodHandler`，没有变。
+
+
+
+# Ribbon
+
+ribbon体现在最初获取的client不一样。
+
+`org.springframework.cloud.openfeign.FeignClientFactoryBean#getTarget`
+
+```java
+	<T> T getTarget() {
+		FeignContext context = this.applicationContext.getBean(FeignContext.class);
+		Feign.Builder builder = feign(context);
+
+		if (!StringUtils.hasText(this.url)) {
+			if (!this.name.startsWith("http")) {
+				this.url = "http://" + this.name;
+			}
+			else {
+				this.url = this.name;
+			}
+			this.url += cleanPath();
+			return (T) loadBalance(builder, context,
+					new HardCodedTarget<>(this.type, this.name, this.url));
+		}
+		if (StringUtils.hasText(this.url) && !this.url.startsWith("http")) {
+			this.url = "http://" + this.url;
+		}
+		String url = this.url + cleanPath();
+		Client client = getOptional(context, Client.class);
+		if (client != null) {
+			if (client instanceof LoadBalancerFeignClient) {
+				// not load balancing because we have a url,
+				// but ribbon is on the classpath, so unwrap
+				client = ((LoadBalancerFeignClient) client).getDelegate();
+			}
+			if (client instanceof FeignBlockingLoadBalancerClient) {
+				// not load balancing because we have a url,
+				// but Spring Cloud LoadBalancer is on the classpath, so unwrap
+				client = ((FeignBlockingLoadBalancerClient) client).getDelegate();
+			}
+			builder.client(client);
+		}
+		Targeter targeter = get(context, Targeter.class);
+		return (T) targeter.target(this, builder, context,
+				new HardCodedTarget<>(this.type, this.name, url));
+	}
+
+	protected <T> T loadBalance(Feign.Builder builder, FeignContext context,
+			HardCodedTarget<T> target) {
+		Client client = getOptional(context, Client.class);
+		if (client != null) {
+			builder.client(client);
+			Targeter targeter = get(context, Targeter.class);
+			return targeter.target(this, builder, context, target);
+		}
+
+		throw new IllegalStateException(
+				"No Feign Client for loadBalancing defined. Did you forget to include spring-cloud-starter-netflix-ribbon?");
+	}
+```
+
+1. 在最初的时候，如果是以服务名的形式指定的，那么就会调用`loadBalance`方法。
+2. `loadBalance`方法中拿到的`client`对象的具体实现类为`LoadBalancerFeignClient`。
+3. 所以在最后发送请求时`response = client.execute(request, options);`使用的就是Ribbon的实现了。
+
+
+
+`org.springframework.cloud.openfeign.ribbon.LoadBalancerFeignClient#execute`
+
+```java
+	public Response execute(Request request, Request.Options options) throws IOException {
+		try {
+			URI asUri = URI.create(request.url());
+			String clientName = asUri.getHost();
+			URI uriWithoutHost = cleanUrl(request.url(), clientName);
+			FeignLoadBalancer.RibbonRequest ribbonRequest = new FeignLoadBalancer.RibbonRequest(
+					this.delegate, request, uriWithoutHost);
+
+			IClientConfig requestConfig = getClientConfig(options, clientName);
+			return lbClient(clientName)
+					.executeWithLoadBalancer(ribbonRequest, requestConfig).toResponse();
+		}
+		catch (ClientException e) {
+			IOException io = findIOException(e);
+			if (io != null) {
+				throw io;
+			}
+			throw new RuntimeException(e);
+		}
+	}
+```
+
+
+
+之后就是调用ribbon相关内容了。
 
 
 
@@ -450,3 +951,5 @@ class DefaultTargeter implements Targeter {
 
 # 引用
 [spring-cloud-openFeign源码深度解析](https://blog.csdn.net/sinat_29899265/article/details/86577997)
+
+[Feign整合Ribbon和Hystrix源码解析](https://www.jianshu.com/p/6373c19f8ba9)
