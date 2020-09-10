@@ -28,13 +28,13 @@
 
 - 与hystrix是如何适配的。
 
-  通过`org.springframework.cloud.openfeign.HystrixTargeter`类，绑定了`fallback`方法。并且重写了后续的方法增强类。
+  通过`org.springframework.cloud.openfeign.HystrixTargeter`类，绑定了`fallback`方法。并且重写了后续的方法增强类，使用`HystrixInvocationHandler`类代替了原生的`FeignInvocationHandler`类。
 
   
 
 - 如何与ribbon适配，实现了请求重试、动态路由与负载均衡。
 
-  在加载client请求客户端的时候，如果有ribbon相关的包，则请求的是ribbon的具体实现`LoadBalancerFeignClient`，此类负责走ribbon相关的请求。
+  在加载`client`、准备请求客户端的时候，如果有ribbon相关的包，则请求的是ribbon的具体实现`LoadBalancerFeignClient`，此类负责实现ribbon相关的功能。
 
   
 
@@ -937,8 +937,6 @@ ribbon体现在最初获取的client不一样。
 		}
 	}
 ```
-
-
 
 之后就是调用ribbon相关内容了。
 
