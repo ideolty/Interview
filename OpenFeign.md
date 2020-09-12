@@ -40,6 +40,14 @@
 
 - openFeign是如何支撑spring原生的注解的
 
+  `openFeign`定义了一个`feign.Contract`接口，这个接口定义了在feign接口上，哪些标签哪些值是有效的。对于springMVC的原生标签，存在一个此接口的具体实现类`org.springframework.cloud.openfeign.support.SpringMvcContract`，在此类中完成了对接口中所有方法的分析，入口在这句
+
+  ```java
+  List<MethodMetadata> metadata = contract.parseAndValidateMetadata(target.type());
+  ```
+
+  最后返回了一个方法元数据列表。
+
 
 
 # 启动流程
@@ -267,7 +275,7 @@
 
 在springcloud环境中，一般是不会显式的使用feign对象，而是像调用本地service接口一样，把目标bean自动装配到指定的对象中。在进行自动装配时，spring通过相关的bean工厂，生成一个bean的实例并注入。但是通过上面的启动流程可知，这些接口已经创建了对应的`FeignClientFactoryBean`，由这些工厂生成出来的是由jdk动态代理动态生成的类了。
 
-`FeignClientFactoryBean`是一个工厂类，在Spring 创建 Bean 实例时会调用它的 `getObject`方法。
+`FeignClientFactoryBean`是一个工厂类，在Spring 创建 Bean 实例时会调用它的 `getObject`方法。在系统启动时，Spring会去扫描被`@Autowired`注解标记的成员变量，并初始化一个实例对象注入到成员变量中，所以严格来说这部分仍然还是启动流程。
 
 `org.springframework.cloud.openfeign.FeignClientFactoryBean#getObject`
 
@@ -469,12 +477,12 @@ class DefaultTargeter implements Targeter {
 
 ```java
   public <T> T newInstance(Target<T> target) {
-    //为每个方法创建一个SynchronousMethodHandler对象
+    // 解析接口中每个方法上方的标签
     Map<String, MethodHandler> nameToHandler = targetToHandlersByName.apply(target);
     Map<Method, MethodHandler> methodToHandler = new LinkedHashMap<Method, MethodHandler>();
     List<DefaultMethodHandler> defaultMethodHandlers = new LinkedList<DefaultMethodHandler>();
 
-    // 遍历原接口所有的方法，为每个方法绑定一个MethodHandler
+    // 遍历原接口所有的方法，为每个方法绑定一个SynchronousMethodHandler
     for (Method method : target.type().getMethods()) {
       if (method.getDeclaringClass() == Object.class) {
         continue;
@@ -655,6 +663,8 @@ public interface InvocationHandlerFactory {
     }
   }
 ```
+
+
 
 
 
@@ -942,7 +952,282 @@ ribbon体现在最初获取的client不一样。
 
 
 
+# 标签解析
 
+原生的NetFlix的feign是不支持springMVC的这一套标签的，spring自己提供的openFeign是怎么做的呢。
+
+标签的解析是发生在系统启动过程中，创建对应接口的实例对象的时候。
+
+
+
+`feign.ReflectiveFeign#newInstance`
+
+```java
+public <T> T newInstance(Target<T> target) {
+  	// 扫描、解析接口中每个方法上方的标签
+    Map<String, MethodHandler> nameToHandler = targetToHandlersByName.apply(target);
+    Map<Method, MethodHandler> methodToHandler = new LinkedHashMap<Method, MethodHandler>();
+    List<DefaultMethodHandler> defaultMethodHandlers = new LinkedList<DefaultMethodHandler>();
+
+    ……
+  }
+```
+
+入口方法是在`return build().newInstance(target);`的时候。
+
+
+
+`feign.ReflectiveFeign.ParseHandlersByName#apply`
+
+```java
+    public Map<String, MethodHandler> apply(Target target) {
+      // 使用contract接口 解析、验证对应类中方法的标签
+      List<MethodMetadata> metadata = contract.parseAndValidateMetadata(target.type());
+      Map<String, MethodHandler> result = new LinkedHashMap<String, MethodHandler>();
+      // 循环处理每个方法
+      for (MethodMetadata md : metadata) {
+        // 把解析出来的参数重新打包成一个Template
+        BuildTemplateByResolvingArgs buildTemplate;
+        if (!md.formParams().isEmpty() && md.template().bodyTemplate() == null) {
+          buildTemplate =
+              new BuildFormEncodedTemplateFromArgs(md, encoder, queryMapEncoder, target);
+        } else if (md.bodyIndex() != null) {
+          buildTemplate = new BuildEncodedTemplateFromArgs(md, encoder, queryMapEncoder, target);
+        } else {
+          buildTemplate = new BuildTemplateByResolvingArgs(md, queryMapEncoder, target);
+        }
+        // 为每个方法都创建一个方法增强类
+        if (md.isIgnored()) {
+          result.put(md.configKey(), args -> {
+            throw new IllegalStateException(md.configKey() + " is not a method handled by feign");
+          });
+        } else {
+          // 这里的factory 当然是SynchronousMethodHandler.Factory啦
+          result.put(md.configKey(),
+              factory.create(target, md, buildTemplate, options, decoder, errorDecoder));
+        }
+      }
+      return result;
+    }
+```
+
+- `Contract`接口
+
+  > Defines what annotations and values are valid on interfaces.
+
+- 把接口中每个方法上的标签都解析了
+
+- 得到一个`List<MethodMetadata>`元数据列表，遍历列表对每个方法构建增强类。
+
+在看看如何解析标签的。
+
+
+
+`feign.hystrix.HystrixDelegatingContract#parseAndValidateMetadata`
+
+```java
+public final class HystrixDelegatingContract implements Contract {
+
+  // 注意此处注入的是子类 SpringMvcContract
+  private final Contract delegate;
+
+  public HystrixDelegatingContract(Contract delegate) {
+    this.delegate = delegate;
+  }
+
+  @Override
+  public List<MethodMetadata> parseAndValidateMetadata(Class<?> targetType) {
+    // 调用SpringMvcContract父类的对应方法
+    List<MethodMetadata> metadatas = this.delegate.parseAndValidateMetadata(targetType);
+
+    // hystrix的额外处理
+    for (MethodMetadata metadata : metadatas) {
+      Type type = metadata.returnType();
+
+      if (type instanceof ParameterizedType
+          && ((ParameterizedType) type).getRawType().equals(HystrixCommand.class)) {
+        Type actualType = resolveLastTypeParameter(type, HystrixCommand.class);
+        metadata.returnType(actualType);
+      } else if (type instanceof ParameterizedType
+          && ((ParameterizedType) type).getRawType().equals(Observable.class)) {
+        Type actualType = resolveLastTypeParameter(type, Observable.class);
+        metadata.returnType(actualType);
+      } else if (type instanceof ParameterizedType
+          && ((ParameterizedType) type).getRawType().equals(Single.class)) {
+        Type actualType = resolveLastTypeParameter(type, Single.class);
+        metadata.returnType(actualType);
+      } else if (type instanceof ParameterizedType
+          && ((ParameterizedType) type).getRawType().equals(Completable.class)) {
+        metadata.returnType(void.class);
+      } else if (type instanceof ParameterizedType
+          && ((ParameterizedType) type).getRawType().equals(CompletableFuture.class)) {
+        metadata.returnType(resolveLastTypeParameter(type, CompletableFuture.class));
+      }
+    }
+
+    return metadatas;
+  }
+}
+
+```
+
+
+
+`feign.Contract.BaseContract#parseAndValidateMetadata(java.lang.Class<?>)`
+
+```java
+    public List<MethodMetadata> parseAndValidateMetadata(Class<?> targetType) {
+      // 校验
+      checkState(targetType.getTypeParameters().length == 0, "Parameterized types unsupported: %s",
+          targetType.getSimpleName());
+      checkState(targetType.getInterfaces().length <= 1, "Only single inheritance supported: %s",
+          targetType.getSimpleName());
+      if (targetType.getInterfaces().length == 1) {
+        checkState(targetType.getInterfaces()[0].getInterfaces().length == 0,
+            "Only single-level inheritance supported: %s",
+            targetType.getSimpleName());
+      }
+      final Map<String, MethodMetadata> result = new LinkedHashMap<String, MethodMetadata>();
+      for (final Method method : targetType.getMethods()) {
+        if (method.getDeclaringClass() == Object.class ||
+            (method.getModifiers() & Modifier.STATIC) != 0 ||
+            Util.isDefault(method)) {
+          continue;
+        }
+        // 对每一个方法进行解析
+        final MethodMetadata metadata = parseAndValidateMetadata(targetType, method);
+        checkState(!result.containsKey(metadata.configKey()), "Overrides unsupported: %s",
+            metadata.configKey());
+        result.put(metadata.configKey(), metadata);
+      }
+      return new ArrayList<>(result.values());
+    }
+```
+
+- 无论是否有引入hystrix，都会调用父类`feign.Contract.BaseContract`中的此方法，以hystrix为例。
+- 如果引入了hystrix会先调用`feign.hystrix.HystrixDelegatingContract#parseAndValidateMetadata`方法，在方法中再调用此方法，区别是hystrix会设置返回的`MethodMetadata`对象的返回类型。
+- 此处调用的是子类`SpringMvcContract`中的`parseAndValidateMetadata`
+- 后续的主要流程控制在父类中，但是具体的处理都是在子类`SpringMvcContract`中。
+
+
+
+`org.springframework.cloud.openfeign.support.SpringMvcContract#parseAndValidateMetadata`
+
+```java
+	@Override
+	public MethodMetadata parseAndValidateMetadata(Class<?> targetType, Method method) {
+		this.processedMethods.put(Feign.configKey(targetType, method), method);
+    // 调用父类的解析方法
+		MethodMetadata md = super.parseAndValidateMetadata(targetType, method);
+
+    // 如果有使用@RequestMapping标签 处理一下
+		RequestMapping classAnnotation = findMergedAnnotation(targetType,
+				RequestMapping.class);
+		if (classAnnotation != null) {
+			// produces - use from class annotation only if method has not specified this
+			if (!md.template().headers().containsKey(ACCEPT)) {
+				parseProduces(md, method, classAnnotation);
+			}
+
+			// consumes -- use from class annotation only if method has not specified this
+			if (!md.template().headers().containsKey(CONTENT_TYPE)) {
+				parseConsumes(md, method, classAnnotation);
+			}
+
+			// headers -- class annotation is inherited to methods, always write these if
+			// present
+			parseHeaders(md, method, classAnnotation);
+		}
+		return md;
+	}
+```
+
+- 上来直接继续调用父类的流程，这里续上了无spring的流程。
+- 在父类流程最后处理一下`@RequestMapping`标签中的三个变量，子类比父类就多这一点。
+
+
+
+`feign.Contract.BaseContract#parseAndValidateMetadata(java.lang.Class<?>, java.lang.reflect.Method)`
+
+```java
+    protected MethodMetadata parseAndValidateMetadata(Class<?> targetType, Method method) {
+      // 为每个方法构建一个MethodMetadata类
+      final MethodMetadata data = new MethodMetadata();
+      data.targetType(targetType);
+      data.method(method);
+      data.returnType(Types.resolve(targetType, targetType, method.getGenericReturnType()));
+      data.configKey(Feign.configKey(targetType, method));
+
+      // 解析类上面的标签
+      if (targetType.getInterfaces().length == 1) {
+        processAnnotationOnClass(data, targetType.getInterfaces()[0]);
+      }
+      processAnnotationOnClass(data, targetType);
+
+      // 挨个解析方法上的标签
+      for (final Annotation methodAnnotation : method.getAnnotations()) {
+        processAnnotationOnMethod(data, methodAnnotation, method);
+      }
+      if (data.isIgnored()) {
+        return data;
+      }
+      checkState(data.template().method() != null,
+          "Method %s not annotated with HTTP method type (ex. GET, POST)%s",
+          data.configKey(), data.warnings());
+      final Class<?>[] parameterTypes = method.getParameterTypes();
+      final Type[] genericParameterTypes = method.getGenericParameterTypes();
+
+      final Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+      final int count = parameterAnnotations.length;
+      for (int i = 0; i < count; i++) {
+        boolean isHttpAnnotation = false;
+        if (parameterAnnotations[i] != null) {
+          // 处理在参数上的标签
+          isHttpAnnotation = processAnnotationsOnParameter(data, parameterAnnotations[i], i);
+        }
+
+        if (isHttpAnnotation) {
+          data.ignoreParamater(i);
+        }
+
+        if (parameterTypes[i] == URI.class) {
+          data.urlIndex(i);
+        } else if (!isHttpAnnotation && parameterTypes[i] != Request.Options.class) {
+          if (data.isAlreadyProcessed(i)) {
+            checkState(data.formParams().isEmpty() || data.bodyIndex() == null,
+                "Body parameters cannot be used with form parameters.%s", data.warnings());
+          } else {
+            checkState(data.formParams().isEmpty(),
+                "Body parameters cannot be used with form parameters.%s", data.warnings());
+            checkState(data.bodyIndex() == null,
+                "Method has too many Body parameters: %s%s", method, data.warnings());
+            data.bodyIndex(i);
+            data.bodyType(Types.resolve(targetType, targetType, genericParameterTypes[i]));
+          }
+        }
+      }
+
+      if (data.headerMapIndex() != null) {
+        checkMapString("HeaderMap", parameterTypes[data.headerMapIndex()],
+            genericParameterTypes[data.headerMapIndex()]);
+      }
+
+      if (data.queryMapIndex() != null) {
+        if (Map.class.isAssignableFrom(parameterTypes[data.queryMapIndex()])) {
+          checkMapKeys("QueryMap", genericParameterTypes[data.queryMapIndex()]);
+        }
+      }
+
+      return data;
+    }
+```
+
+- 构建一个`MethodMetadata`，记录一下此方法的相关参数。
+- 依次解析类上的标签，方法上的标签，方法参数的标签。
+
+
+
+具体细节不打算继续挖了，快挖穿地板了。总之他会调用spring的几个解析工具类，URL方面会把`@GetMapping`、`@PostMapping`等标签都解析成`@RequestMapping`。参数方面会调用每个标签自己的处理器`processor`类去解析。
 
 
 
