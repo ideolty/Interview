@@ -64,9 +64,9 @@
 	@Override
 	public void registerBeanDefinitions(AnnotationMetadata metadata,
 			BeanDefinitionRegistry registry) {
-    // 读取默认的配置
+		// 读取默认的配置
 		registerDefaultConfiguration(metadata, registry);
-    // 注册相关的请求接口
+		// 注册相关的请求接口
 		registerFeignClients(metadata, registry);
 	}
 ```
@@ -82,12 +82,12 @@
 ```java
 	private void registerDefaultConfiguration(AnnotationMetadata metadata,
 			BeanDefinitionRegistry registry) {
-    // 读取@EnableFeignClients标签定义的5个参数值
+		// 读取@EnableFeignClients标签定义的5个参数值
 		Map<String, Object> defaultAttrs = metadata
 				.getAnnotationAttributes(EnableFeignClients.class.getName(), true);
 
 		if (defaultAttrs != null && defaultAttrs.containsKey("defaultConfiguration")) {
-      // 生成一个类名
+			// 生成一个类名
 			String name;
 			if (metadata.hasEnclosingClass()) {
 				name = "default." + metadata.getEnclosingClassName();
@@ -95,7 +95,7 @@
 			else {
 				name = "default." + metadata.getClassName();
 			}
-      // 注册配置
+			// 注册配置
 			registerClientConfiguration(registry, name,
 					defaultAttrs.get("defaultConfiguration"));
 		}
@@ -103,8 +103,8 @@
 
 	private void registerClientConfiguration(BeanDefinitionRegistry registry, Object name,
 			Object configuration) {
-    // 这是spring创建bean的标准流程 
-    // 创建一个FeignClientSpecification类型的bean，通过BeanDefinitionRegistry 注入spring上下文容器中
+		// 这是spring创建bean的标准流程 
+		// 创建一个FeignClientSpecification类型的bean，通过BeanDefinitionRegistry 注入spring上下文容器中
 		BeanDefinitionBuilder builder = BeanDefinitionBuilder
 				.genericBeanDefinition(FeignClientSpecification.class);
 		builder.addConstructorArgValue(name);
@@ -130,17 +130,17 @@
 ```java
 	public void registerFeignClients(AnnotationMetadata metadata,
 			BeanDefinitionRegistry registry) {
-    // 与spring一脉相承 先拿到一个扫描器
+		// 与spring一脉相承 先拿到一个扫描器
 		ClassPathScanningCandidateComponentProvider scanner = getScanner();
 		scanner.setResourceLoader(this.resourceLoader);
 
-    // 这个集合里面放了一些@EnableFeignClients标签参数
+		// 这个集合里面放了一些@EnableFeignClients标签参数
 		Set<String> basePackages;
 
-    // 取出@EnableFeignClients标签内附带的值
+		// 取出@EnableFeignClients标签内附带的值
 		Map<String, Object> attrs = metadata
 				.getAnnotationAttributes(EnableFeignClients.class.getName());
-    // 设置标签过滤器需要过滤的类型 这里是FeignClient
+		// 设置标签过滤器需要过滤的类型 这里是FeignClient
 		AnnotationTypeFilter annotationTypeFilter = new AnnotationTypeFilter(
 				FeignClient.class);
 		final Class<?>[] clients = attrs == null ? null
@@ -167,35 +167,35 @@
 					new AllTypeFilter(Arrays.asList(filter, annotationTypeFilter)));
 		}
 
-    // 如果@EnableFeignClients没有加额外参数，这里的值是@EnableFeignClients所在类的全类名
+		// 如果@EnableFeignClients没有加额外参数，这里的值是@EnableFeignClients所在类的全类名
 		for (String basePackage : basePackages) {
-      // 扫描指定目录下是否有符合条件的类
-      // 一般情况下 @EnableFeignClients 写在主类上，主类在所有类的顶级目录 这个扫描相当于扫描整个项目了
+			// 扫描指定目录下是否有符合条件的类
+			// 一般情况下 @EnableFeignClients 写在主类上，主类在所有类的顶级目录 这个扫描相当于扫描整个项目了
 			Set<BeanDefinition> candidateComponents = scanner
 					.findCandidateComponents(basePackage);
-      // 变量所有有@FeignClient标签文件（类或者接口都能抓到）
+			// 变量所有有@FeignClient标签文件（类或者接口都能抓到）
 			for (BeanDefinition candidateComponent : candidateComponents) {
-        // 判断是不是通过注解标注的bean
+				// 判断是不是通过注解标注的bean
 				if (candidateComponent instanceof AnnotatedBeanDefinition) {
 					// verify annotated class is an interface
-          // 检查这个类是不是一个接口
+					// 检查这个类是不是一个接口
 					AnnotatedBeanDefinition beanDefinition = (AnnotatedBeanDefinition) candidateComponent;
 					AnnotationMetadata annotationMetadata = beanDefinition.getMetadata();
 					Assert.isTrue(annotationMetadata.isInterface(),
 							"@FeignClient can only be specified on an interface");
 
-          // 把@FeignClient标签的参数读取到map中
+					// 把@FeignClient标签的参数读取到map中
 					Map<String, Object> attributes = annotationMetadata
 							.getAnnotationAttributes(
 									FeignClient.class.getCanonicalName());
 
-          // 根据一些规则确定一个name
+					// 根据一些规则确定一个name
 					String name = getClientName(attributes);
-          // 与上面注册参数的方法是同一个，把这个@FeignClient标签的参数也注册成一个bean 方便后续取用
+					// 与上面注册参数的方法是同一个，把这个@FeignClient标签的参数也注册成一个bean 方便后续取用
 					registerClientConfiguration(registry, name,
 							attributes.get("configuration"));
 
-          // 注册feign客户端
+					// 注册feign客户端
 					registerFeignClient(registry, annotationMetadata, attributes);
 				}
 			}
@@ -215,8 +215,8 @@
 ```java
 	private void registerFeignClient(BeanDefinitionRegistry registry,
 			AnnotationMetadata annotationMetadata, Map<String, Object> attributes) {
-    // 创建一个bean 类型是FeignClientFactoryBean feign客户端的工厂bean
-    // 然后给这个bean的成员变量赋值
+		// 创建一个bean 类型是FeignClientFactoryBean feign客户端的工厂bean
+		// 然后给这个bean的成员变量赋值
 		String className = annotationMetadata.getClassName();
 		BeanDefinitionBuilder definition = BeanDefinitionBuilder
 				.genericBeanDefinition(FeignClientFactoryBean.class);
@@ -247,7 +247,7 @@
 			alias = qualifier;
 		}
 
-    // 注入spring 容器
+		// 注入spring 容器
 		BeanDefinitionHolder holder = new BeanDefinitionHolder(beanDefinition, className,
 				new String[] { alias });
 		BeanDefinitionReaderUtils.registerBeanDefinition(holder, registry);
@@ -286,14 +286,14 @@
 	}
 
 	<T> T getTarget() {
-    // 从spring容器中拿到feign上下文容器
+		// 从spring容器中拿到feign上下文容器
 		FeignContext context = this.applicationContext.getBean(FeignContext.class);
-    // 创建一个feign的构建器
+		// 创建一个feign的构建器
 		Feign.Builder builder = feign(context);
 
-    // 检查是直接写的url还是通过服务名来访问
+		// 检查是直接写的url还是通过服务名来访问
 		if (!StringUtils.hasText(this.url)) {
-      // 如果通过服务名访问，最后还是会被拼成http://consumer的形式，这里是写死的http
+			// 如果通过服务名访问，最后还是会被拼成http://consumer的形式，这里是写死的http
 			if (!this.name.startsWith("http")) {
 				this.url = "http://" + this.name;
 			}
@@ -301,17 +301,17 @@
 				this.url = this.name;
 			}
 			this.url += cleanPath();
-      // 返回一个经过负载选择后对象
+			// 返回一个经过负载选择后对象
 			return (T) loadBalance(builder, context,
 					new HardCodedTarget<>(this.type, this.name, this.url));
 		}
-    // 如果用的是直链的方式
+		// 如果用的是直链的方式
 		if (StringUtils.hasText(this.url) && !this.url.startsWith("http")) {
 			this.url = "http://" + this.url;
 		}
-    // cleanPath是用来补偿路径中的斜杠/的
+		// cleanPath是用来补偿路径中的斜杠/的
 		String url = this.url + cleanPath();
-    // 根据本类绑定的接口，取出相应客户端
+		// 根据本类绑定的接口，取出相应客户端
 		Client client = getOptional(context, Client.class);
 		if (client != null) {
 			if (client instanceof LoadBalancerFeignClient) {
@@ -326,9 +326,9 @@
 			}
 			builder.client(client);
 		}
-    // 获取一个触发器
+		// 获取一个触发器
 		Targeter targeter = get(context, Targeter.class);
-    // 调用触发器，获取一个实现了fegin接口的对象
+		// 调用触发器，获取一个实现了fegin接口的对象
 		return (T) targeter.target(this, builder, context,
 				new HardCodedTarget<>(this.type, this.name, url));
 	}
@@ -337,11 +337,11 @@
 	org.springframework.cloud.openfeign.FeignClientFactoryBean#loadBalance
 	protected <T> T loadBalance(Feign.Builder builder, FeignContext context,
 			HardCodedTarget<T> target) {
-    // 从FeignContext拿取指定的Client
+		// 从FeignContext拿取指定的Client
 		Client client = getOptional(context, Client.class);
 		if (client != null) {
 			builder.client(client);
-      // 调用下面的方法拿 Targeter
+			// 调用下面的方法拿 Targeter
 			Targeter targeter = get(context, Targeter.class);
 			return targeter.target(this, builder, context, target);
 		}
@@ -396,7 +396,7 @@ class DefaultTargeter implements Targeter {
 	@Override
 	public <T> T target(FeignClientFactoryBean factory, Feign.Builder feign,
 			FeignContext context, Target.HardCodedTarget<T> target) {
-    // 如果类型不对也不做什么操作了
+		// 如果类型不对也不做什么操作了
 		if (!(feign instanceof feign.hystrix.HystrixFeign.Builder)) {
 			return feign.target(target);
 		}
@@ -407,7 +407,7 @@ class DefaultTargeter implements Targeter {
 		if (setterFactory != null) {
 			builder.setterFactory(setterFactory);
 		}
-    // 绑定熔断的fallback方法，也就是@FeignClient的fallback属性的值
+		// 绑定熔断的fallback方法，也就是@FeignClient的fallback属性的值
 		Class<?> fallback = factory.getFallback();
 		if (fallback != void.class) {
 			return targetWithFallback(name, context, target, builder, fallback);
@@ -418,7 +418,7 @@ class DefaultTargeter implements Targeter {
 					fallbackFactory);
 		}
 
-    // 还是调用target方法
+		// 还是调用target方法
 		return feign.target(target);
 	}
 ```
@@ -704,7 +704,7 @@ public interface InvocationHandlerFactory {
 		}
 		Class<?> fallback = factory.getFallback();
 		if (fallback != void.class) {
-      // 如果@FeignClient标签的fallback属性不为空，则创建一个hystrix自己实现的类
+			// 如果@FeignClient标签的fallback属性不为空，则创建一个hystrix自己实现的类
 			return targetWithFallback(name, context, target, builder, fallback);
 		}
 		Class<?> fallbackFactory = factory.getFallbackFactory();
@@ -713,7 +713,7 @@ public interface InvocationHandlerFactory {
 					fallbackFactory);
 		}
 
-    // 如果发现没有指定 fallback 对应的类 那么还是走原生
+		// 如果发现没有指定 fallback 对应的类 那么还是走原生
 		return feign.target(target);
 	}
 
@@ -727,7 +727,7 @@ public interface InvocationHandlerFactory {
 	private <T> T targetWithFallback(String feignClientName, FeignContext context,
 			Target.HardCodedTarget<T> target, HystrixFeign.Builder builder,
 			Class<?> fallback) {
-    // 生成一个fallback对应的类的实例对象
+		// 生成一个fallback对应的类的实例对象
 		T fallbackInstance = getFromContext("fallback", feignClientName, context,
 				fallback, target.type());
 		return builder.target(target, fallbackInstance);
@@ -1117,10 +1117,10 @@ public final class HystrixDelegatingContract implements Contract {
 	@Override
 	public MethodMetadata parseAndValidateMetadata(Class<?> targetType, Method method) {
 		this.processedMethods.put(Feign.configKey(targetType, method), method);
-    // 调用父类的解析方法
+		// 调用父类的解析方法
 		MethodMetadata md = super.parseAndValidateMetadata(targetType, method);
 
-    // 如果有使用@RequestMapping标签 处理一下
+		// 如果有使用@RequestMapping标签 处理一下
 		RequestMapping classAnnotation = findMergedAnnotation(targetType,
 				RequestMapping.class);
 		if (classAnnotation != null) {
