@@ -52,7 +52,7 @@
 
 # 启动流程
 
-//todo 需要一张流程图 体现hystrix 与 ribbon
+![启动流程](截图/Spring/OpenFeign/启动流程.png)
 
 
 
@@ -274,6 +274,8 @@
 # 调用流程
 
 在springcloud环境中，一般是不会显式的使用feign对象，而是像调用本地service接口一样，把目标bean自动装配到指定的对象中。在进行自动装配时，spring通过相关的bean工厂，生成一个bean的实例并注入。但是通过上面的启动流程可知，这些接口已经创建了对应的`FeignClientFactoryBean`，由这些工厂生成出来的是由jdk动态代理动态生成的类了。
+
+![](截图/Spring/OpenFeign/注入流程.png)
 
 `FeignClientFactoryBean`是一个工厂类，在Spring 创建 Bean 实例时会调用它的 `getObject`方法。在系统启动时，Spring会去扫描被`@Autowired`注解标记的成员变量，并初始化一个实例对象注入到成员变量中，所以严格来说这部分仍然还是启动流程。
 
