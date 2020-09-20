@@ -38,7 +38,7 @@
 - [Maven](https://github.com/ideolty/Interview/blob/master/Maven.md)
 - [Git](https://github.com/ideolty/Interview/blob/master/Git.md)
 - Docker
-- k8s
+- 8s
 - [Nginx](https://github.com/ideolty/Interview/blob/master/Nginx.md)
 - [Zookeeper](https://github.com/ideolty/Interview/blob/master/Zookeeper.md)
 - [消息中间件](https://github.com/ideolty/Interview/blob/master/消息中间件.md)
@@ -51,5 +51,8 @@
 - Elasticsearch
 - [分布式](https://github.com/ideolty/Interview/blob/master/分布式.md)
 - [Netflix-Archaius](https://github.com/ideolty/Interview/blob/master/Netflix-Archaius.md)
+- Linux
+- Flink
 - 面试题
+- 软件等级考试 - 系统架构设计师
 
