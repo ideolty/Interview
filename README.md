@@ -9,7 +9,7 @@
 - 文档目的是为了知识的总结与分享。
 - 我所做的工作很大程度是收集并且把引用的文章用自己的语言再重新表达一遍，达到一个知识梳理的目的。
 - 非商业用途，如果需要引用，请注明原文地址就可以了，其中引用部分的版权归原版权作者所属。
-- MD格式的文档，我是使用Typora方便的进行编辑和查看。
+- MD格式的文档，我是使用Typora方便的进行编辑和查看，提交到GitHub中后会出现格式问题。
 - 持续更新中。。
 
 
@@ -20,27 +20,30 @@
   - [Java 基础](https://github.com/ideolty/Interview/blob/master/Java基础.md)
   - [JDK](https://github.com/ideolty/Interview/blob/master/JDK.md)
   - [JVM](https://github.com/ideolty/Interview/blob/master/JVM.md)
-  - [设计模式](https://github.com/ideolty/Interview/blob/master/设计模式.md)
+- [设计模式](https://github.com/ideolty/Interview/blob/master/设计模式.md)
 - [算法](https://github.com/ideolty/Interview/blob/master/算法.md)
 - [计算机网络基础](https://github.com/ideolty/Interview/blob/master/计算机网络基础.md)
-- [Spring Core](https://github.com/ideolty/Interview/blob/master/SpringCore.md)
-- Spring MVC
-- [Spring Boot](https://github.com/ideolty/Interview/blob/master/SpringBoot.md)
-- [Spring Cloud](https://github.com/ideolty/Interview/blob/master/SpringCloud.md)
-  - [Eureka](https://github.com/ideolty/Interview/blob/master/SpringCloudEureka.md)
-  - [OpenFeign](https://github.com/ideolty/Interview/blob/master/OpenFeign.md)
-  - Hystrix
-  - Ribbon
-- Spring Data JPA
-- Spring Security
+- Spring 全家桶
+  - [Spring Core](https://github.com/ideolty/Interview/blob/master/SpringCore.md)
+  - Spring MVC
+  - [Spring Boot](https://github.com/ideolty/Interview/blob/master/SpringBoot.md)
+  - [Spring Cloud](https://github.com/ideolty/Interview/blob/master/SpringCloud.md)
+    - [Eureka](https://github.com/ideolty/Interview/blob/master/SpringCloudEureka.md)
+    - [OpenFeign](https://github.com/ideolty/Interview/blob/master/OpenFeign.md)
+    - Hystrix
+    - Ribbon
+    - Spring GateWay
+    - Zuul
+- ~~Spring Data JPA~~
+- ~~Spring Security~~
 - Netty
 - [Mybatis](https://github.com/ideolty/Interview/blob/master/Mybatis.md)
 - [Maven](https://github.com/ideolty/Interview/blob/master/Maven.md)
 - [Git](https://github.com/ideolty/Interview/blob/master/Git.md)
-- Docker
-- 8s
+- 容器化
+  - Docker
+  - K8s
 - [Nginx](https://github.com/ideolty/Interview/blob/master/Nginx.md)
-- [Zookeeper](https://github.com/ideolty/Interview/blob/master/Zookeeper.md)
 - [消息中间件](https://github.com/ideolty/Interview/blob/master/消息中间件.md)
   - [RabbitMQ](https://github.com/ideolty/Interview/blob/master/RabbitMQ.md)
   - [Kafka](https://github.com/ideolty/Interview/blob/master/Kafka.md)
@@ -48,11 +51,19 @@
 - [数据库](https://github.com/ideolty/Interview/blob/master/数据库.md)
   - [Redis](https://github.com/ideolty/Interview/blob/master/Redis.md)
   - [Mysql](https://github.com/ideolty/Interview/blob/master/Mysql.md)
-- Elasticsearch
+  - Elasticsearch
 - [分布式](https://github.com/ideolty/Interview/blob/master/分布式.md)
 - [Netflix-Archaius](https://github.com/ideolty/Interview/blob/master/Netflix-Archaius.md)
 - Linux
-- Flink
+- 大数据全家桶
+  - Hdfs
+  - Yarn
+  - MapReduce
+  - Hbase
+  - [Zookeeper](https://github.com/ideolty/Interview/blob/master/Zookeeper.md)
+  - Flume
+  - Flink
+  - Spark
 - 面试题
 - 软件等级考试 - 系统架构设计师
 
