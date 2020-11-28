@@ -3516,9 +3516,10 @@ String/StringBuilder/StringBuffer
 
 
 1. String 、StringBuffer、StringBuilder继承于CharSequence接口，CharSequence就是字符序列，String, StringBuilder和StringBuffer本质上都是通过**字符数组**实现的。
-2. **String为字符串常量**，StringBuilder和StringBuffer都是**可变的**字符序列。
-3. StringBuilder是**非线程安全**的，而StringBuffer是**线程安全**的。
-4. 执行速度，**运行速度快慢为：StringBuilder > StringBuffer > String**
+2. **String为字符串常量**，StringBuilder和StringBuffer都是**可变的**字符序列。它是典型的Immutable类，被声明成为final class，所有属性也都是final的。也由于它的不可变性，类似拼接、裁剪字符串等动作，都会产生新的String对象。
+3. StringBufer本质是一个线程安全的可修改字符序列（char，JDK 9以后是byte）数组，它保证了**线程安全**(synchronized)，也随之带来了额外的性能开销，所以除非有线程安全的需要，不然还是推荐使用它的后继者，也就是StringBuilder。
+4. StringBuilder是Java 1.5中新增的，在能力上和StringBufer没有本质区别，但是它去掉了线程安全的部分，有效减小了开销，是绝大部分情况下进行字符串拼接的首选，StringBuilder是**非线程安全**的，
+5. 执行速度，**运行速度快慢为：StringBuilder > StringBuffer > String**
 
 
 
@@ -3539,9 +3540,13 @@ String/StringBuilder/StringBuffer
 **String对象的两种创建方式：**
 
 ```java
-         String str1 = "abcd";
-         String str2 = new String("abcd");
-         System.out.println(str1==str2);//false
+        String str1 = "abcd";
+        String str2 = new String("abcd");
+        System.out.println(str1==str2);//false
+
+  			String str1 = "abcd";
+        String str2 = new String("abcd").intern();
+        System.out.println(str1==str2);//true
 ```
 
 这两种不同的创建方法是有差别的，第一种方式是在常量池中拿对象，第二种方式是直接在堆内存空间创建一个新的对象。只要使用new方法，就需要创建新的对象。
@@ -3551,7 +3556,8 @@ String/StringBuilder/StringBuffer
 **String类型的常量池比较特殊。它的主要使用方法有两种：**
 
 - 直接使用双引号声明出来的String对象会直接存储在常量池中。
-- 如果不是用双引号声明的String对象，可以使用String提供的intern方String.intern()   是一个Native方法，它的作用是：如果运行时常量池中已经包含一个等于此String对象内容的字符串，则返回常量池中该字符串的引用；如果没有，则在常量池中创建与此  String 内容相同的字符串，并返回常量池中创建的字符串的引用。
+- 如果不是用双引号声明的String对象，可以使用String提供的intern方String.intern()   是一个Native方法，它的作用是：如果运行时常量池中已经包含一个等于此String对象内容的字符串，则返回常量池中该字符串的引用；如果没有，则在常量池中创建与此 String 内容相同的字符串，并返回常量池中创建的字符串的引用。
+  - Java 6以后提供了intern()方法，一般使用Java 6这种历史版本，并不推荐大量使用intern，被缓存的字符串是存在所谓PermGen里的，也就是臭名昭著的“永久代”，这个空间是很有限的，也基本不会被FullGC之外的垃圾收集照顾到。所以，如果使用不当，OOM就会光顾。 在后续版本中，这个缓存被放置在堆中，这样就极大避免了永久代占满的问题，甚至永久代在JDK 8中被MetaSpace（元数据区）替代了。而且，默认缓存大小也在不断地扩大中， 从最初的1009，到7u40以后被修改为60013。
 
 
 
@@ -3564,16 +3570,30 @@ String/StringBuilder/StringBuffer
     private final char value[];
 ```
 
+从设计上来说
+
+1. **字符串常量池的需要。**
+
+   字符串常量池(String pool, String intern pool, String保留池) 是Java堆内存中一个特殊的存储区域, 当创建一个String对象时,假如此字符串值已经存在于常量池中,则不会创建一个新的对象,而是引用已经存在的对象。假若字符串对象允许改变,那么将会导致各种逻辑错误,比如改变一个对象会影响到另一个独立对象. 严格来说，这种常量池的思想,是一种优化手段.
+
+2. **允许String对象缓存HashCode**
+    Java中String对象的哈希码被频繁地使用, 比如在hashMap 等容器中。
+
+   字符串不变性保证了hash码的唯一性,因此可以放心地进行缓存.这也是一种性能优化手段,意味着不必每次都去计算新的哈希码. 
+
+3. **安全性** 
+   String被许多的Java类(库)用来当做参数,例如 网络连接地址URL,文件路径path,还有反射机制所需要的String参数等, 假若String不是固定不变的,将会引起各种安全隐患。
+
+
+
 如果要变怎么办？
 
 用反射可以访问私有成员， 然后反射出String对象中的value属性， 进而改变通过获得的value引用改变数组的结构。
 
-
-
 > ### **String字符串拼接**
 
 ```java
-    	  String str1 = "str";
+    	    String str1 = "str";
           String str2 = "ing";
           String str3 = "str" + "ing";//常量池中的对象
           String str4 = str1 + str2; //在堆上创建的新的对象     
@@ -3583,7 +3603,7 @@ String/StringBuilder/StringBuffer
           System.out.println(str4 == str5);//false
 ```
 
-尽量避免多个字符串拼接，因为这样会重新创建对象。如果需要改变字符串的花，可以使用 StringBuilder 或者 StringBuffer。
+尽量避免多个字符串拼接，因为这样会重新创建对象。如果需要改变字符串的花，可以使用 StringBuilder 或者 StringBuffer。不过在java8中已经有了优化，编译后会被写成StringBuilder，而在JDK 9里面为了更加统一字符串操作优化，提供 了StringConcatFactory，作为一个统一的入口。
 
 
 
@@ -3610,7 +3630,7 @@ String/StringBuilder/StringBuffer
         return (this == obj);
     }
 
-	public String toString() {
+  	public String toString() {
         return getClass().getName() + "@" + Integer.toHexString(hashCode());
     }
 ```
