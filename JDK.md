@@ -1615,9 +1615,7 @@ public enum State {
 
 
 
-## volatile
-
- **首先需要了解Java内存模型。**
+## Java内存模型
 
 ​	当程序在运行过程中，会将运算需要的数据从主内存复制一份到CPU的高速缓存当中，那么CPU进行计算时就可以直接从它的高速缓存读取数据和向其中写入数据，当运算结束之后，再将高速缓存中的数据刷新到主存当中。		
 
@@ -1651,11 +1649,17 @@ public enum State {
 
 
 
-　　1. 保证了不同线程对这个变量进行操作时的可见性，即一个线程修改了某个变量的值，这新值对其他线程来说是立即可见的。
+  　　1. 保证了不同线程对这个变量进行操作时的可见性，即一个线程修改了某个变量的值，这新值对其他线程来说是立即可见的。
 
-　　2. 禁止进行指令重排序。
+  　　2. 禁止进行指令重排序。
 
 
+
+
+
+
+
+## volatile
 
 volatile的性质
 
@@ -3634,4 +3638,43 @@ String/StringBuilder/StringBuffer
         return getClass().getName() + "@" + Integer.toHexString(hashCode());
     }
 ```
+
+
+
+## Exception和Error
+
+Exception和Error都是继承了Throwable类。
+
+Exception和Error体现了Java平台设计者对不同异常情况的分类。
+
+Exception是程序正常运行中，可以预料的意外情况，可能并且应该被捕获，进行相应处理。 
+
+Error是指在正常情况下，不大可能出现的情况，绝大部分的Error都会导致程序（比如JVM自身）处于非正常的、不可恢复状态。既然是非正常情况，所以不便于也不需要捕获，常见的比如OutOfMemoryError之类，都是Error的子类。 
+
+
+
+>  ### 运行时异常
+
+Exception又分为可检查（checked）异常和不检查（unchecked）异常
+
+- 可检查异常在源代码里必须显式地进行捕获处理，这是编译期检查的一部分。
+
+- 不检查异常就是所谓的运行时异常，类似 NullPointerException、ArrayIndexOutOfBoundsException之类，通常是可以编码避免的逻辑错误，具体根据需要来判断是否需要捕 获，并不会在编译期强制要求。
+
+
+
+> ### NoClassDefFoundError和ClassNotFoundException
+
+-  ClassNotFoundException的产生原因： Java支持使用Class.forName方法来动态地加载类，任意一个类的类名如果被作为参数传递给这个方法都将导致该类被加载到JVM内存中，如果这个类在类路径中没有被找到，那么此时就会在 运行时抛出ClassNotFoundException异常。 另外还有一个导致ClassNotFoundException的原因就是：当一个类已经某个类加载器加载到内存中了，此时另一个类加载器又尝试着动态地从同一个包中加载这个类。通过控制动态类加载过程，可以避免上述情况发生。 - -
+- NoClassDefFoundError产生的原因在于： 如果JVM或者ClassLoader实例尝试加载（可以通过正常的方法调用，也可能是使用new来创建新的对象）类的时候却找不到类的定义。要查找的类在编译的时候是存在的，运行的时候却找不到了。这个时候就会导致NoClassDefFoundError. 造成该问题的原因可能是打包过程漏掉了部分类，或者jar包出现损坏或者篡改。解决这个问题的办法是查找那些在开发期间存在于类路径下但在运行期间却不在类路径下的类。
+
+
+
+> ### finally
+
+什么时候finally语句不会执行？
+
+- try语句没有被执行到，如在try语句之前就返回了，这样finally语句就不会执行，这也说明了finally语句被执行的必要而非充分条件是：相应的try语句一定被执行到。
+
+- 在try块中有System.exit(0);这样的语句，System.exit(0);是终止Java虚拟机JVM的，连JVM都停止了，所有都结束了，当然finally语句也不会被执行到。
 
