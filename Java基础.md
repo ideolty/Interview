@@ -315,6 +315,18 @@ C中的*p，其实是一个对象，只不过是指针类型，函数调用的�
 
 
 
+# 引用
+
+
+
+# Java8 
+
+- 函数接口
+- 接口final函数
+- lambda
+
+
+
 # 面试题
 
 > #### 抽象类必须要有抽象方法吗？
@@ -454,6 +466,12 @@ throws是用来声明一个方法可能抛出的所有异常信息，throws是�
 
 
 [try-catch-finally中，如果在catch中return了，finally中的代码还会执行么，原理是什么？（异常相关四）](https://blog.csdn.net/qq_40180411/article/details/81428382)
+
+
+
+> 大数相加
+
+
 
 
 
