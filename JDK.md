@@ -1651,7 +1651,7 @@ public enum State {
 
   　　1. 保证了不同线程对这个变量进行操作时的可见性，即一个线程修改了某个变量的值，这新值对其他线程来说是立即可见的。
 
-  　　2. 禁止进行指令重排序。
+        　　2. 禁止进行指令重排序。
 
 
 
@@ -3678,3 +3678,79 @@ Exception又分为可检查（checked）异常和不检查（unchecked）异常
 
 - 在try块中有System.exit(0);这样的语句，System.exit(0);是终止Java虚拟机JVM的，连JVM都停止了，所有都结束了，当然finally语句也不会被执行到。
 
+
+
+## Integer与int
+
+8个原始数据类型（Primitive Types，boolean、byte 、short、char、int、foat、double、long）
+
+> #### 值缓存
+
+构建Integer对象的传统方式是直接调用构造器，直接new一个对象。但是根据实践，我们发现大部分数据操作都是集中在有限的、较小的数值范围，因而，在Java 5中新增了静态工厂方法valueOf，在调用它的时候会利用一个缓存机制，带来了明显的性能改进。按照Javadoc，这个值默认缓存 是-128到127之间。
+
+
+
+其他的一些包装类也存在这种缓存，比如：
+
+- Boolean，缓存了true/false对应实例，确切说，只会返回两个常量实例Boolean.TRUE/FALSE。
+- Short，同样是缓存了-128到127之间的数值。 
+- Byte，数值有限，所以全部都被缓存。 
+- Character，缓存范围'\u0000' 到 '\u007F'。
+
+
+
+>  #### 自动装箱/自动拆箱是发生在什么阶段
+
+自动装箱实际上是一种语法糖。它们发生在编译阶段，生成的字节码是一致的。javac替我们自动把装箱转换为Integer.valueOf()，把拆箱替换为Integer.intValue() 
+
+
+
+### 源码分析
+
+> #### 缓存大小
+
+Integer的缓存范围虽然默认是-128到127，但是在特别的应用场景，比如我们明确知道应用会频繁使用更大的数值，这时候应该怎么办呢？ 缓存上限值实际是可以根据需要调整的，JVM提供了参数设置： ```-XX:AutoBoxCacheMax=N```
+
+实现在IntegerCache的静态初始化块里
+
+```java
+private satic class IntegerCache {
+ satic fnal int low = -128;
+ satic fnal int high;
+ satic fnal Integer cache[];
+ satic {
+ // high value may be confgured by property
+ int h = 127;
+ String integerCacheHighPropValue = VM.getSavedProperty("java.lang.Integer.IntegerCache.high");
+ ...
+ // range [-128, 127] mus be interned (JLS7 5.1.7)
+ assert IntegerCache.high >= 127;
+ }
+ ...
+ }
+```
+
+> #### 可变性
+
+字符串是不可变的，保证了基本的信息安全和并发编程中的线程安全。如果去看包装类里存储数值的成员变量“value”，会发现， 不管是Integer还Boolean等，都被声明为“private fnal”，所以，它们同样是不可变类型！ 
+
+这种设计是可以理解的，或者说是必须的选择。想象一下这个应用场景，比如Integer提供了getInteger()方法，用于方便地读取系统属性，我们可以用属性来设置服务器某个服务 的端口，如果我可以轻易地把获取到的Integer对象改变为其他数值，这会带来产品可靠性方面的严重问题。
+
+
+
+> #### 线程安全
+
+- 原始数据类型的变量，显然要使用并发相关手段，才能保证线程安全，类似AtomicInteger、AtomicLong这样的线程安全类。 
+- 特别的是，部分比较宽的数据类型，比如foat、double，甚至不能保证更新操作的原子性，可能出现程序读取到只更新了一半数据位的数值！
+
+
+
+> #### 原始数据类型和引用类型局限性
+
+- 原始数据类型和Java泛型并不能配合使用 
+
+  这是因为Java的泛型某种程度上可以算作伪泛型，它完全是一种编译期的技巧，Java编译期会自动将类型转换为对应的特定类型，这就决定了使用泛型，必须保证相应类型可以转换 为Object。
+
+- 无法高效地表达数据，也不便于表达复杂的数据结构，比如vector和tuple 
+
+  我们知道Java的对象都是引用类型，如果是一个原始数据类型数组，它在内存里是一段连续的内存，而对象数组则不然，数据存储的是引用，对象往往是分散地存储在堆的不同位置。这种设计虽然带来了极大灵活性，但是也导致了数据操作的低效，尤其是无法充分利用现代CPU缓存机制。
