@@ -482,6 +482,7 @@ new Resource().action()
 
 - 函数接口
 - 接口final函数
+- 接口default method
 - lambda
 
 
