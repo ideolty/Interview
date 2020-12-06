@@ -1659,7 +1659,7 @@ public enum State {
 
 
 
-## volatile
+## Volatile
 
 volatile的性质
 
@@ -1704,7 +1704,7 @@ volatile的性质
 
 
 
-## synchronize
+## Synchronize
 
 对于每一个对象，**有且仅有一个同步锁**；不同的线程能共同访问该同步锁。但是，在同一个时间点，该同步锁**能且只能被一个线程**获取到。这样，获取到同步锁的线程就能进行CPU调度，从而在CPU上执行；而没有获取到同步锁的线程，必须进行等待，直到获取到同步锁之后才能继续运行。synchronized是在JVM层面实现的，编译后，synchronized关键字会被编译成一组命令包裹住文件块。
 
@@ -1745,6 +1745,10 @@ synchronized 使用的锁存在 Java 对象头中。HotSpot 虚拟机的对象�
 
 
 
+>  具体更细节的问题，例如，多个线程抢一把锁，那么是如何等待的？是不断的轮询加锁，还是有个等待队列，参考JVM文档
+
+
+
 [重学多线程（十）—— synchronized 原理与锁升级](https://blog.csdn.net/tjreal/article/details/80548662)
 
 
@@ -1765,7 +1769,7 @@ synchronized 使用的锁存在 Java 对象头中。HotSpot 虚拟机的对象�
 
 
 
-- ### **ReentrantLock**(独占锁、可重入锁)
+### **ReentrantLock**(独占锁、可重入锁)
 
 1. ReentrantLock是一个**可重入的互斥锁**，又被称为“独占锁”。
 
@@ -1777,7 +1781,9 @@ synchronized 使用的锁存在 Java 对象头中。HotSpot 虚拟机的对象�
 
 
 
-​	ReentrantLock分为“**公平锁**”和“**非公平锁**”。它们的区别体现在获取锁的机制上是否公平。“锁”是为了保护竞争资源，防止多个线程同时操作线程而出错，ReentrantLock在**同一个时间点只能被一个线程获取**(当某线程获取到“锁”时，其它线程就必须等待)；ReentraantLock是通过一个**FIFO的等待队列**来管理获取该锁所有线程的。在“公平锁”的机制下，线程依次排队获取锁；而“非公平锁”在锁是可获取状态时，不管自己是不是在队列的开头都会获取锁。
+ReentrantLock分为“**公平锁**”和“**非公平锁**”。它们的区别体现在获取锁的机制上是否公平。“锁”是为了保护竞争资源，防止多个线程同时操作线程而出错，ReentrantLock在**同一个时间点只能被一个线程获取**(当某线程获取到“锁”时，其它线程就必须等待)；ReentraantLock是通过一个**FIFO的等待队列**来管理获取该锁所有线程的。在“公平锁”的机制下，线程依次排队获取锁；而“非公平锁”在锁是可获取状态时，不管自己是不是在队列的开头都会获取锁。
+
+这里所谓的公平性是指在竞争场景中，当公平性为真时，会倾向于将锁赋予等待时间最久的线程。公平性是减少线程“饥饿”（个别线程长期等待锁，但始终无法获取）情况发生的一 个办法。
 
 
 
@@ -1803,20 +1809,6 @@ synchronized 使用的锁存在 Java 对象头中。HotSpot 虚拟机的对象�
 
 
 
-### AbstractQueuedSynchronizer(AQS **抽象队列同步器**)
-
-​	**AQS是一个并发包的基础组件，用来实现各种锁，各种同步组件的。它包含了state同步状态变量、加锁线程、等待队列等并发中的核心组件。** **ReentrantLock、CountDownLatch、CyclicBarrier**底层是基于AQS实现的锁。ReentrantLock这种东西只是一个外层的API，**内核中的锁机制实现都是依赖AQS组件的**。
-
-
-
-AQS替用户解决了如下问题
-
-1. 资源是可以被同时访问？还是在同一时间只能被一个线程访问？（共享/独占功能）
-2. 访问资源的线程如何进行并发管理？（等待队列）
-3. 如果线程等不及资源了，如何从等待队列退出？（超时/中断）
-
-
-
 ReentrantLock加锁的主要过程：
 
 1. **可重入加锁**。其实每次线程可重入加锁一次，会判断一下当前加锁线程就是自己，那么他自己就可重入多次加锁，每次加锁就是把state的值给累加1，别的没变化。
@@ -1826,17 +1818,11 @@ ReentrantLock加锁的主要过程：
 
 
 
+与synchronize相比，可以实现更加精细化的操作，体现在：
 
-
-
-
-[大白话聊聊Java并发面试问题之谈谈你对AQS的理解？【石杉的架构笔记】](https://juejin.im/post/5c07e59cf265da617464a09c)
-
-[Java多线程进阶（六）—— J.U.C之locks框架：AQS综述(1)](https://segmentfault.com/a/1190000015562787)
-
-[Java多线程进阶（七）—— J.U.C之locks框架：AQS独占功能剖析(2)](https://segmentfault.com/a/1190000015804888)
-
-
+- 带超时的获取锁尝试。 
+- 可以判断是否有线程，或者某个特定线程，在排队等待获取锁。 
+- 可以响应中断请求。
 
 
 
@@ -1844,7 +1830,10 @@ ReentrantLock加锁的主要过程：
 
 所谓的读写锁，就是将一个锁拆分为读锁和写锁两个锁。
 
-
+1. ReadWriteLock，是读写锁。它维护了一对相关的锁 — — “读取锁”和“写入锁”，一个用于读取操作，另一个用于写入操作。
+2. “读取锁”用于只读操作，它是“共享锁”，能同时被多个线程获取。
+3. “写入锁”用于写入操作，它是“独占锁”，写入锁只能被一个线程锁获取。**注意：不能同时存在读取锁和写入锁！**
+4. ReadWriteLock是一个接口。ReentrantReadWriteLock是它的实现类，ReentrantReadWriteLock包括子类ReadLock和WriteLock。
 
 ```java
         ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
@@ -1868,7 +1857,27 @@ ReentrantLock加锁的主要过程：
 
 
 
-链接：https://juejin.im/post/5c0c8540e51d451dbe4fdd83
+
+
+
+
+**获取锁的过程**：
+
+   	1. 先通过tryAcquireShared()尝试获取共享锁。尝试成功的话，则直接返回；
+   	2. 尝试失败的话，则通过doAcquireShared()不断的循环并尝试获取锁，若有需要，则阻塞等待。doAcquireShared()在循环中每次尝试获取锁时，都是通过tryAcquireShared()来进行尝试的。
+
+
+
+**释放共享锁**：
+
+1. 先通过tryReleaseShared()尝试释放共享锁。
+2. 尝试成功的话，则通过doReleaseShared()唤醒“其他等待获取共享锁的线程”，并返回true；否则的话，返回flase。
+
+
+
+https://juejin.im/post/5c0c8540e51d451dbe4fdd83
+
+[自旋锁、排队自旋锁、MCS锁、CLH锁](https://coderbee.net/index.php/concurrent/20131115/577/comment-page-1)
 
 
 
@@ -1876,7 +1885,7 @@ ReentrantLock加锁的主要过程：
 
 ### Condition
 
-​	Condition的作用是对锁进行更精确的控制。Condition中的await()方法相当于Object的wait()方法，Condition中的signal()方法相当于Object的notify()方法，Condition中的signalAll()相当于Object的notifyAll()方法。不同的是，Object中的wait(),notify(),notifyAll()方法是和"同步锁"synchronized关键字捆绑使用的；而Condition是需要与"互斥锁"/"共享锁"捆绑使用的。
+Condition的作用是对锁进行更精确的控制。Condition中的await()方法相当于Object的wait()方法，Condition中的signal()方法相当于Object的notify()方法，Condition中的signalAll()相当于Object的notifyAll()方法。不同的是，Object中的wait(),notify(),notifyAll()方法是和"同步锁"synchronized关键字捆绑使用的；而Condition是需要与"互斥锁"/"共享锁"捆绑使用的。
 
 
 
@@ -1884,9 +1893,61 @@ ReentrantLock加锁的主要过程：
 
 
 
+这里参考ArrayBlockingQueue类的源码看如何使用
+
+```java
+    /** Condition for waiting takes */
+    private fnal Condition notEmpty;
+    /** Condition for waiting puts */
+    private fnal Condition notFull;
+    public ArrayBlockingQueue(int capacity, boolean fair) {
+        if (capacity <= 0)
+            throw new IllegalArgumentException();
+        this.items = new Object[capacity];
+        lock = new ReentrantLock(fair);
+        notEmpty = lock.newCondition();
+        notFull =  lock.newCondition();
+    }
+
+    public E take() throws InterruptedException {
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            while (count == 0)
+                notEmpty.await();
+            return dequeue();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void enqueue(E x) {
+        // assert lock.getHoldCount() == 1;
+        // assert items[putIndex] == null;
+        final Object[] items = this.items;
+        items[putIndex] = x;
+        if (++putIndex == items.length)
+            putIndex = 0;
+        count++;
+        notEmpty.signal();
+    }
+```
+
+
+
+- 两个条件变量是从同一再入锁创建出来，然后使用在特定操作中，如take方法。
+- 当队列为空时，试图take的线程的正确行为应该是等待入队发生，而不是直接返回，这是BlockingQueue的语义，使用条件notEmpty就可以优雅地实现这一逻辑。
+- 在enqueue方法中入队，触发后续take操作。
+
+
+
+
+
+
+
 ### LockSupport
 
-​	LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。 LockSupport中的park() 和 unpark() 的作用分别是阻塞线程和解除阻塞线程，而且park()和unpark()不会遇到“Thread.suspend 和 Thread.resume所可能引发的死锁”问题。因为park() 和 unpark()有许可的存在；调用 park() 的线程和另一个试图将其 unpark() 的线程之间的竞争将保持活性。
+LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。 LockSupport中的park() 和 unpark() 的作用分别是阻塞线程和解除阻塞线程，而且park()和unpark()不会遇到“Thread.suspend 和 Thread.resume所可能引发的死锁”问题。因为park() 和 unpark()有许可的存在；调用 park() 的线程和另一个试图将其 unpark() 的线程之间的竞争将保持活性。
 
 
 
@@ -1898,38 +1959,35 @@ ReentrantLock加锁的主要过程：
 
 
 
-- ### **ReentrantReadWriteLock**(可重入的读写锁)
-
-1. ReadWriteLock，是读写锁。它维护了一对相关的锁 — — “读取锁”和“写入锁”，一个用于读取操作，另一个用于写入操作。
-2. “读取锁”用于只读操作，它是“共享锁”，能同时被多个线程获取。
-3. “写入锁”用于写入操作，它是“独占锁”，写入锁只能被一个线程锁获取。**注意：不能同时存在读取锁和写入锁！**
-4. ReadWriteLock是一个接口。ReentrantReadWriteLock是它的实现类，ReentrantReadWriteLock包括子类ReadLock和WriteLock。
-
-
-
-**获取锁的过程**：
-
- 	1. 先通过tryAcquireShared()尝试获取共享锁。尝试成功的话，则直接返回；
- 	2. 尝试失败的话，则通过doAcquireShared()不断的循环并尝试获取锁，若有需要，则阻塞等待。doAcquireShared()在循环中每次尝试获取锁时，都是通过tryAcquireShared()来进行尝试的。
-
-
-
-**释放共享锁**：
-
-1. 先通过tryReleaseShared()尝试释放共享锁。
-2. 尝试成功的话，则通过doReleaseShared()唤醒“其他等待获取共享锁的线程”，并返回true；否则的话，返回flase。
-
-
-
-[自旋锁、排队自旋锁、MCS锁、CLH锁](https://coderbee.net/index.php/concurrent/20131115/577/comment-page-1)
-
-
-
 ### Semaphore 
 
 //todo
 
 [深入理解Semaphore](https://blog.csdn.net/qq_19431333/article/details/70212663)
+
+
+
+## AbstractQueuedSynchronizer(AQS **抽象队列同步器**)
+
+**AQS是一个并发包的基础组件，用来实现各种锁，各种同步组件的。它包含了state同步状态变量、加锁线程、等待队列等并发中的核心组件。** **ReentrantLock、CountDownLatch、CyclicBarrier**底层是基于AQS实现的锁。ReentrantLock这种东西只是一个外层的API，**内核中的锁机制实现都是依赖AQS组件的**。
+
+
+
+AQS替用户解决了如下问题
+
+1. 资源是可以被同时访问？还是在同一时间只能被一个线程访问？（共享/独占功能）
+2. 访问资源的线程如何进行并发管理？（等待队列）
+3. 如果线程等不及资源了，如何从等待队列退出？（超时/中断）
+
+
+
+[大白话聊聊Java并发面试问题之谈谈你对AQS的理解？【石杉的架构笔记】](https://juejin.im/post/5c07e59cf265da617464a09c)
+
+[Java多线程进阶（六）—— J.U.C之locks框架：AQS综述(1)](https://segmentfault.com/a/1190000015562787)
+
+[Java多线程进阶（七）—— J.U.C之locks框架：AQS独占功能剖析(2)](https://segmentfault.com/a/1190000015804888)
+
+
 
 
 
@@ -3043,7 +3101,7 @@ public class RunnableTest implements Runnable {
 
 ## ThreadLocal
 
-​	线程本地变量，ThreadLocal设计的目的是为了能够在当前线程中有属于自己的变量，并不是为了解决并发或者共享变量的问题。一般用在这几个地方：
+线程本地变量，ThreadLocal设计的目的是为了能够在当前线程中有属于自己的变量，并不是为了解决并发或者共享变量的问题。一般用在这几个地方：
 
 - 管理数据库的Connection，把创建的Connection存起来，保证同一个线程使用同一个Connection，从而保证了事务。
 - 避免一些参数的传递，可以参考一下Cookie和Session：
