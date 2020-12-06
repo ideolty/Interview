@@ -1449,6 +1449,16 @@ takeLock用于控制出队的并发，putLock用于入队的并发。这也就�
 
 
 
+> #### 线程是什么
+
+从操作系统的角度，可以简单认为，线程是系统调度的最小单元，一个进程可以包含多个线程，作为任务的真正运作者，有自己的栈（Stack）、寄存器（Register）、本地存储 （Thread Local）等，但是会和进程内其他线程共享文件描述符、虚拟地址空间等。
+
+在具体实现中，线程还分为内核线程、用户线程，Java的线程实现其实是与虚拟机相关的。对于我们最熟悉的Sun/Oracle JDK，其线程也经历了一个演进过程，基本上在Java 1.2之后，JDK已经抛弃了所谓的Green Thread，也就是用户调度的线程，现在的模型是一对一映射到操作系统内核线程。 如果我们来看Thread的源码，你会发现其基本操作逻辑大都是以JNI形式调用的本地代码。
+
+
+
+
+
 ## Thread 和 Runnable
 
 **Runnable** 是一个接口，该接口中只包含了一个run()方法。它的定义如下：
@@ -2207,6 +2217,100 @@ join
   ```
 
   在 join 线程完成后会调用 notifyAll() 方法，是在 JVM 实现中调用，所以这里看不出来。
+
+
+
+## 死锁
+
+>  #### 什么情况下Java程序会产生死锁？
+
+死锁是一种特定的程序状态，在实体之间，由于循环依赖导致彼此一直处于等待之中，没有任何个体可以继续前进。死锁不仅仅是在线程之间会发生，存在资源独占的进程之间同样 也可能出现死锁。通常来说，我们大多是聚焦在多线程场景中的死锁，指两个或多个线程之间，由于互相持有对方需要的锁，而永久处于阻塞的状态。
+
+```java
+public class DeadLockSample extends Thread {
+    private String frs;
+    private String second;
+    public DeadLockSample(String name, String frs, String second) {
+        super(name);
+        this.frs = frs;
+        this.second = second;
+    }
+    public void run() {
+        synchronized (frs) {
+            Sysem.out.println(this.getName() + " obtained: " + frs);
+            try {
+                Thread.sleep(1000L);
+                synchronized (second) {
+                    Sysem.out.println(this.getName() + " obtained: " + second);
+                }
+            } catch (InterruptedException e) {
+                // Do nothing
+            }
+        }
+    }
+    public satic void main(String[] args) throws InterruptedException {
+        String lockA = "lockA";
+        String lockB = "lockB";
+      	// 入参顺序不一样
+        DeadLockSample t1 = new DeadLockSample("Thread1", lockA, lockB);
+        DeadLockSample t2 = new DeadLockSample("Thread2", lockB, lockA);
+        t1.sart();
+        t2.sart();
+        t1.join();
+        t2.join();
+    }
+}
+```
+
+
+
+> #### 如何定位、修复？
+
+定位死锁最常见的方式就是利用jstack等工具获取线程栈，然后定位互相之间的依赖关系，进而找到死锁。如果是比较明显的死锁，往往jstack等就能直接定位，类似JConsole甚至可以在图形界面进行有限的死锁检测。 如果程序运行时发生了死锁，绝大多数情况下都是无法在线解决的，只能重启、修正程序本身问题。所以，代码开发阶段互相审查，或者利用工具进行预防性排查，往往也是很重要的。
+
+
+
+- 首先，可以使用jps或者系统的ps命令、任务管理器等工具，确定进程ID。 
+
+- 其次，调用jstack获取线程栈：
+
+  ```cmd
+  ${JAVA_HOME}\bin\jsack your_pid
+  ```
+
+  
+
+- 最后，结合代码分析线程栈信息。
+
+可以考虑使用Java提供的标准管理API，**ThreadMXBean**，其直接就提供 了fndDeadlockedThreads()方法用于定位
+
+
+
+> #### 死锁避免
+
+**死锁前提**
+
+- 互斥条件：一个资源每次只能被一个进程使用，即在一段时间内某 资源仅为一个进程所占有。此时若有其他进程请求该资源，则请求进程只能等待。
+- 请求与保持条件：进程已经保持了至少一个资源，但又提出了新的资源请求，而该资源 已被其他进程占有，此时请求进程被阻塞，但对自己已获得的资源保持不放。
+- 不可剥夺条件:进程所获得的资源在未使用完毕之前，不能被其他进程强行夺走，即只能 由获得该资源的进程自己来释放（只能是主动释放)。
+- 循环等待条件: 若干进程间形成首尾相接循环等待资源的关系
+
+
+
+**思路**
+
+- 第一种方法 如果可能的话，尽量避免使用多个锁，并且只有需要时才持有锁。
+- 第二种方法 如果必须使用多个锁，尽量设计好锁的获取顺序，银行家算法。
+- 第三种方法 使用带超时的方法
+- 第四种方法 业界也有一些其他方面的尝试，比如通过静态代码分析（如FindBugs）去查找固定的模式，进而定位可能的死锁或者竞争情况。
+
+
+
+
+
+
+
+《java核心技术面试精讲-40讲——18什么情况下Java程序会产生死锁？如何定位、修复》
 
 
 
@@ -3299,6 +3403,7 @@ jdk11
 3. 调用ThreadLocal的set()方法时，实际上就是往ThreadLocalMap设置值，key是ThreadLocal对象（this），值是传递进来的对象
 4. 调用ThreadLocal的get()方法时，实际上就是往ThreadLocalMap获取值，key是ThreadLocal对象
 5.  **ThreadLocal本身并不存储值**，它只是**作为一个key来让线程从ThreadLocalMap获取value**。
+6. ThreadLocalMap，其内部条目是**弱引用**，
 
 
 
