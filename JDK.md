@@ -1418,6 +1418,10 @@ takeLock用于控制出队的并发，putLock用于入队的并发。这也就�
 
 
 
+### CopyOnWriteArrayList
+
+
+
 
 
 
@@ -1882,7 +1886,7 @@ ReentrantLock加锁的主要过程：
 **获取锁的过程**：
 
    	1. 先通过tryAcquireShared()尝试获取共享锁。尝试成功的话，则直接返回；
-   	2. 尝试失败的话，则通过doAcquireShared()不断的循环并尝试获取锁，若有需要，则阻塞等待。doAcquireShared()在循环中每次尝试获取锁时，都是通过tryAcquireShared()来进行尝试的。
+      	2. 尝试失败的话，则通过doAcquireShared()不断的循环并尝试获取锁，若有需要，则阻塞等待。doAcquireShared()在循环中每次尝试获取锁时，都是通过tryAcquireShared()来进行尝试的。
 
 
 
