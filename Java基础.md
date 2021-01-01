@@ -499,7 +499,96 @@ Java提供的默认排序算法是什么？
 
 
 
+# 反射 — 动态代理
 
+> 谈谈Java反射机制，动态代理是基于什么原理？ ——  《java核心技术面试精讲-40讲 — 06动态代理是基于什么原理？》
+
+这个题目有点诱导的嫌疑，会下意识地以为动态代理就是利用反射机制实现的，这么说不算错但稍微有些不全面。
+
+实现动态代理的方式很多，比如：
+
+- JDK自身提供的动态代理，就是主要利用了**反射机制**。
+- 比如利用传说中更高性能的**字节码操作**机制，类似ASM、cglib（基于ASM）、Javassist等。
+
+
+
+最简单的通常的使用，我们可以通过 Class 对象枚举该类中的所有方法，我们还可以通过 `Method.setAccessible`绕过 Java 语言的访问权限，在私有方法所在类之外的地方调用该方法。例如
+
+```java
+Method method = test.class.getMethod("main1");
+Annotation[] annotations = test.class.getAnnotations();
+method.invoke("name");
+```
+
+这里观察一下反射具体是怎么实现的。
+
+java.lang.reflect.Method#invoke
+
+```java
+public Object invoke(Object obj, Object... args)
+    throws IllegalAccessException, IllegalArgumentException,
+       InvocationTargetException
+{
+    // 权限检查
+    if (!override) {
+        if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, clazz, obj, modifiers);
+        }
+    }
+    // 委派给MethodAccessor来处理具体任务
+    MethodAccessor ma = methodAccessor;             // read volatile
+    if (ma == null) {
+        ma = acquireMethodAccessor();
+    }
+    return ma.invoke(obj, args);
+}
+```
+
+`MethodAccessor `是一个接口，它有两个已有的具体实现：一个通过本地方法来实现反射调用，另一个则使用了委派模式。
+
+反射调用先是调用了Method.invoke，然后进入委派实现（DelegatingMethodAccessorImpl），再然后进入本地实现（NativeMethodAccessorImpl），最后到达目标方法。 
+
+为什么反射调用还要采取委派实现作为中间层？直接交给本地实现不可以么？Java 的反射调用机制还设立了另一种动态生成字节码的实现（下称动态实现），直接使用 invoke 指令来调用目标方法。之所以采用委派实现，便是为了能够在本地实现以及动态实现中切换。
+
+sun.reflect.ReflectionFactory#newMethodAccessor
+
+```
+public MethodAccessor newMethodAccessor(Method var1) {
+    checkInitted();
+    if (noInflation && !ReflectUtil.isVMAnonymousClass(var1.getDeclaringClass())) {
+    		// 使用asm等一些动态字节码操作工具
+        return (new MethodAccessorGenerator()).generateMethod(var1.getDeclaringClass(), var1.getName(), var1.getParameterTypes(), var1.getReturnType(), var1.getExceptionTypes(), var1.getModifiers());
+    } else {
+    		// 使用本地实现
+        NativeMethodAccessorImpl var2 = new NativeMethodAccessorImpl(var1);
+        DelegatingMethodAccessorImpl var3 = new DelegatingMethodAccessorImpl(var2);
+        var2.setParent(var3);
+        return var3;
+    }
+}
+```
+
+动态实现和本地实现相比，其运行效率要快上 20 倍 。这是因为动态实现无需经过 Java 到 C++ 再到 Java 的切换。
+
+但由于生成字节码十分耗时，仅调用一次的话，反而是本地实现要快 上 3 到 4 倍 [3]。 考虑到许多反射调用仅会执行一次，Java 虚拟机设置了一个阈值 15（可以通过 - Dsun.reflect.inflationThreshold= 来调整），当某个反射调用的调用次数在 15 之下时，采用本地实现；当达到 15 时，便开始动态生成字节码，并将委派实现的委派对象切换至动态实现， 这个过程我们称之为 Inflation。
+
+
+
+> **反射开销**
+
+Class.forName 和 Class.getMethod。
+
+Class.forName 会调用本地方法，Class.getMethod 则会遍历该类的公有方法。如果没有匹配到，它还将遍历父类的公有方法。所以能缓存就缓存一下。
+
+
+
+Method.invoke
+
+- 第一，由于 Method.invoke 是一个变长参数方法，在字节码层面它的最后一个参数会是 Object 数组。Java 编译器会在方法调用处生成一个长度为传入参数数量的 Object 数组，并将传入参数一一存储进该数组中。 
+- 第二，由于 Object 数组不能存储基本类型，Java 编译器会对传入的基本类型参数进行自动装箱。
+
+这两个操作除了带来性能开销外，还可能占用堆内存，使得 GC 更加频繁。
 
 
 
@@ -671,3 +760,6 @@ throws是用来声明一个方法可能抛出的所有异常信息，throws是�
 **代码补充**
 
 按照要求，定义一个类型或者实现类型中的成员函数
+
+
+
