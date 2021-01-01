@@ -1,8 +1,7 @@
 # 综述
 
 1. 多个JDK版本混合使用，如果没有特别指明，那么本文使用的jdk版本为jdk1.8.0_65。
-2. 主要内容是java容器与多线程。
-3. 最初的书写时间为2018年11月。
+2. 主要内容是java容器与多线程，面向面试梳理。
 4. 文章内大量引用技术博客。
 
 
@@ -1312,11 +1311,11 @@ Set的底层存储都是基于Map。HashSet的实现基于HashMap，TreeSet的�
 
 
 
-## Concurrent下集合
+## Concurrent包中集合
 
 **堵塞和非堵塞**
 
-阻塞队列与普通队列的区别在于，当队列是空的时，从队列中获取元素的操作将会被阻塞，或者当队列是满时，往队列里添加元素的操作会被阻塞。试图从空的阻塞队列中获取元素的线程将会被阻塞，直到其他的线程往空的队列插入新的元素。同样，试图往已满的阻塞队列中添加新元素的线程同样也会被阻塞，直到其他的线程使队列重新变得空闲起来，如从队列中移除一个或者多个元素，或者完全清空队列.
+阻塞队列与普通队列的区别在于，当队列是空的时，从队列中获取元素的操作将会被阻塞，或者当队列是满时，往队列里添加元素的操作会被阻塞。试图从空的阻塞队列中获取元素的线程将会被阻塞，直到其他的线程往空的队列插入新的元素。同样，试图往已满的阻塞队列中添加新元素的线程同样也会被阻塞，直到其他的线程使队列重新变得空闲起来，如从队列中移除一个或者多个元素，或者完全清空队列。
 
 1. ArrayDeque, （数组双端队列）
 
@@ -1345,6 +1344,230 @@ Set的底层存储都是基于Map。HashSet的实现基于HashMap，TreeSet的�
 13. BlockingQueue: 这是一个接口，JDK内部通过链表、数组等方式实现了这个接口。表示阻塞队列，非常适合用于作为数据共享的通道。
 
 14. ConcurrentSkipListMap: 跳表的实现。这是一个Map，使用跳表的数据结构进行快速查找
+
+
+
+首先明确一下概念，Deque与Queue的区别，这两个单词实在是太像了。
+
+- Deque是double ended queue，将其理解成双端结束的队列，双端队列，可以在首尾插入或删除元素。
+- Queue是简单的FIFO队列，在概念上来说，Queue是FIFO的单端队列，Deque是双端队列。
+
+
+
+其实里面大多数的内容应该是属于数据结构的范围，此处分析几个与同步相关的集合，其余部分在数据结构中分析。
+
+
+
+### CopyOnWriteArrayList
+
+首先可以知道的是，这个是CopyOnWrite思路的一个实现，此时需要先了解一下概念，cow在很多地方都有具体的应用，例如redis子线程在写日志的时候，等等。
+
+> ## CopyOnWrite 
+>
+> 写入时复制（CopyOnWrite，简称COW）思想是计算机程序设计领域中的一种通用优化策略。其核心思想是，如果有多个调用者（Callers）同时访问相同的资源（如内存或者是磁盘上的数据存储），他们会共同获取相同的指针指向相同的资源，直到某个调用者修改资源内容时，系统才会真正复制一份专用副本（private  copy）给该调用者，而其他调用者所见到的最初的资源仍然保持不变。这过程对其他的调用者都是透明的（transparently）。此做法主要的优点是如果调用者没有修改资源，就不会有副本（private copy）被创建，因此多个调用者只是读取操作时可以共享同一份资源。
+>
+> 通俗易懂的讲，写入时复制技术就是不同进程在访问同一资源的时候，只有更新操作，才会去复制一份新的数据并更新替换，否则都是访问同一个资源。
+
+
+
+先看一下内部成员变量
+
+```java
+public class CopyOnWriteArrayList<E>
+    implements List<E>, RandomAccess, Cloneable, java.io.Serializable {
+    private static final long serialVersionUID = 8673264195747942595L;
+
+    /** The lock protecting all mutators */
+    final transient ReentrantLock lock = new ReentrantLock();
+
+    /** The array, accessed only via getArray/setArray. */
+    private transient volatile Object[] array;
+……
+```
+
+- 使用ReentrantLock来保证线程安全。
+- 内部具体存数据的时候还是与list一样，使用一个加了**transient volatile**的数组。
+- 除此之外还有3个私有的内部类，`COWIterator`、`COWSubList`、`COWSubListIterator`
+
+
+
+当调用`CopyOnWriteArrayList`的subList方法的时候其实是返回了一个新的`COWSubList`对象，这也是这个内部类唯一被使用到的地方了。
+
+```java
+public List<E> subList(int fromIndex, int toIndex) {
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        Object[] elements = getArray();
+        int len = elements.length;
+        if (fromIndex < 0 || toIndex > len || fromIndex > toIndex)
+            throw new IndexOutOfBoundsException();
+        return new COWSubList<E>(this, fromIndex, toIndex);
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+
+
+先从构造方法入手，一共有3个构造
+
+```java
+public CopyOnWriteArrayList() {
+    setArray(new Object[0]);
+}
+
+/**
+ * Creates a list containing the elements of the specified
+ * collection, in the order they are returned by the collection's
+ * iterator.
+ *
+ * @param c the collection of initially held elements
+ * @throws NullPointerException if the specified collection is null
+ */
+public CopyOnWriteArrayList(Collection<? extends E> c) {
+    Object[] elements;
+    if (c.getClass() == CopyOnWriteArrayList.class)
+        elements = ((CopyOnWriteArrayList<?>)c).getArray();
+    else {
+        elements = c.toArray();
+        // c.toArray might (incorrectly) not return Object[] (see 6260652)
+        if (elements.getClass() != Object[].class)
+            elements = Arrays.copyOf(elements, elements.length, Object[].class);
+    }
+    setArray(elements);
+}
+
+/**
+ * Creates a list holding a copy of the given array.
+ *
+ * @param toCopyIn the array (a copy of this array is used as the
+ *        internal array)
+ * @throws NullPointerException if the specified array is null
+ */
+public CopyOnWriteArrayList(E[] toCopyIn) {
+    setArray(Arrays.copyOf(toCopyIn, toCopyIn.length, Object[].class));
+}
+
+/**
+     * Sets the array.
+     */
+final void setArray(Object[] a) {
+  array = a;
+}
+```
+
+1. 如果是无参的，那么直接给一个空数组，这个其实有点奇怪，为什么没有16之类的默认长度？
+2. 如果是集合，或者是数组，最后都是进行一个元素拷贝，拿到一个新的数组。
+
+
+
+然后是新增方法
+
+```java
+public boolean add(E e) {
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        Object[] elements = getArray();
+        int len = elements.length;
+        Object[] newElements = Arrays.copyOf(elements, len + 1);
+        newElements[len] = e;
+        setArray(newElements);
+        return true;
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+1. 使用ReentrantLock来保证线程安全。
+2. 因为是写时复制，所以每次往里面插数据的时候都是进行一次原数组的拷贝。
+3. 相比于`ArrayList`，这个东西简单除暴了很多，没有什么预分配与数组的扩容了，相对而言简单了很多。
+
+
+
+然后查看删除方法
+
+```java
+public E remove(int index) {
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        Object[] elements = getArray();
+        int len = elements.length;
+        E oldValue = get(elements, index);
+        int numMoved = len - index - 1;
+        if (numMoved == 0)
+            setArray(Arrays.copyOf(elements, len - 1));
+        else {
+            Object[] newElements = new Object[len - 1];
+            System.arraycopy(elements, 0, newElements, 0, index);
+            System.arraycopy(elements, index + 1, newElements, index,
+                             numMoved);
+            setArray(newElements);
+        }
+        return oldValue;
+      
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+仍然很暴力，删掉一个数据后，直接通过`System.arraycopy`方法进行拷贝。
+
+
+
+再看看get方法。
+
+```java
+private E get(Object[] a, int index) {
+    return (E) a[index];
+}
+
+/**
+ * {@inheritDoc}
+ *
+ * @throws IndexOutOfBoundsException {@inheritDoc}
+ */
+public E get(int index) {
+    return get(getArray(), index);
+}
+
+private E get(Object[] a, int index) {
+		return (E) a[index];
+}
+```
+
+
+
+> **总结**
+
+- 这个类整体与想象中的不太一样。在系统中主进程fork创建子进程的时候，会采用写时复制的形式，把自己内存的段页映射表复制一份给子进程。当子进程读的时候，其实还是读的同一份，当主进程或者子进程写的时候，才开始真正进行内容复制。
+
+- 另外这个写时复制，复制的范围是不是太大了，直接全数组复制，明明只是增加了一个元素缺需要复制整个数组。
+
+- CopyOnWrite并发容器用于**读多写少**的**并发**场景。因为写入的成本太高了，而读的时候也不用加锁，只是一个对数组的随机访问。
+
+
+
+> **CopyOnWrite的缺点**
+
+CopyOnWrite容器有很多优点，但是同时也存在两个问题，即内存占用问题和数据一致性问题。
+
+- **内存占用问题**。因为CopyOnWrite的写时复制机制，所以在进行写操作的时候，内存里会同时驻扎两个对象的内存，旧的对象和新写入的对象。如果这些对象占用的内存比较大，比如说200M左右，那么再写入100M数据进去，内存就会占用300M，那么这个时候很有可能造成频繁的Yong GC和Full GC。针对内存占用问题，可以通过压缩容器中的元素的方法来减少大对象的内存消耗，比如，如果元素全是10进制的数字，可以考虑把它压缩成36进制或64进制。或者不使用CopyOnWrite容器，而使用其他的并发容器，如ConcurrentHashMap。
+
+- **数据一致性问题**。CopyOnWrite容器只能保证数据的最终一致性，不能保证数据的实时一致性。所以如果你希望写入的的数据，马上能读到，请不要使用CopyOnWrite容器。
+
+  
+
+> **CopyOnWriteArrayList为什么并发安全且性能比Vector好**
+
+Vector增删改查方法都加了synchronized，保证同步，但是每个方法执行的时候都要去获得锁，性能就会大大下降，而CopyOnWriteArrayList 只是在增删改上加锁，但是读不加锁，在读方面的性能就好于Vector，CopyOnWriteArrayList支持读多写少的并发情况。
+
+
 
 
 
@@ -1415,10 +1638,6 @@ takeLock用于控制出队的并发，putLock用于入队的并发。这也就�
 ### DelayQueue
 
 //todo
-
-
-
-### CopyOnWriteArrayList
 
 
 
@@ -1631,9 +1850,9 @@ public enum State {
 
 ## Java内存模型
 
-​	当程序在运行过程中，会将运算需要的数据从主内存复制一份到CPU的高速缓存当中，那么CPU进行计算时就可以直接从它的高速缓存读取数据和向其中写入数据，当运算结束之后，再将高速缓存中的数据刷新到主存当中。		
+当程序在运行过程中，会将运算需要的数据从主内存复制一份到CPU的高速缓存当中，那么CPU进行计算时就可以直接从它的高速缓存读取数据和向其中写入数据，当运算结束之后，再将高速缓存中的数据刷新到主存当中。		
 
-​	在多核CPU中，每条线程可能运行于不同的CPU中，因此每个线程运行时有自己的高速缓存（对单核CPU来说，其实也会出现这种问题，只不过是以线程调度的形式来分别执行的）从而出现缓存一致性问题。
+在多核CPU中，每条线程可能运行于不同的CPU中，因此每个线程运行时有自己的高速缓存（对单核CPU来说，其实也会出现这种问题，只不过是以线程调度的形式来分别执行的）从而出现缓存一致性问题。
 
 　　为了解决缓存不一致性问题，通常来说有以下2种解决方法：
 
@@ -1657,9 +1876,9 @@ public enum State {
 2. 可见性：是指当多个线程访问同一个变量时，一个线程修改了这个变量的值，其他线程能够立即看得到修改的值。
 3. 有序性：即程序执行的顺序按照代码的先后顺序执行。
 
-​	难道程序执行的顺序不是按照代码的先后顺序执行吗？并不完全是。一般来说，处理器为了提高程序运行效率，可能会对输入代码进行优化，它不保证程序中各个语句的执行先后顺序同代码中的顺序一致，但是它会保证程序最终执行结果和代码顺序执行的结果是一致的。这叫做JVM的**指令重排序**。
+难道程序执行的顺序不是按照代码的先后顺序执行吗？并不完全是。一般来说，处理器为了提高程序运行效率，可能会对输入代码进行优化，它不保证程序中各个语句的执行先后顺序同代码中的顺序一致，但是它会保证程序最终执行结果和代码顺序执行的结果是一致的。这叫做JVM的**指令重排序**。
 
-​	要想并发程序正确地执行，必须要保证原子性、可见性以及有序性。只要有一个没有被保证，就有可能会导致程序运行不正确。
+要想并发程序正确地执行，必须要保证原子性、可见性以及有序性。只要有一个没有被保证，就有可能会导致程序运行不正确。
 
 
 
@@ -1671,9 +1890,7 @@ public enum State {
 
 
 
-
-
-## Volatile
+### Volatile
 
 volatile的性质
 
@@ -1681,29 +1898,34 @@ volatile的性质
 
 **2. 可见性**：
 
-　　当一个共享变量被volatile修饰时，它会保证修改的值会立即被更新到主存，当有其他线程需要读取时，它会去内存中读取新值。这样就保证，任何一个线程修改了变量值，其他线程立马就可以看见了！这就是所谓的volatile保证了可见性的工作原理！
+　　当一个共享变量被volatile修饰时，它会保证修改的值会立即被更新到主存，当有其他线程需要读取时，它会去内存中读取新值。这样就保证，任何一个线程修改了变量值，其他线程立马就可以看见了！这就是所谓的volatile保证了可见性的工作原理。
 
 　　而普通的共享变量不能保证可见性，因为普通共享变量被修改之后，什么时候被写入主存是不确定的，当其他线程去读取时，此时内存中可能还是原来的旧值，因此无法保证可见性。
 
 　　另外，通过synchronized和Lock也能够保证可见性，synchronized和Lock能保证同一时刻只有一个线程获取锁然后执行同步代码，并且在释放锁之前会将对变量的修改刷新到主存当中。因此可以保证可见性。
 
+
+
 **3.有序性**：
 
-​	在Java内存模型中，允许编译器和处理器对指令进行重排序，但是重排序过程不会影响到单线程程序的执行，却会影响到多线程并发执行的正确性。
+在Java内存模型中，允许编译器和处理器对指令进行重排序，但是重排序过程不会影响到单线程程序的执行，却会影响到多线程并发执行的正确性。
 
-　　在Java里面，可以通过volatile关键字来保证一定的“有序性”。另外可以通过synchronized和Lock来保证有序性，很显然，synchronized和Lock保证每个时刻是有一个线程执行同步代码，相当于是让线程顺序执行同步代码，自然就保证了有序性。
+在Java里面，可以通过volatile关键字来保证一定的“有序性”。另外可以通过synchronized和Lock来保证有序性，很显然，synchronized和Lock保证每个时刻是有一个线程执行同步代码，相当于是让线程顺序执行同步代码，自然就保证了有序性。
 
 
 
 **4. 实现原理**：
 
-“观察加入volatile关键字和没有加入volatile关键字时所生成的汇编代码发现，加入volatile关键字时，会多出一个lock前缀指令”lock前缀指令实际上相当于一个内存屏障（也成内存栅栏），内存屏障会提供3个功能：
+观察加入volatile关键字和没有加入volatile关键字时所生成的汇编代码发现，加入volatile关键字时，会多出一个lock前缀指令lock前缀指令实际上相当于一个内存屏障（也成内存栅栏），内存屏障会提供3个功能：
 
-　　1）它确保指令重排序时不会把其后面的指令排到内存屏障之前的位置，也不会把前面的指令排到内存屏障的后面；即在执行到内存屏障这句指令时，在它前面的操作已经全部完成；
+  　　1. 它确保指令重排序时不会把其后面的指令排到内存屏障之前的位置，也不会把前面的指令排到内存屏障的后面；即在执行到内存屏障这句指令时，在它前面的操作已经全部完成；
+        　　2. 它会强制将对缓存的修改操作**立即**写入主存；
+              　　3. 如果是**写操作**，它会导致其他CPU中对应的缓存行无效。
 
-　　2）它会强制将对缓存的修改操作**立即**写入主存；
+具体场景是对于一个volatile变量：
 
-　　3）如果是**写操作**，它会导致其他CPU中对应的缓存行无效。
+- 对该变量的写操作之后，编译器会插入一个写屏障。 
+- 对该变量的读操作之前，编译器会插入一个读屏障。
 
 
 
@@ -1886,7 +2108,7 @@ ReentrantLock加锁的主要过程：
 **获取锁的过程**：
 
    	1. 先通过tryAcquireShared()尝试获取共享锁。尝试成功的话，则直接返回；
-      	2. 尝试失败的话，则通过doAcquireShared()不断的循环并尝试获取锁，若有需要，则阻塞等待。doAcquireShared()在循环中每次尝试获取锁时，都是通过tryAcquireShared()来进行尝试的。
+   	        	2. 尝试失败的话，则通过doAcquireShared()不断的循环并尝试获取锁，若有需要，则阻塞等待。doAcquireShared()在循环中每次尝试获取锁时，都是通过tryAcquireShared()来进行尝试的。
 
 
 
@@ -1988,6 +2210,10 @@ LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。 Lo
 
 
 ### Semaphore 
+
+Java版本的信号量实现
+
+
 
 //todo
 
@@ -3935,3 +4161,10 @@ private satic class IntegerCache {
 - 无法高效地表达数据，也不便于表达复杂的数据结构，比如vector和tuple 
 
   我们知道Java的对象都是引用类型，如果是一个原始数据类型数组，它在内存里是一段连续的内存，而对象数组则不然，数据存储的是引用，对象往往是分散地存储在堆的不同位置。这种设计虽然带来了极大灵活性，但是也导致了数据操作的低效，尤其是无法充分利用现代CPU缓存机制。
+
+
+
+
+
+# 动态代理
+
