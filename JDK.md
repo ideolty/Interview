@@ -1,3 +1,5 @@
+
+
 # 综述
 
 1. 多个JDK版本混合使用，如果没有特别指明，那么本文使用的jdk版本为jdk1.8.0_65。
@@ -4032,7 +4034,7 @@ Exception又分为可检查（checked）异常和不检查（unchecked）异常
 
 > #### 值缓存
 
-构建Integer对象的传统方式是直接调用构造器，直接new一个对象。但是根据实践，我们发现大部分数据操作都是集中在有限的、较小的数值范围，因而，在Java 5中新增了静态工厂方法valueOf，在调用它的时候会利用一个缓存机制，带来了明显的性能改进。按照Javadoc，这个值默认缓存 是-128到127之间。
+构建Integer对象的传统方式是直接调用构造器，直接new一个对象。但是根据实践，我们发现大部分数据操作都是集中在有限的、较小的数值范围，因而，在Java 5中新增了静态工厂方法valueOf，在调用它的时候会利用一个缓存机制，带来了明显的性能改进。按照Javadoc，这个值默认缓存是**-128到127之间**。这个是可以在启动的时候配置的
 
 
 
@@ -4061,10 +4063,10 @@ Integer的缓存范围虽然默认是-128到127，但是在特别的应用场景
 
 ```java
 private satic class IntegerCache {
- satic fnal int low = -128;
- satic fnal int high;
- satic fnal Integer cache[];
- satic {
+ static final int low = -128;
+ static final int high;
+ static final Integer cache[];
+ static {
  // high value may be confgured by property
  int h = 127;
  String integerCacheHighPropValue = VM.getSavedProperty("java.lang.Integer.IntegerCache.high");
@@ -4076,9 +4078,14 @@ private satic class IntegerCache {
  }
 ```
 
+Integer等包装类，定义了类似SIZE或者BYTES这样的常量，这反映了什么样的设计考虑呢？如果你使用过其他语言，比如C、C++，类似整数的位数，其实是不确定的，可 能在不同的平台，比如32位或者64位平台，存在非常大的不同。那么，在32位JDK或者64位JDK里，数据位数会有不同吗？或者说，这个问题可以扩展为，我使用32位JDK开发编 译的程序，运行在64位JDK上，需要做什么特别的移植工作吗？ 其实，这种移植对于Java来说相对要简单些，因为原始数据类型是不存在差异的，这些明确定义在Java语言规范里面，不管是32位还是64位环境，开发者无需担心数据的位数差异。
+
+
+
+
 > #### 可变性
 
-字符串是不可变的，保证了基本的信息安全和并发编程中的线程安全。如果去看包装类里存储数值的成员变量“value”，会发现， 不管是Integer还Boolean等，都被声明为“private fnal”，所以，它们同样是不可变类型！ 
+字符串是不可变的，保证了基本的信息安全和并发编程中的线程安全。如果去看包装类里存储数值的成员变量“value”，会发现， 不管是Integer还Boolean等，都被声明为“private final”，所以，它们同样是**不可变类型**！ 
 
 这种设计是可以理解的，或者说是必须的选择。想象一下这个应用场景，比如Integer提供了getInteger()方法，用于方便地读取系统属性，我们可以用属性来设置服务器某个服务 的端口，如果我可以轻易地把获取到的Integer对象改变为其他数值，这会带来产品可靠性方面的严重问题。
 
