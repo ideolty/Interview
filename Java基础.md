@@ -336,7 +336,7 @@ jcmd <pid> VM.native_memory detail.dif
 
 
 
-## 拷贝
+## 零拷贝
 
 > #### Java有几种文件拷贝方式？
 
