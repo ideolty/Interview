@@ -1958,23 +1958,23 @@ synchronized 使用的锁存在 Java 对象头中。HotSpot 虚拟机的对象�
 
 
 
-### **ReentrantLock**(独占锁、可重入锁)
+### **ReentrantLock**
 
 1. ReentrantLock是一个**可重入的互斥锁**，又被称为“独占锁”。
-
 2. ReentrantLock锁在同一个时间点只能被一个线程锁持有；
-
 3. 而可重入的意思是，ReentrantLock锁，可以被**单个线程**多次获取。
-
 4. 默认是“非公平锁”。
-
-
+5. 主要利用CAS+AQS队列来实现。
 
 ReentrantLock分为“**公平锁**”和“**非公平锁**”。它们的区别体现在获取锁的机制上是否公平。“锁”是为了保护竞争资源，防止多个线程同时操作线程而出错，ReentrantLock在**同一个时间点只能被一个线程获取**(当某线程获取到“锁”时，其它线程就必须等待)；ReentraantLock是通过一个**FIFO的等待队列**来管理获取该锁所有线程的。在“公平锁”的机制下，线程依次排队获取锁；而“非公平锁”在锁是可获取状态时，不管自己是不是在队列的开头都会获取锁。
 
 这里所谓的公平性是指在竞争场景中，当公平性为真时，会倾向于将锁赋予等待时间最久的线程。公平性是减少线程“饥饿”（个别线程长期等待锁，但始终无法获取）情况发生的一 个办法。
 
 
+
+看一下底层具体实现。
+
+首先ReentrantLock定义了3个内部类，分别是一个抽象类`Sync`与一个公平锁的实现`FairSync`与`NonfairSync`。其中抽象类`Sync`实现了AQS，ReentrantLock全程就调用`FairSync`与`NonfairSync`类来实现加锁。
 
 **获取锁的过程**：
 
@@ -2015,7 +2015,11 @@ ReentrantLock加锁的主要过程：
 
 
 
-### 读写锁
+可以参考[ReentrantLock原理](https://blog.csdn.net/fuyuwei2015/article/details/83719444)，文章中详细的分析了源码，需要把4个流程背一下。
+
+
+
+### ReentrantReadWriteLock
 
 所谓的读写锁，就是将一个锁拆分为读锁和写锁两个锁。
 
@@ -2068,9 +2072,43 @@ https://juejin.im/post/5c0c8540e51d451dbe4fdd83
 
 ### StampedLock
 
-JDK在后期引入了StampedLock，在提供类似读写锁的同时，还支持优化读模式。
+JDK8在后期引入了StampedLock，在提供类似读写锁的同时，还支持优化读模式。
 
 优化读基于假设，大多数情况下读操作并不会和写操作冲突，其逻辑是先试着修改，然后通过validate方法确认是否进入了写模式，如果没有进入，就成功避免了开销；如果进入，则尝试获取读锁。
+
+StampedLock虽然**不像其它锁一样定义了内部类来实现AQS框架**，但是StampedLock的基本实现思路还是利用CLH队列进行线程的管理，通过同步状态值来表示锁的状态和类型。StampedLock内部定义了很多常量，定义这些常量的根本目的还是和ReentrantReadWriteLock一样，对同步状态值按位切分，以通过位运算对State进行操作。
+
+
+
+**StampedLock的特点**
+
+StampedLock的主要特点概括一下，有以下几点：
+
+- StampedLock是为了优化可重入读写锁性能的一个锁实现工具，jdk8开始引入
+- 相比于普通的ReentranReadWriteLock主要多了一种乐观读的功能
+- 在API上增加了stamp的入参和返回值
+  - 所有获取锁的方法，都返回一个邮戳（Stamp），Stamp为0表示获取失败，其余都表示成功；
+  - 所有释放锁的方法，都需要一个邮戳（Stamp），这个Stamp必须是和成功获取锁时得到的Stamp一致；
+- StampedLock**是不可重入的**；（如果一个线程已经持有了写锁，再去获取写锁的话就会造成死锁）
+- StampedLock有三种访问模式：
+   ①Reading（读模式）：功能和ReentrantReadWriteLock的读锁类似
+   ②Writing（写模式）：功能和ReentrantReadWriteLock的写锁类似
+   ③Optimistic reading（乐观读模式）：这是一种优化的读模式。
+- StampedLock支持读锁和写锁的相互转换
+   我们知道RRW中，当线程获取到写锁后，可以降级为读锁，但是读锁是不能直接升级为写锁的。
+  StampedLock提供了读锁和写锁相互转换的功能，使得该类支持更多的应用场景。
+- 无论写锁还是读锁，都不支持Conditon等待
+
+> 我们知道，在ReentrantReadWriteLock中，当读锁被使用时，如果有线程尝试获取写锁，该写线程会阻塞。
+> 但是，在Optimistic reading中，即使读线程获取到了读锁，写线程尝试获取写锁也不会阻塞，这相当于对读模式的优化，但是可能会导致数据不一致的问题。所以，当使用Optimistic reading获取到读锁时，必须对获取结果进行校验。
+
+
+
+
+
+[Java多线程进阶（十一）—— J.U.C之locks框架：StampedLock](https://segmentfault.com/a/1190000015808032)
+
+
 
 
 
@@ -2148,8 +2186,6 @@ LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。 Lo
 
 
 
-
-
 ### Semaphore 
 
 Java版本的信号量实现
@@ -2162,33 +2198,9 @@ Java版本的信号量实现
 
 
 
-## AbstractQueuedSynchronizer(AQS **抽象队列同步器**)
-
-**AQS是一个并发包的基础组件，用来实现各种锁，各种同步组件的。它包含了state同步状态变量、加锁线程、等待队列等并发中的核心组件。** **ReentrantLock、CountDownLatch、CyclicBarrier**底层是基于AQS实现的锁。ReentrantLock这种东西只是一个外层的API，**内核中的锁机制实现都是依赖AQS组件的**。
 
 
-
-AQS替用户解决了如下问题
-
-1. 资源是可以被同时访问？还是在同一时间只能被一个线程访问？（共享/独占功能）
-2. 访问资源的线程如何进行并发管理？（等待队列）
-3. 如果线程等不及资源了，如何从等待队列退出？（超时/中断）
-
-
-
-[大白话聊聊Java并发面试问题之谈谈你对AQS的理解？【石杉的架构笔记】](https://juejin.im/post/5c07e59cf265da617464a09c)
-
-[Java多线程进阶（六）—— J.U.C之locks框架：AQS综述(1)](https://segmentfault.com/a/1190000015562787)
-
-[Java多线程进阶（七）—— J.U.C之locks框架：AQS独占功能剖析(2)](https://segmentfault.com/a/1190000015804888)
-
-
-
-
-
-## CountDownLatch 和 CyclicBarrier
-
- ### CountDownLatch 
+### CountDownLatch 
 
 CountDownLatch是一个同步辅助类，在完成一组正在其他线程中执行的操作之前，它允许一个或多个线程一直等待。CountDownLatch 可以实现 join 相同的功能，但是更加的灵活。
 
@@ -2232,11 +2244,9 @@ CountDownLatch 也是基于 AQS(AbstractQueuedSynchronizer) 实现的
 
 
 
-
-
 ### CyclicBarrier（同步屏障）
 
-​	CyclicBarrier是一个同步辅助类，允许一组线程互相等待，直到到达某个公共屏障点 (common barrier point)。因为该 barrier 在释放等待线程后可以重用，所以称它为循环 的 barrier。
+CyclicBarrier是一个同步辅助类，允许一组线程互相等待，直到到达某个公共屏障点 (common barrier point)。因为该 barrier 在释放等待线程后可以重用，所以称它为循环 的 barrier。
 
 
 
@@ -2302,6 +2312,36 @@ public class CyclicBarrierTest {
 
 1. CountDownLatch的作用是允许1或N个线程等待其他线程完成执行；而CyclicBarrier则是允许N个线程相互等待。
 2.  CountDownLatch的计数器无法被重置；CyclicBarrier的计数器可以被重置后使用，因此它被称为是循环的barrier。
+
+
+
+## AbstractQueuedSynchronizer(AQS **抽象队列同步器**)
+
+**AQS是一个并发包的基础组件，用来实现各种锁，各种同步组件的。它包含了state同步状态变量、加锁线程、等待队列等并发中的核心组件。** **ReentrantLock、CountDownLatch、CyclicBarrier**底层是基于AQS实现的锁。ReentrantLock这种东西只是一个外层的API，**内核中的锁机制实现都是依赖AQS组件的**。
+
+
+
+AQS替用户解决了如下问题
+
+1. 资源是可以被同时访问？还是在同一时间只能被一个线程访问？（共享/独占功能）
+2. 访问资源的线程如何进行并发管理？（等待队列）
+3. 如果线程等不及资源了，如何从等待队列退出？（超时/中断）
+
+
+
+> AQS队列内部维护的是一个FIFO的双向链表，这种结构的特点是每个数据结构都有两个指针，分别指向直接的后继节点和直接前驱节点。所以双向链表可以从任意一个节点开始很方便的访问前驱和后继。每个Node其实是由线程封装，当线程争抢锁失败后会封装成Node加入到ASQ队列中去
+
+这里可以参考[深入分析AQS实现原理](https://segmentfault.com/a/1190000017372067)，里面使用ReentrantLock为例子，说明了AQS是怎么用，同时画出了ReentrantLock的时序图。
+
+
+
+
+
+[大白话聊聊Java并发面试问题之谈谈你对AQS的理解？【石杉的架构笔记】](https://juejin.im/post/5c07e59cf265da617464a09c)
+
+[Java多线程进阶（六）—— J.U.C之locks框架：AQS综述(1)](https://segmentfault.com/a/1190000015562787)
+
+[Java多线程进阶（七）—— J.U.C之locks框架：AQS独占功能剖析(2)](https://segmentfault.com/a/1190000015804888)
 
 
 
