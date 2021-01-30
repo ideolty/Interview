@@ -3656,7 +3656,7 @@ jdk11
 
 
 
-## 原子类（CAS）
+## 原子类
 
 主要考察`AtomicLong`、`LongAdder`
 
@@ -3810,6 +3810,32 @@ public class LongAdder extends Striped64 implements Serializable {
 [大白话聊聊Java并发面试问题之Java 8如何优化CAS性能？【石杉的架构笔记】](https://juejin.im/post/5c062c87e51d451dbc21801b)
 
 [Java 并发计数组件Striped64详解](https://www.jianshu.com/p/30d328e9353b)
+
+
+
+### CAS
+
+CAS虽然很高效的解决原子操作，但是CAS仍然存在三大问题。**ABA问题**，**循环时间长开销大**和**只能保证一个共享变量的原子操作**
+
+
+
+> #### ABA问题
+
+ABA问题的解决思路就是使用版本号。在变量前面追加上版本号，每次变量更新的时候把版本号加一，那么A－B－A 就会变成1A-2B－3A。从Java1.5开始JDK的atomic包里提供了一个类AtomicStampedReference来解决ABA问题。这个类的`compareAndSet`方法作用是首先检查当前引用是否等于预期引用，并且当前标志是否等于预期标志，如果全部相等，则以原子方式将该引用和该标志的值设置为给定的更新值。
+
+
+
+> #### 循环时间长
+
+这里可以参考AQS的做法，超过一定的次数就直接堵塞。或者中断暂停一下，让出CPU资源。
+
+
+
+> #### 只能保证一个共享变量的原子操作
+
+CAS操作是针对一个变量的，如果对多个变量操作，1. 可以加锁来解决。2 .封装成对象类解决。思路就是多个合并成一个，例如多个布尔类型的可以合并成一个位运算。
+
+
 
 
 
