@@ -19,14 +19,6 @@ jdk底层大量使用位运算，记录一下基本知识
 
 
 
-TODO
-
-- [ ] ReentrantLock具体是怎么怎么实现加锁的
-
-
-
-
-
 # 集合类
 
 ## 综述
@@ -1954,6 +1946,14 @@ synchronized 使用的锁存在 Java 对象头中。HotSpot 虚拟机的对象�
 
 ## Lock
 
+首先推荐资料
+
+[透彻理解Java并发编程系列](https://segmentfault.com/a/1190000015558984)
+
+
+
+
+
 ![锁的框架图](截图/JDK/锁的框架图.jpg)
 
 
@@ -2116,12 +2116,6 @@ StampedLock的主要特点概括一下，有以下几点：
 
 Condition的作用是对锁进行更精确的控制。Condition中的await()方法相当于Object的wait()方法，Condition中的signal()方法相当于Object的notify()方法，Condition中的signalAll()相当于Object的notifyAll()方法。不同的是，Object中的wait(),notify(),notifyAll()方法是和"同步锁"synchronized关键字捆绑使用的；而Condition是需要与"互斥锁"/"共享锁"捆绑使用的。
 
-
-
-//todo Condition接口及其实现原理
-
-
-
 这里参考ArrayBlockingQueue类的源码看如何使用
 
 ```java
@@ -2162,15 +2156,29 @@ Condition的作用是对锁进行更精确的控制。Condition中的await()方�
     }
 ```
 
-
-
 - 两个条件变量是从同一再入锁创建出来，然后使用在特定操作中，如take方法。
 - 当队列为空时，试图take的线程的正确行为应该是等待入队发生，而不是直接返回，这是BlockingQueue的语义，使用条件notEmpty就可以优雅地实现这一逻辑。
 - 在enqueue方法中入队，触发后续take操作。
 
 
 
+在这三篇文章中非常详细的进行了说明
 
+[J.U.C之locks框架（7）：Condition 原理](https://segmentfault.com/a/1190000015807209)
+
+一份非常详尽的源码分析，看完就懂了
+
+
+
+[Java并发之Condition](https://segmentfault.com/a/1190000038273839)
+
+这篇文章中对Condition的等待队列的变化做了详细的描述，画了图，非常好理解。
+
+
+
+[java并发编程学习之Condition-分析(二)](https://segmentfault.com/a/1190000019883589)
+
+这篇文章中不仅有代码分析，还有一份流程图，方便背诵。
 
 
 
@@ -2180,9 +2188,9 @@ LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。 Lo
 
 
 
-//todo
-
 [自己动手写把”锁”---LockSupport深入浅出](https://www.cnblogs.com/qingquanzi/p/8228422.html)
+
+[J.U.C之locks框架（4）：LockSupport 工具类](https://segmentfault.com/a/1190000015562456)
 
 
 
@@ -2192,7 +2200,7 @@ Java版本的信号量实现
 
 
 
-//todo
+[J.U.C之synchronizer框架（3）：信号量——Semaphore](https://segmentfault.com/a/1190000015918459)
 
 [深入理解Semaphore](https://blog.csdn.net/qq_19431333/article/details/70212663)
 
@@ -2237,10 +2245,14 @@ private static void countDownLatch() throws Exception{
 CountDownLatch 也是基于 AQS(AbstractQueuedSynchronizer) 实现的
 
 - 初始化一个 CountDownLatch 时告诉并发的线程，然后在每个线程处理完毕之后调用 countDown() 方法。
+
 - 该方法会将 AQS 内置的一个 state 状态 -1 。
+
 - 最终在主线程调用 await() 方法，它会阻塞直到 `state == 0` 的时候返回。
 
+  
 
+[J.U.C之synchronizer框架（1）：倒数计数器——CountDownLatch](https://segmentfault.com/a/1190000015886497)
 
 
 
@@ -2315,6 +2327,22 @@ public class CyclicBarrierTest {
 
 
 
+[J.U.C之synchronizer框架（2）：循环栅栏——CyclicBarrier](https://segmentfault.com/a/1190000015888316)
+
+
+
+
+
+文章的后续还提到了`Exchanger`与`Phaser`，讲真这两个东西实在是有点小众了，功能也比较复杂，在实际情况下要实现如此复杂的功能，还需要考虑到分布式的情况，不太可能只单机部署，所以基本上被问的几率不大
+
+[J.U.C之synchronizer框架（4）：数据交换器——Exchanger](https://segmentfault.com/a/1190000015963932)
+
+[J.U.C之synchronizer框架（5）：多阶段栅栏——Phaser](https://segmentfault.com/a/1190000015979879)
+
+
+
+
+
 ## AbstractQueuedSynchronizer(AQS **抽象队列同步器**)
 
 **AQS是一个并发包的基础组件，用来实现各种锁，各种同步组件的。它包含了state同步状态变量、加锁线程、等待队列等并发中的核心组件。** **ReentrantLock、CountDownLatch、CyclicBarrier**底层是基于AQS实现的锁。ReentrantLock这种东西只是一个外层的API，**内核中的锁机制实现都是依赖AQS组件的**。
@@ -2342,6 +2370,12 @@ AQS替用户解决了如下问题
 [Java多线程进阶（六）—— J.U.C之locks框架：AQS综述(1)](https://segmentfault.com/a/1190000015562787)
 
 [Java多线程进阶（七）—— J.U.C之locks框架：AQS独占功能剖析(2)](https://segmentfault.com/a/1190000015804888)
+
+[J.U.C之locks框架（5）：AbstractQueuedSynchronizer 综述](https://segmentfault.com/a/1190000015562787)
+
+[J.U.C之locks框架（6）：AbstractQueuedSynchronizer 的独占功能原理](https://segmentfault.com/a/1190000015804888)
+
+[J.U.C之locks框架（8）：AbstractQueuedSynchronizer 的共享功能原理](https://segmentfault.com/a/1190000015807573)
 
 
 

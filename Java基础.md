@@ -592,6 +592,29 @@ Method.invoke
 
 
 
+# 中断
+
+[Java里一个线程调用了Thread.interrupt()到底意味着什么？](https://www.zhihu.com/question/41048032/answer/89431513)
+
+简单来说就是在java中，interrupt() 并不能真正的中断线程。
+
+>具体来说，当对一个线程，调用 interrupt() 时，
+>① 如果线程处于被阻塞状态（例如处于sleep, wait, join 等状态），那么线程将立即退出被阻塞状态，并抛出一个InterruptedException异常。仅此而已。
+>② 如果线程处于正常活动状态，那么会将该线程的中断标志设置为 true，仅此而已。被设置中断标志的线程将继续正常运行，不受影响。
+>
+>
+>
+>作者：Intopass
+>链接：https://www.zhihu.com/question/41048032/answer/89431513
+>来源：知乎
+>著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+
+
+
+
+
+
 # 面试题
 
 > #### 抽象类必须要有抽象方法吗？
