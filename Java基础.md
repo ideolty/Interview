@@ -574,6 +574,8 @@ Java提供的默认排序算法是什么？
 # 反射 — 动态代理
 
 > 谈谈Java反射机制，动态代理是基于什么原理？ ——  《java核心技术面试精讲-40讲 — 06动态代理是基于什么原理？》
+>
+> 07 | JVM是如何实现反射的？  —— 《深入拆解 Java 虚拟机 07 JVM是如何实现反射的？》
 
 这个题目有点诱导的嫌疑，会下意识地以为动态代理就是利用反射机制实现的，这么说不算错但稍微有些不全面。
 
@@ -621,7 +623,11 @@ public Object invoke(Object obj, Object... args)
 
 反射调用先是调用了Method.invoke，然后进入委派实现（DelegatingMethodAccessorImpl），再然后进入本地实现（NativeMethodAccessorImpl），最后到达目标方法。 
 
-为什么反射调用还要采取委派实现作为中间层？直接交给本地实现不可以么？Java 的反射调用机制还设立了另一种动态生成字节码的实现（下称动态实现），直接使用 invoke 指令来调用目标方法。之所以采用委派实现，便是为了能够在本地实现以及动态实现中切换。
+
+
+> #### 为什么反射调用还要采取委派实现作为中间层？直接交给本地实现不可以么？
+
+Java 的反射调用机制还设立了另一种动态生成字节码的实现（下称动态实现），直接使用 invoke 指令来调用目标方法。之所以采用委派实现，便是为了能够在本地实现以及动态实现中切换。
 
 sun.reflect.ReflectionFactory#newMethodAccessor
 
@@ -645,9 +651,21 @@ public MethodAccessor newMethodAccessor(Method var1) {
 
 但由于生成字节码十分耗时，仅调用一次的话，反而是本地实现要快 上 3 到 4 倍 [3]。 考虑到许多反射调用仅会执行一次，Java 虚拟机设置了一个阈值 15（可以通过 - Dsun.reflect.inflationThreshold= 来调整），当某个反射调用的调用次数在 15 之下时，采用本地实现；当达到 15 时，便开始动态生成字节码，并将委派实现的委派对象切换至动态实现， 这个过程我们称之为 Inflation。
 
+在默认情况下，方法的反射调用为委派实现，委派给本地实现来进行方法调用。在调用超过 15 次之后，委派实现便会将委派对象切换至动态实现。这个动态实现的字节码是自动生成的，它将直接使用 invoke 指令来调用目标方法。
 
 
-> **反射开销**
+
+> #### 反射调用的开销
+
+一个简单的调用例子
+
+```java
+  public static void main(String[] args) throws Exception {
+    Class<?> klass = Class.forName("Test");
+    Method method = klass.getMethod("target", int.class);
+    method.invoke(null, 0);
+  }
+```
 
 Class.forName 和 Class.getMethod。
 
@@ -659,8 +677,18 @@ Method.invoke
 
 - 第一，由于 Method.invoke 是一个变长参数方法，在字节码层面它的最后一个参数会是 Object 数组。Java 编译器会在方法调用处生成一个长度为传入参数数量的 Object 数组，并将传入参数一一存储进该数组中。 
 - 第二，由于 Object 数组不能存储基本类型，Java 编译器会对传入的基本类型参数进行自动装箱。
+- 由于 Java 虚拟机的关于上述调用点的类型 profile无法同时记录这么多个类，因此可能造成所测试的反射调用没有被内联的情况。
+- 除了没有内联之外，另外一个原因是逃逸分析不再起效（这两个原因慎用）
 
 这两个操作除了带来性能开销外，还可能占用堆内存，使得 GC 更加频繁。
+
+
+
+> #### Class.forName 与ClassLoader区别
+
+// todo 待整理oneNote笔记
+
+
 
 
 
