@@ -4113,6 +4113,10 @@ String/StringBuilder/StringBuffer
 
 ## Exception和Error
 
+Java 的异常分为 Exception 和 Error 两种，而 Exception 又分为 RuntimeException  和其他类型。RuntimeException 和 Error 属于非检查异常。其他的 Exception  皆属于检查异常，在触发时需要显式捕获，或者在方法头用 throws 关键字声明。
+
+
+
 Exception和Error都是继承了Throwable类。
 
 Exception和Error体现了Java平台设计者对不同异常情况的分类。
