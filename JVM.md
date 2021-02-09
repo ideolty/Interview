@@ -843,6 +843,81 @@ finally 代码块的编译比较复杂。当前版本 Java 编译器的做法，
 
 
 
+# 注解处理器
+
+> 27 注解处理器 —— 《深入拆解 Java 虚拟机》
+
+Java 的注解机制允许开发人员自定义注解，这些自定义注解同样可以为 Java 编译器添加编译规则。不过，这种功能需要由开发人员提供，并且以插件的形式接入 Java 编译器中，这些插件我们称之为注解处理器（annotation processor）。
+
+
+
+> #### 注解处理器的原理
+
+![img](截图/JVM/编译器工作流程.png)
+
+Java 源代码的编译过程可分为三个步骤：
+
+1. 将源文件解析为抽象语法树；
+2. 调用已注册的注解处理器；
+3. 生成字节码。
+
+如果在第 2 步调用注解处理器过程中生成了新的源文件，那么编译器将重复第 1、2 步，解析并且处理新生成的源文件。每次重复我们称之为一轮（Round）。
+
+```java
+public interface Processor {
+  void init(ProcessingEnvironment processingEnv);
+  Set<String> getSupportedAnnotationTypes();
+  SourceVersion getSupportedSourceVersion();
+  boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv);
+}
+```
+
+所有的注解处理器类都需要实现接口`Processor`。该接口主要有四个重要方法。其中，`init`方法用来存放注解处理器的初始化代码。之所以不用构造器，是因为在 Java 编译器中，注解处理器的实例是通过反射 API 生成的。也正是因为使用反射 API，每个注解处理器类都需要定义一个无参数构造器。通常来说，当编写注解处理器时，我们不声明任何构造器，并依赖于 Java 编译器，为之插入一个无参数构造器。而具体的初始化代码，则放入`init`方法之中。
+
+在剩下的三个方法中，`getSupportedAnnotationTypes`方法将返回注解处理器所支持的注解类型，这些注解类型只需用字符串形式表示即可。
+
+`getSupportedSourceVersion`方法将返回该处理器所支持的 Java 版本，通常，这个版本需要与你的 Java 编译器版本保持一致；而`process`方法则是最为关键的注解处理方法。
+
+JDK 提供了一个实现`Processor`接口的抽象类`AbstractProcessor`。该抽象类实现了`init`、`getSupportedAnnotationTypes`和`getSupportedSourceVersion`方法。它的子类可以通过`@SupportedAnnotationTypes`和`@SupportedSourceVersion`注解来声明所支持的注解类型以及 Java 版本。
+
+
+
+在将该注解处理器编译成 class 文件后，我们便可以将其注册为 Java 编译器的插件，并用来处理其他源代码。注册的方法主要有两种。
+
+- 第一种是直接使用 javac 命令的`-processor`参数，如下所示：
+
+  ```bash
+  $ javac -cp /CLASSPATH/TO/CheckGetterProcessor -processor bar.CheckGetterProcessor Foo.java
+  error: Class 'Foo' is annotated as @CheckGetter, but field 'a' is without getter
+  1 error
+  ```
+
+- 第二种则是将注解处理器编译生成的 class 文件压缩入 jar 包中，并在 jar 包的配置文件中记录该注解处理器的包名及类名，即`bar.CheckGetterProcessor`。
+
+  ```bash
+  （具体路径及配置文件名为`META-INF/services/javax.annotation.processing.Processor`）
+  ```
+
+  当启动 Java 编译器时，它会寻找 classpath 路径上的 jar 包是否包含上述配置文件，并自动注册其中记录的注解处理器。
+
+  ```sh
+  $ javac -cp /PATH/TO/CheckGetterProcessor.jar Foo.java
+  error: Class 'Foo' is annotated as @CheckGetter, but field 'a' is without getter
+  1 error
+  ```
+
+
+
+> #### 利用注解处理器生成源代码
+
+这里指的是修改由 Java 源代码生成的抽象语法树，在其中修改已有树节点或者插入新的树节点，从而使生成的字节码发生变化。对抽象语法树的修改涉及了 Java 编译器的内部 API，这部分很可能随着版本变更而失效。因此，我并不推荐这种修改方式。
+
+如果你感兴趣的话，可以参考 [Project Lombok][4]。这个项目自定义了一系列注解，并根据注解的内容来修改已有的源代码。例如它提供了`@Getter`和`@Setter`注解，能够为程序自动添加`getter`以及`setter`方法。
+
+用注解处理器来生成源代码则比较常用。我们以前介绍过的压力测试 jcstress，以及接下来即将介绍的 JMH 工具，都是依赖这种方式来生成测试代码的。
+
+
+
 # 进程和线程、协程的区别
 
 > #### 概念
