@@ -2,17 +2,324 @@
 
 IOC容器部分是网上别人的文章的一个自己的总结，基本与别人的总结一致，原文发于2014年，此文写于2019年，现在Spring 5已正式使用，差别肯定很大，但是原理是相通的，后面会自己再根据最新版本总结一遍。
 
-
-
-
-
 // todo另一条路的容器初始化
 
 [剑指Spring源码（一）](https://juejin.im/post/5c637df35188256282695a8c)
 
 
 
-# Spring IOC容器解析
+2021年02月新写的一部分。版本为
+
+```xml
+    <spring-framework.version>5.3.3</spring-framework.version>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.4.2</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+```
+
+文中参考了《小马哥讲Spring核心编程思想》，把250多集的内容裁剪出了核心的内容。
+
+
+
+# Spring IOC容器
+
+
+
+## 依赖注入
+
+> 如何注入？何时注入？
+
+
+
+## 依赖查找
+
+>从哪里查
+
+
+
+## 容器
+
+### BeanFactory
+
+### ApplicationContext
+
+### 生命周期
+
+
+
+# Spring Bean
+
+## 结构（BeanDefinition）
+
+![image-20210214155810910](截图/Spring/core/BeanDefinition继承结构.png)
+
+其中有2大分支，一个是基于注解的BeanDefinition ，一个是有继承结构的BeanDefinition。
+
+BeanDefinition 是Spring Framework 中定义Bean 的配置元信息接口，包含：
+
+- Bean 的类名
+
+- Bean 行为配置元素
+
+  如作用域、自动绑定的模式，生命周期回调等
+
+- 其他Bean 引用，又可称作合作者（collaborators）或者依赖（dependencies）
+
+- 配置设置，比如Bean 属性（Properties）
+
+![image-20210214160232648](截图/Spring/core/BeanDefinition元信息.png)
+
+
+
+> #### 手动构建BeanDefinition
+
+```java
+// 使用 BeanDefinitionBuilder
+BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder.genericBeanDefinition(clazz);
+beanDefinitionBuilder.addPropertyValue("key", "value");
+
+// 直接硬new
+GenericBeanDefinition genericBeanDefinition = new GenericBeanDefinition();
+genericBeanDefinition.setBeanClass(Main.class);
+MutablePropertyValues mutablePropertyValues = new MutablePropertyValues();
+mutablePropertyValues.addPropertyValue("key", "value");
+genericBeanDefinition.setPropertyValues(mutablePropertyValues);
+```
+
+
+
+> #### BeanDefinition 注册
+
+- XML 配置元信息•<bean name=”...” ... />
+
+- Java 注解配置元信息
+
+  @Bean、@Component、@Import
+
+- Java API 配置元信息
+
+  - 命名方式：BeanDefinitionRegistry#registerBeanDefinition(String,BeanDefinition)
+  - 非命名方式：BeanDefinitionReaderUtils#registerWithGeneratedName(AbstractBeanDefinition,BeanDefinitionRegistry)
+  - 配置类方式：AnnotatedBeanDefinitionReader#register(Class...)
+
+- 外部单例对象注册
+
+  Java API 配置元信息SingletonBeanRegistry#registerSingleton
+
+
+
+> ####  Bean实例化
+
+- 常规方式
+  - 通过构造器（配置元信息：XML、Java 注解和Java API ）
+  - 通过静态工厂方法（配置元信息：XML 和Java API ）
+  - 通过Bean 工厂方法（配置元信息：XML和Java API ）
+  - 通过FactoryBean（配置元信息：XML、Java 注解和Java API ）
+- 特殊方式
+  - 通过ServiceLoaderFactoryBean（配置元信息：XML、Java 注解和Java API ）
+  - 通过AutowireCapableBeanFactory#createBean(java.lang.Class, int, boolean)
+  - 通过BeanDefinitionRegistry#registerBeanDefinition(String,BeanDefinition) 
+
+
+
+> ####  Bean 初始化（Initialization） 
+
+- `@PostConstruct`标注方法 
+- 实现 `InitializingBean` 接口的 `afterPropertiesSet()` 方法 
+- 自定义初始化方法 
+  - XML 配置： ` <bean init-method=”init” ... />`
+  -  Java 注解：`@Bean(initMethod=”init”) `
+  -  Java API：`AbstractBeanDefinition#setInitMethodName(String) `
+
+思考：假设以上三种方式均在同一 Bean 中定义，那么这些方法的执行顺序是怎样？ 
+
+> #### Bean 延迟初始化（Lazy Initialization）
+
+- XML 配置： 
+- Java 注解：`@Lazy(true) `
+
+思考：当某个 Bean 定义为延迟初始化，那么，Spring 容器返回的对象与非延迟的对象存在怎样的差异？
+
+
+
+## 存储
+
+## 生命周期
+
+> #### BeanFactory 是怎样处理 Bean 生命周期？
+
+BeanFactory 的默认实现为 DefaultListableBeanFactory，其中 Bean生命周期与方法映射如下： 
+
+- BeanDefinition 注册阶段 - registerBeanDefinition 
+- BeanDefinition 合并阶段 - getMergedBeanDefinition 
+- Bean 实例化前阶段 - resolveBeforeInstantiation 
+- Bean 实例化阶段 - createBeanInstance 
+- Bean 初始化后阶段 - populateBean 
+- Bean 属性赋值前阶段 - populateBean 
+- Bean 属性赋值阶段 - populateBean 
+- Bean Aware 接口回调阶段 - initializeBean 
+- Bean 初始化前阶段 - initializeBean
+- Bean 初始化阶段 - initializeBean 
+- Bean 初始化后阶段 - initializeBean 
+- Bean 初始化完成阶段 - preInstantiateSingletons 
+- Bean 销毁前阶段 - destroyBean 
+- Bean 销毁阶段 - destroyBean
+
+
+
+> #### Spring Bean 元信息配置阶段 
+
+- BeanDefinition 配置 
+  - 面向资源 
+    - XML 配置  
+    - Properties 资源配置 
+  - 面向注解 
+  - 面向 API
+
+
+
+> #### Spring Bean 元信息解析阶段 
+
+- 面向资源 BeanDefinition 解析 
+  - BeanDefinitionReader
+  - XML 解析器 - BeanDefinitionParser 
+- 面向注解 BeanDefinition 解析 
+  - AnnotatedBeanDefinitionReader
+
+
+
+> #### Spring Bean 注册阶段 
+
+- BeanDefinition 注册接口 
+  - BeanDefinitionRegistry
+
+
+
+> #### Spring BeanDefinition 合并阶段
+
+- BeanDefinition 合并 
+  - 父子 BeanDefinition 合并
+    - 当前 BeanFactory 查找 
+    - 层次性 BeanFactory 查找
+
+
+
+> #### Spring Bean Class 加载阶段 
+
+- ClassLoader 类加载 
+- Java Security 安全控制 
+- ConfigurableBeanFactory 临时 ClassLoader
+
+
+
+> #### Spring Bean 实例化阶段 
+
+- 实例化方式
+  - 传统实例化方式
+    - 实例化策略 - InstantiationStrategy 
+  - 构造器依赖注入
+
+
+
+> #### Spring Bean 实例化前阶段
+
+- 非主流生命周期 - Bean 实例化前阶段
+  - InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation
+
+
+
+> #### Spring Bean 实例化后阶段
+
+- Bean 属性赋值（Populate）判断 
+  - InstantiationAwareBeanPostProcessor#postProcessAfterInstantiation
+
+
+
+> #### Spring Bean 属性赋值前阶段
+
+- Bean 属性值元信息  
+  - PropertyValues 
+- Bean 属性赋值前回调 
+  - Spring 1.2 - 5.0：InstantiationAwareBeanPostProcessor#postProcessPropertyValues 
+  - Spring 5.1：InstantiationAwareBeanPostProcessor#postProcessProperties
+
+
+
+> #### Spring Bean Aware 接口回调阶段
+
+- Spring Aware 接口 
+  - BeanNameAware 
+  - BeanClassLoaderAware 
+  - BeanFactoryAware 
+  - EnvironmentAware 
+  - EmbeddedValueResolverAware 
+  - ResourceLoaderAware 
+  - ApplicationEventPublisherAware 
+  - MessageSourceAware 
+  - ApplicationContextAware
+
+
+
+> #### Spring Bean 初始化前阶段
+
+- 已完成 
+  - Bean 实例化 
+  - Bean 属性赋值 
+  - Bean Aware 接口回调 
+- 方法回调 
+  - BeanPostProcessor#postProcessBeforeInitialization
+
+
+
+> #### Spring Bean 初始化阶段
+
+- Bean 初始化（Initialization） 
+  - @PostConstruct 标注方法
+  - 实现 InitializingBean 接口的 afterPropertiesSet() 方法 
+  - 自定义初始化方法
+
+
+
+> #### Spring Bean 初始化后阶段
+
+- 方法回调 
+  - BeanPostProcessor#postProcessAfterInitialization
+
+
+
+> #### Spring Bean 初始化完成阶段
+
+- 方法回调 
+  - Spring 4.1 +：SmartInitializingSingleton#afterSingletonsInstantiated
+
+
+
+> #### Spring Bean 销毁前阶段
+
+- 方法回调 
+  - DestructionAwareBeanPostProcessor#postProcessBeforeDestruction
+
+
+
+> #### Spring Bean 销毁阶段
+
+- Bean 销毁（Destroy） 
+  - @PreDestroy 标注方法 
+  - 实现 DisposableBean 接口的 destroy() 方法 
+  - 自定义销毁方法
+
+
+
+
+
+# 启动流程
+
+
+
+# Spring IOC容器解析（旧-待整合）
 
 - IOC 容器：最主要是完成了完成对象的创建和依赖的管理注入等等。
 - 所谓控制反转，就是把原先我们代码里面需要实现的对象创建、依赖的代码，反转给容器来帮忙实现。
@@ -1392,7 +1699,7 @@ Spring切面可以应用5种类型的通知：
 
 
 
-# 注解
+# Spring 注解
 
 ## 原理
 
@@ -1415,7 +1722,7 @@ Spring MVC 解读——@Autowired、@Controller、@Service从原理层面来分�
 
 
 
-## 事务 @Transactional 
+# 事务 @Transactional 
 
 1. Spring事务管理分为编码式和声明式的两种方式。
 2. 编程式事务管理使用TransactionTemplate或者直接使用底层的PlatformTransactionManager。对于编程式事务管理，spring推荐使用TransactionTemplate。
@@ -1460,7 +1767,7 @@ try {
 
 
 
-### 线程安全
+## 线程安全
 
 Spring 的事务管理器是通过线程相关的 ThreadLocal 来保存数据访问基础设施，再结合 IOC 和 AOP 实现高级声明式事务的功能，所以spring的事务是线程安全的。
 
@@ -1474,7 +1781,7 @@ Spring 的事务管理器是通过线程相关的 ThreadLocal 来保存数据访
 
 
 
-### 传播行为
+## 传播行为
 
 Spring在`TransactionDefinition`接口中规定了7种类型的事务传播行为，它们规定了事务方法和事务方法发生嵌套调用时事务如何进行传播，即协调已经有事务标识的方法之间的发生调用时的事务上下文的规则（是否要有独立的事务隔离级别和锁）
 
@@ -1494,7 +1801,7 @@ Spring在`TransactionDefinition`接口中规定了7种类型的事务传播行�
 
 
 
-### 隔离级别
+## 隔离级别
 
 TransactionDefinition 接口中定义了五个表示隔离级别的常量：
 
@@ -1506,7 +1813,7 @@ TransactionDefinition 接口中定义了五个表示隔离级别的常量：
 
 
 
-### 注意事项
+## 注意事项
 
 1. **propagation** 属性的设置。
 
