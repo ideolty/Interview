@@ -230,6 +230,215 @@ Bean 延迟依赖查找接口
 
 ### 生命周期
 
+> #### Spring 应用上下文启动准备阶段
+
+AbstractApplicationContext#prepareRefresh()方法
+
+- 启动时间-startup Date
+- 状态标识-closed(false)s active(true)
+- 初始化 Propertysources - initPropertySources()
+- 检验Environment中必须属性
+- 初始化事件监听器集合
+- 初始化早期Spring事件集合
+
+
+
+> #### BeanFactory创建阶段
+
+AbstractApplicati onCon text#obta inF reshBea nF actory()方法
+
+- 刷新 Spring 应用上下文底层 BeanFactory - refreshBeanFactory()
+  - 销毁或关闭BeanFactory,如果已存在的话
+  - 创建 BeanFactory - createBeanFactory()
+  - 设置 BeanFactory Id
+  - 设置"是否允许 BeanDefinition 重复定义〃 -customizeBeanFactory(DefaultListableBeanFactory)
+  - 设置"是否允许循环引用(依赖)“ -customizeBeanFactory(DefauLtListabLeBeanFactory)
+  - 加载 BeanDefinition - loadBeanDefinitions(DefaultListableBeanFactory) 方法
+  - 关联新建BeanFactory到Spring应用上下文
+-   返回 Spring 应用上下文底层 BeanFactory - getBeanFactory()
+
+
+
+> #### BeanFactory准备阶段
+
+AbstractApplicationContext#prepareBeanFactory(ConfigurableListableBeanFactory)方法
+
+- 关联 ClassLoader
+- 设置Bean表达式处理器
+- 添力口 PropertyEditorRegistrar 实现-ResourceEditorRegistrar
+
+- 添加 Aware 回调接口 BeanPostProcessor 实现-ApplicationContextAwareProcessor
+
+- 忽略Aware回调接口作为依赖注入接口
+
+- 注册 ResolvableDependency 对象-BeanFactory、ResourceLoader. ApplicationEventPublisher 以及
+
+Applicationcontext
+
+- 注册 ApplicationListenerDetector 对象
+
+- 注册 LoadTimeWeaverAwareProcessor 对象
+
+- 注册单例对象-Environments Java System Properties以及OS环境变量
+
+
+
+> #### BeanFactory后置处理阶段
+
+AbstractApplicati onCon text#postProcessBea nF actory(C on figurableListableBea nF actory)方法
+
+- 由子类覆盖该方法
+
+AbstractApplicati onCon text#i nvokeBea nF actoryPostProcessors(C on figurableListableBea nF act
+
+ory方法
+
+- 调用 BeanFactoryPostProcessor 或 BeanDefinitionRegistry 后置处理方法
+
+- 注册 LoadTimeWeaverAwareProcessor 对象
+
+
+
+> #### BeanFactory 注册 BeanPostProcessor 阶段
+
+ AbstractApplicationContext#registerBeanPostProcessors(ConfigurableListableBeanFactory)方法
+
+- 注册 PriorityOrdered 类型的 BeanPostProcessor Beans
+
+- 注册 Ordered 类型的 BeanPostProcessor Beans
+
+- 注册普通 BeanPostProcessor Beans
+
+- 注册 MergedBeanDefinitionPostProcessor Beans
+
+- 注册 ApplicationListenerDetector 对象
+
+
+
+> #### 初始化內建 Bean: Messagesource
+
+AbstractApplicationContext#initMessageSource()方法
+
+
+
+> #### 初始化內建Bean: Spring事件广播器
+
+AbstractApplicationContext#initAppLicationEventMulticaster()方法
+
+
+
+> #### Spring 应用上下文刷新阶段
+
+AbstractApplicationContext#onRefresh()方法
+
+- 子类覆盖该方法 
+  - org .springframework .web. context .support・AbstractRefreshableWebApplicationContext#onRefres h()
+
+  - org .springframework .web .context .support ・GenericWebApplicationContext#onRefresh()
+
+  - org .springframework .boot, web .reactive .context ・ReactiveWebServerApplicationContext#onRefres h()
+
+  - org .springframework .boot, web .servlet .context ・ServletWebServerApplicationContext#onRefresh() org .springframework .web .context .support ・StaticWebApplicationContext#onRefresh()
+
+    
+
+> #### Spring事件监听器注册阶段
+
+AbstractApplicationContext#registerListeners()方法
+
+- 添加当前应用上下文所关联的ApplicationListener对象(集合)
+
+- 添力口 BeanFactory 所注册 ApplicationListener Beans
+
+- 广播早期Spring事件
+
+
+
+> #### BeanFactory初始化完成阶段
+
+AbstractApplicati onCon text#fi nishBea nF actoryl nitializati on (Con figurableListableBea nF actory) 方法
+
+- BeanFactory 关联 Conversionservice Bean,如果存在
+
+- 添加 StringValueResolver 对象
+
+- 依赖查找 LoadTimeWeaverAware Bean
+
+- BeanFactory 临时 ClassLoader 置为 null
+
+- BeanFactory冻结配置
+
+- BeanFactory初始化非延迟单例Beans
+
+
+
+> #### Spring应用上下文刷新完成阶段
+
+AbstractApplicati onCon text#finishRefresh()方法
+
+- 清除 ResourceLoader 缓存-clearResourceCaches() @since 5.0
+
+- 初始化 LifecycleProcessor 对象-initLifecycleProcessor()
+
+- 调用 LifecycleProcessor#onRefresh()方法
+
+- 发布Spring应用上下文已刷新事件-ContextRefreshedEvent
+
+- 向 MBeanServer 托管 Live Beans
+
+
+
+> #### Spring应用上下文启动阶段
+
+AbstractApplicationContext#start()方法
+
+- 启动 LifecycleProcessor
+  - 依赖查找 Lifecycle Beans
+  - 启动 Lifecycle Beans
+
+- 发布Spring应用上下文已启动事件-ContextStartedEvent
+
+
+
+> #### Spring应用上下文停止阶段
+
+AbstractApplicationContext#stop()方法
+
+- 停止 LifecycleProcessor
+  - 依赖查找 Lifecycle Beans
+  - 停止 Lifecycle Beans
+
+- 发布Spring应用上下文已停止事件-ContextStoppedEvent
+
+
+
+> #### Spring应用上下文关闭阶段
+
+AbstractApplicationContext#close()方法
+
+- 状态标识：active(false)s closed(true)
+
+- Live Beans JMX 撤销托管
+  - LiveBeansView .unregisterApplicationContext(ConfigurableApplicationContext)
+
+- 发布Spring应用上下文已关闭事件-ContextCLosedEvent
+
+- 关闭 LifecycleProcessor
+  - 依赖查找 Lifecycle Beans
+  - 停止 Lifecycle Beans
+
+- 销毁 Spring Beans
+
+- 关闭 BeanFactory
+
+- 回调 onCLose()
+
+- 注册Shutdown Hook线程(如果曾注册)
+
+
+
+
+
 
 
 # Spring Bean
@@ -275,7 +484,7 @@ genericBeanDefinition.setPropertyValues(mutablePropertyValues);
 
 > #### BeanDefinition 注册
 
-- XML 配置元信息•<bean name=”...” ... />
+- XML 配置元信息- <bean name=”...” ... />
 
 - Java 注解配置元信息
 
