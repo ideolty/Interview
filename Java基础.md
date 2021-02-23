@@ -1,6 +1,12 @@
 # 综述
 
-java的基本原理，记录面试时容易考的。记录平时容易混淆的。
+- java的基本原理，记录面试时容易考的。
+
+- 记录平时容易混淆的。
+
+- 内容与《JDK》中的有部分重复
+
+
 
 参考：
 
@@ -104,19 +110,25 @@ java的基本原理，记录面试时容易考的。记录平时容易混淆的�
 
 接口是对行为的抽象，它是抽象方法的集合，利用接口可以达到**API定义和实现分离的目的**。接口，不能实例化;不能包含任何非常量成员，任何field都是隐含着public static final的意义;同时，没有非静态方法实现，也就是说要么是抽象方法，要么是静态方法。
 
+内部结构：
+    jdk7：接口只有常量和抽象方法，无构造器
+    jdk8：接口增加了 默认方法 和 静态方法，无构造器
+    jdk9：接口允许 以 private 修饰的方法，无构造器
+
 
 
 > #### 抽象类
 
 抽象类是不能实例化的类，用abstract关键字修饰class，**其目的主要是代码重用**。除了不能实例化，形式上和一般的Java类并没有太大区别，可以有一个或者多个抽象方法，也可以没有抽象方法。抽象类大多用于抽取相关Java类的共用方法实现或者是共同成员变量，然后通过继承的方式达到代码复用的目的。
 
-
-
 Java类实现interface使用implements关键词，继承abstract class则是使用extends关键词。
 
 
 
-
+- 接口可以被类多实现（被其他接口多继承），抽象类只能被单继承。
+- 接口中没有 `this` 指针，没有构造函数，不能拥有实例字段（实例变量）或实例方法，无法保存 状态（state），抽象方法中可以。
+- 抽象类不能在 java 8 的 lambda 表达式中使用。
+- 从设计理念上，接口反映的是 “like-a” 关系，抽象类反映的是 “is-a” 关系。
 
 
 
@@ -548,16 +560,127 @@ new Resource().action()
 
 # Java8 
 
-- 函数接口
-- 接口final函数
-- 接口default method
-- lambda
+## 新特性
+
+Java8 新增了非常多的特性，我们主要讨论以下几个：
+
+- **Lambda 表达式** − Lambda 允许把函数作为一个方法的参数（函数作为参数传递到方法中）。
+- **方法引用（双冒号）** −  方法引用提供了非常有用的语法，可以直接引用已有Java类或对象（实例）的方法或构造器。与lambda联合使用，方法引用可以使语言的构造更紧凑简洁，减少冗余代码。
+- **默认方法** − 默认方法就是一个在接口里面有了一个实现的方法。
+- **新工具** − 新的编译工具，如：Nashorn引擎 jjs、 类依赖分析器jdeps。
+- **Stream API** −新添加的Stream API（java.util.stream） 把真正的函数式编程风格引入到Java中。
+- **Date Time API** − 加强对日期与时间的处理。
+- **Optional 类** − Optional 类已经成为 Java 8 类库的一部分，用来解决空指针异常。
+- **Nashorn, JavaScript 引擎** −  Java 8提供了一个新的Nashorn javascript引擎，它允许我们在JVM上运行特定的javascript应用。
+
+
+
+## 函数式接口
+
+> [必看：深入学习Java8中的函数式接口](https://www.sohu.com/a/123958799_465959)
+
+就是interface里有且仅有一个抽象方法，但是可以有多个非抽象方法的接口，可以有default方法，也可以有Object类的public方法。
+
+Java8里关于函数式接口的包是java.util.function，里面全部是函数式接口。主要包含几大类：Function、Predicate、Supplier、Consumer和*Operator（没有Operator接口，只有类似BinaryOperator这样的接口）
+
+
+
+## default method
+
+> [Java 8 默认方法（Default Methods）](https://www.cnblogs.com/sidesky/p/9287710.html)
+
+默认方法是在接口中的方法签名前加上了 `default` 关键字的实现方法。
+
+`ClassA` 类并没有实现 `InterfaceA` 接口中的 `foo` 方法，`InterfaceA` 接口中提供了 `foo` 方法的默认实现，因此可以直接调用 `ClassA` 类的 `foo` 方法。
+
+> #### 为什么要有默认方法?
+
+在 java 8 之前，接口与其实现类之间的 耦合度 太高了（tightly  coupled），当需要为一个接口添加方法时，所有的实现类都必须随之修改。默认方法解决了这个问题，它可以为接口添加新的方法，而不会破坏已有的接口的实现。这在 lambda 表达式作为 java 8 语言的重要特性而出现之际，为升级旧接口且保持向后兼容（backward  compatibility）提供了途径。
+
+> #### 默认方法的继承
+
+- 不覆写默认方法，直接从父接口中获取方法的默认实现。
+- 覆写默认方法，这跟类与类之间的覆写规则相类似。
+- 覆写默认方法并将它重新声明为抽象方法，这样新接口的子类必须再次覆写并实现这个抽象方法。
+
+
+
+> #### 默认方法的多继承
+
+Java 使用的是单继承、多实现的机制，为的是避免多继承带来的调用歧义的问题。当接口的子类同时拥有具有相同签名的方法时，就需要考虑一种解决冲突的方案。
+
+在 `ClassA` 类中，它实现的 `InterfaceA` 接口和 `InterfaceB` 接口中的方法不存在歧义，可以直接多实现。
+
+在 `ClassB` 类中，它实现的 `InterfaceB` 接口和 `InterfaceC` 接口中都存在相同签名的 `foo` 方法，需要手动解决冲突。覆写存在歧义的方法，并可以使用 **`InterfaceName.super.methodName();`** 的方式手动调用需要的接口默认方法。
+
+
+
+> #### 接口与抽象类
+
+当接口继承行为发生冲突时的另一个规则是，类的方法声明优先于接口默认方法，无论该方法是具体的还是抽象的。
+
+
+
+> #### 其他注意点
+
+- `default` 关键字只能在接口中使用（以及用在 `switch` 语句的 `default` 分支），不能用在抽象类中。
+
+- 接口默认方法不能覆写 `Object` 类的 `equals`、`hashCode` 和 `toString` 方法。
+
+- 接口中的静态方法必须是 `public` 的，`public` 修饰符可以省略，`static` 修饰符不能省略。
+
+  
+
+
+
+## lambda
+
+
+
+
+
+# Java新版本
+
+## 9
+
+- G1成为默认垃圾回收器
+- 集合加强
+
+
+
+## *11
+
+- 本地变量类型推断
+- 字符串加强
+- 集合加强
+- 在模块方面移除Java EE以及CORBA模块
+- 在JVM方面引入了实验性的ZGC
+- 在API方面正式提供了HttpClient类替换原有的HttpURLConnection。
+
+
+
+## 12
+
+- 对switch进行了增强，除了使用statement还可以使用expression
+
+
+
+## 13
+
+- Java13主要新增了如下特性
+  - 350:    Dynamic CDS Archives
+  - 351:    ZGC: Uncommit Unused Memory
+  - 353:    Reimplement the Legacy Socket API
+  - 354:    Switch Expressions (Preview)
+  - 355:    Text Blocks (Preview)
+- 语法层面，改进了Switch Expressions，新增了Text Blocks，二者皆处于Preview状态；API层面主要使用NioSocketImpl来替换JDK1.0的PlainSocketImpl
+- GC层面则改进了ZGC，以支持Uncommit Unused Memory
 
 
 
 # 排序算法
 
-Java提供的默认排序算法是什么？
+> #### Java提供的默认排序算法是什么？
 
 这个问题本身就是有点陷阱的意味，因为需要区分是Arrays.sort()还是Collections.sort() （底层是调用Arrays.sort()）；什么数据类型；多大的数据集（太小的数据集，复杂排序是没必要的，Java会直接进行二分插入排序）等。 
 
@@ -567,7 +690,7 @@ Java提供的默认排序算法是什么？
 
 
 
-> 08. 对比Vector、ArrayList、LinkedList有何区别？.pdf
+> 8. 对比Vector、ArrayList、LinkedList有何区别？.pdf
 
 
 
@@ -715,9 +838,7 @@ Method.invoke
 
 ## 死锁
 
-jdk中也有一部分，内容。
-
-> #### 如何复现出一次死锁
+见《jdk》中相关内容。
 
 
 
