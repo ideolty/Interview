@@ -807,9 +807,175 @@ Method.invoke
 
 
 
-> #### Class.forName 与ClassLoader区别
+## Class.forName 与ClassLoader区别
 
-// todo 待整理oneNote笔记
+在java中Class.forName()和ClassLoader都可以对类进行加载。ClassLoader就是遵循**双亲委派模型**最终调用启动类加载器的类加载器，实现的功能是“通过一个类的全限定名来获取描述此类的二进制字节流”，获取到二进制流后放到JVM中。Class.forName()方法实际上也是调用的CLassLoader来实现的。
+
+```java
+		@CallerSensitive
+    public static Class<?> forName(String className)
+                throws ClassNotFoundException {
+        Class<?> caller = Reflection.getCallerClass();
+        return forName0(className, true, ClassLoader.getClassLoader(caller), caller);
+    }
+```
+
+最后调用的方法是forName0这个方法，在这个forName0方法中的第二个参数被默认设置为了true，这个参数代表是否对加载的类进行初始化，设置为true时会类进行初始化，代表会执行类中的静态代码块，以及对静态变量的赋值等操作。
+
+
+
+- **Class.forName会执行静态代码块，而obj.getClass.getClassLoader不会执行任何构造方法、静态代码块和非静态代码块**
+
+- **class.newInstance()时与使用无参构造方法new对象一样，会自动调用非静态代码块和无参构造方法** 
+
+
+
+> [在Java的反射中，Class.forName和ClassLoader的区别](https://www.cnblogs.com/jimoer/p/9185662.html)
+
+
+
+> #### ClassLoader.getSystemClassLoader（）和Thread.currentThread().getContextClassLoader()
+
+ClassLoader.getSystemClassLoader方法无论何时均会返回ApplicationClassLoader,其只加载classpath下的class文件。
+
+
+
+> #### Class.forName(com.mysql.jdbc.Driver) 加载数据库驱动
+
+Class.forName 遵循双亲委派机制。
+
+从源码可以看出是使用 ClassLoader.getClassLoader(caller) 类加载器进行加载的，默认是使用的用户类加载器，还是符合双亲委派机制的。
+
+为什么必须要破坏?
+DriverManager::getConnection 方法需要根据参数传进来的 url 从所有已经加载过的 Drivers 里找到一个合适的 Driver 实现类去连接数据库.
+Driver 实现类在第三方 jar 里, 要用 AppClassLoader 加载. 而 DriverManager 是 rt.jar 里的类, 被 BootstrapClassLoader 加载, DriverManager 没法用 BootstrapClassLoader 去加载 Driver 实现类, 所以只能破坏双亲委派模型, 用它下级的 AppClassLoader 去加载 Driver.
+
+如何破坏的?
+\> SPI 机制
+Driver 具体的实现类 jar 包在 META-INF/services/java.sql.Driver 文件里写上自己 Driver 实现类的全限定名, 比如 `org.postgresql.Driver` , JDK8 的 DriverManager 在 static 代码块里(JDK14 是在第一次 getConnection 时)会用 ServiceLoader 获取所有的 Driver 并使用 Thread.currentThread().getContextClassLoader() 获取到的 AppClassLoader 加载该类, Driver 实现类的 static 代码块会去调用 DriverManager::registerDriver 将自己注册到 DriverManager 里.
+
+
+
+> [Java 关于 Class.forName(com.mysql.jdbc.Driver) 未遵守了双亲委派模型这件事有什么比较好资料么?](https://www.v2ex.com/t/670286)
+
+
+
+# SPI
+
+SPI ，全称为 Service Provider Interface，是一种服务发现机制。它通过在ClassPath路径下的META-INF/services文件夹查找文件，自动加载文件里所定义的类。
+
+这一机制为很多框架扩展提供了可能，比如在Dubbo、JDBC中都使用到了SPI机制。
+
+使用例子：
+
+```java
+public class Test {
+    public static void main(String[] args) {    
+        Iterator<SPIService> providers = Service.providers(SPIService.class);
+        ServiceLoader<SPIService> load = ServiceLoader.load(SPIService.class);
+
+        while(providers.hasNext()) {
+            SPIService ser = providers.next();
+            ser.execute();
+        }
+        System.out.println("--------------------------------");
+        Iterator<SPIService> iterator = load.iterator();
+        while(iterator.hasNext()) {
+            SPIService ser = iterator.next();
+            ser.execute();
+        }
+    }
+}
+```
+
+简单的跟一下ServiceLoader的代码：
+
+```dart
+    private ServiceLoader(Class<S> svc, ClassLoader cl) {
+      	// 目标接口
+        service = Objects.requireNonNull(svc, "Service interface cannot be null");
+      	// 使用的类加载器，如果不指定则使用ApplicationClassLoader进行加载
+        loader = (cl == null) ? ClassLoader.getSystemClassLoader() : cl;
+        acc = (System.getSecurityManager() != null) ? AccessController.getContext() : null;
+        reload();
+    }
+```
+
+![image-20210224193218208](截图/Java基础/SPI.png)
+
+
+
+比较典型的例子就是JDBC的加载了。在早期版本中，需要先设置数据库驱动的连接，再通过DriverManager.getConnection获取一个Connection。在后续的版本中，设置数据库驱动连接，这一步骤就不再需要了。
+
+```java
+String url = "jdbc:mysql:///consult?serverTimezone=UTC";
+String user = "root";
+String password = "root";
+
+Class.forName("com.mysql.jdbc.Driver");
+Connection connection = DriverManager.getConnection(url, user, password);
+```
+
+`DriverManager`类，它在静态代码块里面做了一件比较重要的事，它通过SPI机制， 把数据库驱动连接初始化了。
+
+```java
+public class DriverManager {
+    static {
+        loadInitialDrivers();
+        println("JDBC DriverManager initialized");
+    }
+  
+    private static void loadInitialDrivers() {
+        AccessController.doPrivileged(new PrivilegedAction<Void>() {
+            public Void run() {
+                //很明显，它要加载Driver接口的服务类，Driver接口的包为:java.sql.Driver
+                //所以它要找的就是META-INF/services/java.sql.Driver文件
+                ServiceLoader<Driver> loadedDrivers = ServiceLoader.load(Driver.class);
+                Iterator<Driver> driversIterator = loadedDrivers.iterator();
+                try{
+                    //查到之后创建对象
+                    while(driversIterator.hasNext()) {
+                        driversIterator.next();
+                    }
+                } catch(Throwable t) {
+                    // Do nothing
+                }
+                return null;
+            }
+        });
+    }
+}
+```
+
+上一步已经找到了MySQL中的com.mysql.cj.jdbc.Driver全限定类名，当调用next方法时，就会创建这个类的实例。它就完成了一件事，向DriverManager注册自身的实例。
+
+```java
+public class Driver extends NonRegisteringDriver implements java.sql.Driver {
+    static {
+        try {
+            //注册
+            //调用DriverManager类的注册方法
+            //往registeredDrivers集合中加入实例
+            java.sql.DriverManager.registerDriver(new Driver());
+        } catch (SQLException E) {
+            throw new RuntimeException("Can't register driver!");
+        }
+    }
+    public Driver() throws SQLException {
+        // Required for Class.forName().newInstance()
+    }
+}
+```
+
+
+
+
+
+
+
+> [深入理解SPI机制](https://www.jianshu.com/p/3a3edbcd8f24)
+
+
 
 
 

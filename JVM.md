@@ -208,6 +208,17 @@ Java 9 引入了模块系统，并且略微更改了上述的类加载器。扩�
 
 ​	优点：使得类先天具有一个层级结构。
 
+JDK主要有3个自带ClassLoader：
+最基础：Bootstrap ClassLoader（加载JDK的/lib目录下的类）
+次基础：Extension ClassLoader（加载JDK的/lib/ext目录下的类）
+普通：Application ClassLoader（程序自己classpath下的类）
+
+
+
+> [spi与双亲委派](https://blog.csdn.net/qq_22041375/article/details/107131262)
+
+
+
 
 
 > #### tomcat类加载有什么不同?
@@ -222,10 +233,23 @@ Java 9 引入了模块系统，并且略微更改了上述的类加载器。扩�
 
 > #### 破坏双亲委派模型
 
-// todo 破坏双亲委派模型 JNI，tomcat等
+需要破坏的原因是：
 
--  JNDI,SPI,JDBC
+> 加载类D的类加载器Dload，在解析过程中，如果要将D中符号引用N解析为类或者接口C的直接引用，C又未被类加载器加载，那么使用Dload对C进行加载。然而由于JDNI是使用启动类加载器加载的，而JNDI类中符号引用代表的类是第三方的代码，所以无法使用启动类加载器进行加载，所以需要调用应用程序类加载器加载。
+
+
+
+
+
+> [为什么spi需要破坏双亲委派模型？](https://www.zhihu.com/question/60812524)
+
+
+
+常常在以下的一些地方见的用处
+
+-  JNDI,SPI,JDBC（已写在《Java基础》）
 - HotSwap，模块热部署
+- tomcat
 
 
 
