@@ -1365,17 +1365,124 @@ Java 中的 native 方法的链接方式主要有两种。一是按照 JNI 的�
 
 # Java Agent
 
-> #### 33 | Java Agent与字节码注入——《深入拆解 Java 虚拟机》
-
-// todo 写的比较奇怪，找过一篇
+> 33 | Java Agent与字节码注入——《深入拆解 Java 虚拟机》
 
 `premain`方法。顾名思义，这个方法指的就是在`main`方法之前执行的方法。Java 虚拟机所能识别的`premain`方法接收的是字符串类型的参数，而并非类似于`main`方法的字符串数组。
 
 - 为了能够以 Java agent 的方式运行该`premain`方法，我们需要将其打包成 jar 包，并在其中的 MANIFEST.MF 配置文件中，指定所谓的`Premain-class`。
-
 - 还可以通过 Attach API 远程加载，使用 Attach API 远程加载的 Java agent 不会再先于`main`方法执行，这取决于另一虚拟机调用 Attach API 的时机。并且，它运行的也不再是`premain`方法，而是名为`agentmain`的方法。
 
+<!--以上为专栏内的摘抄，看起来比较奇怪，并不能很好的展示对agent的理解-->
 
+------
+
+java agent本质上可以理解为一个插件，该插件就是一个精心提供的jar包，这个jar包通过JVMTI（JVM Tool  Interface）完成加载，最终借助JPLISAgent（Java Programming Language Instrumentation  Services Agent）完成对目标代码的修改。
+
+> #### java agent技术的主要功能
+
+- 可以在加载java文件之前做拦截把字节码做修改
+- 可以在运行期将已经加载的类的字节码做变更
+- 还有其他的一些小众的功能
+  - 获取所有已经被加载过的类
+  - 获取所有已经被初始化过了的类
+  - 获取某个对象的大小
+  - 将某个jar加入到bootstrapclasspath里作为高优先级被bootstrapClassloader加载
+  - 将某个jar加入到classpath里供AppClassloard去加载
+  - 设置某些native方法的前缀，主要在查找native方法的时候做规则匹配
+
+
+
+> **JVMTI**
+
+[JVMTI](http://docs.oracle.com/javase/7/docs/platform/jvmti/jvmti.html)全称JVM Tool Interface，是JVM暴露出来的一些供用户扩展的接口集合。JVMTI是基于事件驱动的，JVM每执行到一定的逻辑就会调用一些事件的回调接口（如果有的话），这些接口可以供开发者扩展自己的逻辑。
+
+> **JVMTIAgent**
+
+JVMTIAgent其实就是一个动态库，利用JVMTI暴露出来的一些接口来干一些我们想做、但是正常情况下又做不到的事情，不过为了和普通的动态库进行区分，它一般会实现如下的一个或者多个函数
+
+```cpp
+JNIEXPORT jint JNICALL
+Agent_OnLoad(JavaVM *vm, char *options, void *reserved);
+
+JNIEXPORT jint JNICALL
+Agent_OnAttach(JavaVM* vm, char* options, void* reserved);
+
+JNIEXPORT void JNICALL
+Agent_OnUnload(JavaVM *vm); 
+```
+
+- Agent_OnLoad函数，如果agent是在启动时加载的，也就是在vm参数里通过-agentlib来指定的，那在启动过程中就会去执行这个agent里的Agent_OnLoad函数。
+- Agent_OnAttach函数，如果agent不是在启动时加载的，而是我们先attach到目标进程上，然后给对应的目标进程发送load命令来加载，则在加载过程中会调用Agent_OnAttach函数。
+- Agent_OnUnload函数，在agent卸载时调用，不过貌似基本上很少实现它。
+
+说到javaagent，必须要讲的是一个叫做instrument的JVMTIAgent（Linux下对应的动态库是libinstrument.so），因为javaagent功能就是它来实现的，另外instrument agent还有个别名叫JPLISAgent(Java Programming Language Instrumentation  Services Agent)，这个名字也完全体现了其最本质的功能：就是专门为Java语言编写的插桩服务提供支持的。
+
+> **instrument agent**
+
+instrument agent实现了Agent_OnLoad和Agent_OnAttach两方法，也就是说在使用时，agent既可以在启动时加载，也可以在运行时动态加载。其中启动时加载还可以通过类似-javaagent:myagent.jar的方式来间接加载instrument agent，运行时动态加载依赖的是JVM的attach机制（[JVM Attach机制实现](http://lovestblog.cn/blog/2014/06/18/jvm-attach/)），通过发送load命令来加载agent。
+
+
+
+> #### 实现agent启动
+
+通过java agent技术进行类的字节码修改最主要使用的就是Java Instrumentation API。
+
+Java Agent支持目标JVM启动时加载，也支持在目标JVM运行时加载，这两种不同的加载模式会使用不同的入口函数，如果需要在目标JVM启动的同时加载Agent，那么可以选择实现下面的方法：
+
+```java
+[1] public static void premain(String agentArgs, Instrumentation inst); 
+[2] public static void premain(String agentArgs);
+```
+
+JVM将首先寻找[1]，如果没有发现[1]，再寻找[2]。如果希望在目标JVM运行时加载Agent，则需要实现下面的方法：
+
+```java
+[1] public static void agentmain(String agentArgs, Instrumentation inst); 
+[2] public static void agentmain(String agentArgs);
+```
+
+这两组方法的第一个参数AgentArgs是随同 “–javaagent”一起传入的程序参数，如果这个字符串代表了多个参数，就需要自己解析这些参数。inst是Instrumentation类型的对象，是JVM自动传入的，我们可以拿这个参数进行类增强等操作。
+
+Agent需要打包成一个jar包，在ManiFest属性中指定“Premain-Class”或者“Agent-Class”,且需根据需求定义Can-Redefine-Classes和Can-Retransform-Classes。
+
+**agent加载**
+
+- 启动时加载
+  - 启动参数增加-javaagent:[path]，其中path为对应的agent的jar包路径
+- 运行中加载
+  - 使用com.sun.tools.attach.VirtualMachine加载
+
+
+
+> #### 原理简述
+
+**启动时修改**
+
+<img src="截图/JVM/java agent启动时修改.png" alt="img" style="zoom: 50%;" />
+
+启动时修改主要是在jvm启动时，执行native函数的Agent_OnLoad方法，在方法执行时，执行如下步骤：
+
+- 创建InstrumentationImpl对象
+- 监听ClassFileLoadHook事件
+- 调用InstrumentationImpl的loadClassAndCallPremain方法，在这个方法里会去调用javaagent里MANIFEST.MF里指定的Premain-Class类的premain方法
+
+
+
+**运行时修改**
+
+<img src="截图/JVM/java agent 运行时修改.png" alt="img" style="zoom:50%;" />
+
+运行时修改主要是通过jvm的attach机制来请求目标jvm加载对应的agent，执行native函数的Agent_OnAttach方法，在方法执行时，执行如下步骤：
+
+- 创建InstrumentationImpl对象
+- 监听ClassFileLoadHook事件
+- 调用InstrumentationImpl的loadClassAndCallAgentmain方法，在这个方法里会去调用javaagent里MANIFEST.MF里指定的Agentmain-Class类的agentmain方法
+
+
+
+> [java agent技术原理及简单实现](https://www.cnblogs.com/kokov/p/12120033.html)
+>
+> [JVM源码分析之javaagent原理完全解读](https://www.cnblogs.com/beautiful-code/p/6424931.html)
 
 
 
