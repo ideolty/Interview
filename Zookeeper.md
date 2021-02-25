@@ -417,7 +417,7 @@ Follower的消息循环处理如下几种来自Leader的消息：
 
 ZooKeeper 的选举算法有两种：一种是基于 **Basic Paxos**（Google Chubby 采用）实现的，另外 一种是基于 **Fast Paxos**（ZooKeeper 采用）算法实现的。系统默认的选举算法为 Fast Paxos。 并且 ZooKeeper 在 3.4.0 版本后只保留了 FastLeaderElection 算法。
 
-ZooKeeper 的核心是原子广播，这个机制保证了各个 Server 之间的同步。实现这个机制的协议叫做 ZAB 协议（Zookeeper Atomic BrodCast）。ZAB 协议有两种模式，它们分别是**崩溃恢复模式（选主）和原子广播模式（同步）**。
+ZooKeeper 的核心是原子广播，这个机制保证了各个 Server 之间的同步。实现这个机制的协议叫做 ZAB 协议（Zookeeper Atomic BroadCast）。ZAB 协议有两种模式，它们分别是**崩溃恢复模式（选主）和原子广播模式（同步）**。
 
 　　1. 当服务启动或者在领导者崩溃后，ZAB 就进入了恢复模式，当领导者被选举出来，且大多数 Server 完成了和 leader 的状态同步以后，恢复模式就结束了。状态同步保证了 leader 和 follower 之间具有相同的系统状态。
 
