@@ -101,9 +101,13 @@ TODO
 
 # 类加载机制
 
-《03 | Java虚拟机是如何加载Java类的?》
+> 《03 | Java虚拟机是如何加载Java类的?》
+>
+> 《24 | Context容器（上）：Tomcat如何打破双亲委托机制？》—— 深入拆解Tomcat & Jetty
 
 虚拟机把描述类的数据从class文件加载到内存，并对数据进行校验、转换解析和初始化。最终形成可以被虚拟机最直接使用的java类型的过程就是虚拟机的类加载机制。
+
+Java 的类加载，就是把字节码格式“.class”文件加载到 JVM 的**方法区**，并在 JVM 的**堆区**建立一个`java.lang.Class`对象的实例，用来封装 Java 类相关的数据和方法。
 
 
 
@@ -198,7 +202,7 @@ Java 9 引入了模块系统，并且略微更改了上述的类加载器。扩�
 
 > ### 双亲委派模型
 
-![双亲委派模型](截图/JVM/双亲委派模型.png)
+<img src="截图/JVM/双亲委派模型.png" alt="双亲委派模型" style="zoom:75%;" />
 
 
 
@@ -206,28 +210,23 @@ Java 9 引入了模块系统，并且略微更改了上述的类加载器。扩�
 
 - **双亲委派模型的工作过程：** 如果一个类加载器收到了类加载的请求，先把这个请求委派给父类加载器去完成（所以所有的加载请求最终都应该传送到顶层的启动类加载器中），只有当父加载器反馈自己无法完成加载请求时，子加载器才会尝试自己去加载。
 
-​	优点：使得类先天具有一个层级结构。
+优点：使得类先天具有一个层级结构。
 
 JDK主要有3个自带ClassLoader：
 最基础：Bootstrap ClassLoader（加载JDK的/lib目录下的类）
 次基础：Extension ClassLoader（加载JDK的/lib/ext目录下的类）
 普通：Application ClassLoader（程序自己classpath下的类）
 
-
-
 > [spi与双亲委派](https://blog.csdn.net/qq_22041375/article/details/107131262)
 
 
 
+> #### 自定义类加载器
 
+自定义类加载器，不去继承 AppClassLoader，而是继承 ClassLoader 抽象类，再重写 findClass 和 loadClass 方法即可，Tomcat 就是通过自定义类加载器来实现自己的类加载逻辑。
 
-> #### tomcat类加载有什么不同?
-
-// todo
-
-[图解Tomcat类加载机制(阿里面试题)](https://www.cnblogs.com/aspirant/p/8991830.html)
-
-[Tomcat类加载机制和JAVA类加载机制的比较](https://blog.csdn.net/dreamcatcher1314/article/details/78271251)
+- findClass 方法的主要职责就是找到“.class”文件，可能来自文件系统或者网络，找到后把“.class”文件读到内存得到字节码数组，然后调用 defineClass 方法得到 Class 对象。
+- loadClass 是个 public  方法，说明它才是对外提供服务的接口，具体实现也比较清晰：首先检查这个类是不是已经被加载过了，如果加载过了直接返回，否则交给父加载器去加载。请你注意，这是一个递归调用，也就是说子加载器持有父加载器的引用，当一个类加载器需要加载一个 Java 类时，会先委托父加载器去加载，然后父加载器在自己的加载路径中搜索 Java  类，当父加载器在自己的加载范围内找不到时，才会交还给子加载器加载，这就是双亲委托机制。
 
 
 
@@ -235,23 +234,190 @@ JDK主要有3个自带ClassLoader：
 
 需要破坏的原因是：
 
-> 加载类D的类加载器Dload，在解析过程中，如果要将D中符号引用N解析为类或者接口C的直接引用，C又未被类加载器加载，那么使用Dload对C进行加载。然而由于JDNI是使用启动类加载器加载的，而JNDI类中符号引用代表的类是第三方的代码，所以无法使用启动类加载器进行加载，所以需要调用应用程序类加载器加载。
-
-
+加载类D的类加载器Dload，在解析过程中，如果要将D中符号引用N解析为类或者接口C的直接引用，C又未被类加载器加载，那么使用Dload对C进行加载。然而由于JDNI是使用启动类加载器加载的，而JNDI类中符号引用代表的类是第三方的代码，所以无法使用启动类加载器进行加载，所以需要调用应用程序类加载器加载。
 
 
 
 > [为什么spi需要破坏双亲委派模型？](https://www.zhihu.com/question/60812524)
 
-
-
 常常在以下的一些地方见的用处
 
 -  JNDI,SPI,JDBC（已写在《Java基础》）
-- HotSwap，模块热部署
-- tomcat
+-  HotSwap，模块热部署
+-  tomcat
 
 
+
+
+
+> #### Tomcat类加载
+
+<img src="截图/JVM/Tomcat类加载模型.jpg" alt="img" style="zoom:75%;" />
+
+**为什么Tomcat需要破坏双亲委派？**
+
+1. 一个web容器可能需要部署多个应用程序，不同的应用程序可能会依赖同一个第三方类库的不同版本，不能要求同一个类库在同一个服务器只有一份，因此要保证每个应用程序的类库都是独立的，保证相互隔离。 
+2. 部署在同一个web容器中相同的类库相同的版本可以共享。否则，如果服务器有10个应用程序，那么要有10份相同的类库加载进虚拟机。
+3. web容器也有自己依赖的类库，不能于应用程序的类库混淆。基于安全考虑，应该让容器的类库和程序的类库隔离开来。 
+4. web容器要支持jsp的修改，jsp 文件最终也是要编译成class文件才能在虚拟机中运行，但程序运行后修改jsp已经是司空见惯的事情，所以web容器需要支持 jsp 热更新。
+
+
+
+当tomcat启动时，会创建几种类加载器：
+
+1. **Bootstrap 引导类加载器**
+
+　　加载JVM启动所需的类，以及标准扩展类（位于jre/lib/ext下）
+
+2. **System 系统类加载器** 
+
+   加载tomcat启动的类，比如bootstrap.jar，通常在catalina.bat或者catalina.sh中指定。位于CATALINA_HOME/bin下。
+
+3. **Common 通用类加载器** 
+
+   加载tomcat使用以及应用通用的一些类，位于CATALINA_HOME/lib下，比如servlet-api.jar
+
+4. **webapp 应用类加载器**
+
+   每个应用在部署后，**都会创建一个唯一的类加载器**。该类加载器会加载位于 WEB-INF/lib下的jar文件中的class 和 WEB-INF/classes下的class文件。
+
+
+
+**当应用需要到某个类时，则会按照下面的顺序进行类加载**：
+
+1.  使用bootstrap引导类加载器加载
+2. 使用system系统类加载器加载
+3. 使用应用类加载器在WEB-INF/classes中加载
+4. 使用应用类加载器在WEB-INF/lib中加载
+5. 使用common类加载器在CATALINA_HOME/lib中加载
+
+
+
+Tomcat 的自定义类加载器 WebAppClassLoader 打破了双亲委托机制，它**首先自己尝试去加载某个类，如果找不到再代理给父类加载器**，其目的是优先加载 Web 应用自己定义的类。具体实现就是重写 ClassLoader 的两个方法：findClass 和 loadClass。
+
+- 在 findClass 方法里，主要有三个步骤：
+  1. 先在 Web 应用本地目录下查找要加载的类。
+  2. 如果没有找到，交给父加载器去查找，它的父加载器就是上面提到的系统类加载器 AppClassLoader。
+  3. 如何父加载器也没找到这个类，抛出 ClassNotFound 异常。
+- 在loadClass中，主要有六个步骤：
+  1. 先在本地 Cache 查找该类是否已经加载过，也就是说 Tomcat 的类加载器是否已经加载过这个类。
+  2. 如果 Tomcat 类加载器没有加载过这个类，再看看系统类加载器是否加载过。
+  3. 如果都没有，就让**ExtClassLoader**去加载，这一步比较关键，目的**防止 Web 应用自己的类覆盖 JRE 的核心类**。因为 Tomcat 需要打破双亲委托机制，假如 Web 应用里自定义了一个叫 Object 的类，如果先加载这个 Object 类，就会覆盖 JRE 里面的那个 Object 类，这就是为什么 Tomcat 的类加载器会优先尝试用 ExtClassLoader 去加载，因为  ExtClassLoader 会委托给 BootstrapClassLoader 去加载，BootstrapClassLoader  发现自己已经加载了 Object 类，直接返回给 Tomcat 的类加载器，这样 Tomcat 的类加载器就不会去加载 Web 应用下的  Object 类了，也就避免了覆盖 JRE 核心类的问题。
+  4. 如果 ExtClassLoader 加载器加载失败，也就是说 JRE 核心类中没有这类，那么就在本地 Web 应用目录下查找并加载。
+  5. 如果本地目录下没有这个类，说明不是 Web 应用自己定义的类，那么由系统类加载器去加载。这里请你注意，Web 应用是通过`Class.forName`调用交给系统类加载器的，因为`Class.forName`的默认加载器就是系统类加载器。
+  6. 如果上述加载过程全部失败，抛出 ClassNotFound 异常。
+
+
+
+```java
+public Class<?> findClass(String name) throws ClassNotFoundException {
+    ...
+    Class<?> clazz = null;
+    try {
+      //1. 先在 Web 应用目录下查找类 
+      clazz = findClassInternal(name);
+    }  catch (RuntimeException e) {
+      throw e;
+    }
+    if (clazz == null) {
+    try {
+      //2. 如果在本地目录没有找到，交给父加载器去查找
+      clazz = super.findClass(name);
+    }  catch (RuntimeException e) {
+      throw e;
+    }
+
+    //3. 如果父类也没找到，抛出 ClassNotFoundException
+    if (clazz == null) {
+       throw new ClassNotFoundException(name);
+    }
+    return clazz;
+}
+
+public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+    synchronized (getClassLoadingLock(name)) {
+        Class<?> clazz = null;
+        //1. 先在本地 cache 查找该类是否已经加载过
+        clazz = findLoadedClass0(name);
+        if (clazz != null) {
+            if (resolve)
+                resolveClass(clazz);
+            return clazz;
+        }
+        //2. 从系统类加载器的 cache 中查找是否加载过
+        clazz = findLoadedClass(name);
+        if (clazz != null) {
+            if (resolve)
+                resolveClass(clazz);
+            return clazz;
+        }
+        // 3. 尝试用 ExtClassLoader 类加载器类加载，为什么？
+        ClassLoader javaseLoader = getJavaseClassLoader();
+        try {
+            clazz = javaseLoader.loadClass(name);
+            if (clazz != null) {
+                if (resolve)
+                    resolveClass(clazz);
+                return clazz;
+            }
+        } catch (ClassNotFoundException e) {
+            // Ignore
+        }
+
+        // 4. 尝试在本地目录搜索 class 并加载
+        try {
+            clazz = findClass(name);
+            if (clazz != null) {
+                if (resolve)
+                    resolveClass(clazz);
+                return clazz;
+            }
+        } catch (ClassNotFoundException e) {
+            // Ignore
+        }
+
+        // 5. 尝试用系统类加载器 (也就是 AppClassLoader) 来加载
+      try {
+        clazz = Class.forName(name, false, parent);
+        if (clazz != null) {
+          if (resolve)
+            resolveClass(clazz);
+          return clazz;
+        }
+      } catch (ClassNotFoundException e) {
+        // Ignore
+      }
+    }
+    //6. 上述过程都加载失败，抛出异常
+    throw new ClassNotFoundException(name);
+}
+```
+
+
+
+从上面的过程我们可以看到，Tomcat 的类加载器打破了双亲委托机制，没有一上来就直接委托给父加载器，而是先在本地目录下加载，为了避免本地目录下的类覆盖 JRE 的核心类，先尝试用 JVM 扩展类加载器 ExtClassLoader 去加载。
+
+
+
+更多的内容见tomcat文档
+
+> 24 | Context容器（上）：Tomcat如何打破双亲委托机制？      
+>
+> [图解Tomcat类加载机制(阿里面试题)](https://www.cnblogs.com/aspirant/p/8991830.html)
+>
+> [Tomcat类加载机制和JAVA类加载机制的比较](https://blog.csdn.net/dreamcatcher1314/article/details/78271251)
+
+
+
+
+
+> #### 面试题
+
+> ##### 既然 Tomcat 不遵循双亲委派机制，那么如果我自己定义一个恶意的HashMap，会不会有风险呢？(**阿里的面试官问**)
+
+先在 Tomcat 的类加载器中查找是否已经加载过这个类，如果 Tomcat 类加载器没有加载过这个类，再看看系统类加载器是否加载过。如果都没有，就让**ExtClassLoader**去加载
+
+Tomcat 的类加载器会优先尝试用 ExtClassLoader 去加载，因为  ExtClassLoader 会委托给 BootstrapClassLoader 去加载，BootstrapClassLoader  发现自己已经加载了 Object 类，直接返回给 Tomcat 的类加载器，这样 Tomcat 的类加载器就不会去加载 Web 应用下的  Object 类了，也就避免了覆盖 JRE 核心类的问题。
 
 
 
