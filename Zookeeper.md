@@ -421,9 +421,9 @@ ZooKeeper 的核心是原子广播，这个机制保证了各个 Server 之间�
 
 　　1. 当服务启动或者在领导者崩溃后，ZAB 就进入了恢复模式，当领导者被选举出来，且大多数 Server 完成了和 leader 的状态同步以后，恢复模式就结束了。状态同步保证了 leader 和 follower 之间具有相同的系统状态。
 
- 　   2. 当 ZooKeeper集群选举出 leader同步完状态退出恢复模式之后，便进入了原子广播模式。所有的写请求都被转发给 leader，再由 leader 将更新 proposal广播给 follower。
+  　　2. 当 ZooKeeper集群选举出 leader同步完状态退出恢复模式之后，便进入了原子广播模式。所有的写请求都被转发给 leader，再由 leader 将更新 proposal广播给 follower。
 
- 　　为了保证事务的顺序一致性，zookeeper 采用了递增的事务 id 号（zxid）来标识事务。所有的提议（proposal）都在被提出的时候加上了 zxid。实现中 zxid 是一个 64 位的数字，它高 32 位是 epoch 用来标识  leader 关系是否改变，每次一个 leader 被选出来，它都会有一个新 的 epoch，标识当前属于那个 leader 的统治时期。低  32 位用于递增计数。　　
+为了保证事务的顺序一致性，zookeeper 采用了递增的事务 id 号（zxid）来标识事务。所有的提议（proposal）都在被提出的时候加上了 zxid。实现中 zxid 是一个 64 位的数字，它高 32 位是 epoch 用来标识  leader 关系是否改变，每次一个 leader 被选出来，它都会有一个新 的 epoch，标识当前属于那个 leader 的统治时期。低  32 位用于递增计数。　　
 
 以下是 Basic Paxos 流程：
 
