@@ -57,6 +57,7 @@
 - [分布式](https://github.com/ideolty/Interview/blob/master/分布式.md)
 - [Netflix-Archaius](https://github.com/ideolty/Interview/blob/master/Netflix-Archaius.md)
 - Linux
+- Tomcat
 - 大数据全家桶
   - Hdfs
   - Yarn

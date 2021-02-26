@@ -19,7 +19,6 @@
 TODO
 
 - [ ] Linux中对JVM的一些工具
-- [ ] CAS与自旋相关问题
 
 
 
@@ -1030,7 +1029,7 @@ G1 能够针对每个细分的区域来进行垃圾回收。在选择进行垃�
 
 > #### 什么是`Rset`
 
-每个`Region`初始化时,都会初始化一个Rset(`remembered set`),每个`Region`都包含一个`Rset`,`Rset`的作用是记录了哪些内存区域(`Region`)堆当前`Region`的引用。`Rset`是一个空间换时间的数据结构。有了Rset可以避免对整个堆进行扫描。
+每个`Region`初始化时,都会初始化一个Rset(`remembered set`),每个`Region`都包含一个`Rset`,`Rset`的作用是记录了哪些内存区域(`Region`)对当前`Region`的引用。`Rset`是一个空间换时间的数据结构。有了Rset可以避免对整个堆进行扫描。
 
 
 
@@ -1601,7 +1600,7 @@ public interface Processor {
 
 `getSupportedSourceVersion`方法将返回该处理器所支持的 Java 版本，通常，这个版本需要与你的 Java 编译器版本保持一致；而`process`方法则是最为关键的注解处理方法。
 
-JDK 提供了一个实现`Processor`接口的抽象类`AbstractProcessor`。该抽象类实现了`init`、`getSupportedAnnotationTypes`和`getSupportedSourceVersion`方法。它的子类可以通过`@SupportedAnnotationTypes`和`@SupportedSourceVersion`注解来声明所支持的注解类型以及 Java 版本。
+JDK 提供了一个实现`Processor`接口的抽象类**`AbstractProcessor`**。该抽象类实现了`init`、`getSupportedAnnotationTypes`和`getSupportedSourceVersion`方法。它的子类可以通过`@SupportedAnnotationTypes`和`@SupportedSourceVersion`注解来声明所支持的注解类型以及 Java 版本。
 
 
 
@@ -1752,7 +1751,7 @@ G1收集器：面向服务端应用的垃圾收集器，过程：初始标记；
 
 
 
-> #### 载和链接以后生成的是什么样的数据结构？存储在什么地方？
+> #### 加载和链接以后生成的是什么样的数据结构？存储在什么地方？
 
 JVM并不会直接使用.class文件，类加载链接的目的就是在JVM中创建相应的类结构，会存储在元空间(我之前用的老说法”方法区”。
 
