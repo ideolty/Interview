@@ -1236,6 +1236,14 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
 
 
 
+> [线上程序 CPU 过高问题排查](https://blog.vioao.site/posts/%E7%BA%BF%E4%B8%8A%E7%A8%8B%E5%BA%8FCPU%E8%BF%87%E9%AB%98%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5/)
+
+
+
+
+
+
+
 # JVM调优
 
 首先需要注意的是在对JVM内存调优的时候不能只看操作系统级别Java进程所占用的内存，这个数值不能准确的反应堆内存的真实占用情况，因为GC过后这个值是不会变化的，因此内存调优的时候要更多地使用JDK提供的内存查看工具，比如**JConsole**和**Java VisualVM**。
