@@ -87,10 +87,6 @@ IOC容器部分是网上别人的文章的一个自己的总结，基本与别�
 
 
 
-// todo 源码解析
-
-
-
 ### 注解注入
 
 #### @Autowired 注入
@@ -105,9 +101,155 @@ IOC容器部分是网上别人的文章的一个自己的总结，基本与别�
 
 > #### @Autowired 注入过程 
 
+> 66 | @Autowired注入：@Autowired注入的规则和原理有哪些？
+
 - 元信息解析
 - 依赖查找
 - 依赖注入（字段、方法）
+
+
+
+在bean的创建阶段中，存在一个合并的过程，在`org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean`方法中调用了`applyMergedBeanDefinitionPostProcessors`方法
+
+```java
+protected void applyMergedBeanDefinitionPostProcessors(RootBeanDefinition mbd, Class<?> beanType, String beanName) {
+   for (BeanPostProcessor bp : getBeanPostProcessors()) {
+      if (bp instanceof MergedBeanDefinitionPostProcessor) {
+         MergedBeanDefinitionPostProcessor bdp = (MergedBeanDefinitionPostProcessor) bp;
+         bdp.postProcessMergedBeanDefinition(mbd, beanType, beanName);
+      }
+   }
+}
+```
+
+此方法开始处理`MergedBeanDefinitionPostProcessor`，其中`org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor`类实现了此PostProcessor接口，所以开始处理
+
+
+
+`org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor`
+
+```java
+
+
+  /**
+   * 依赖注入的调用入口
+   */
+	@Override
+	public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
+		InjectionMetadata metadata = findAutowiringMetadata(beanName, beanType, null);
+		metadata.checkConfigMembers(beanDefinition);
+	}
+
+  /**
+   * 首先尝试从缓存中拿元信息，如果没有就创建一个
+   */
+	private InjectionMetadata findAutowiringMetadata(String beanName, Class<?> clazz, @Nullable PropertyValues pvs) {
+		// Fall back to class name as cache key, for backwards compatibility with custom callers.
+		String cacheKey = (StringUtils.hasLength(beanName) ? beanName : clazz.getName());
+		// Quick check on the concurrent map first, with minimal locking.
+		InjectionMetadata metadata = this.injectionMetadataCache.get(cacheKey);
+		if (InjectionMetadata.needsRefresh(metadata, clazz)) {
+			synchronized (this.injectionMetadataCache) {
+				metadata = this.injectionMetadataCache.get(cacheKey);
+				if (InjectionMetadata.needsRefresh(metadata, clazz)) {
+					if (metadata != null) {
+						metadata.clear(pvs);
+					}
+					metadata = buildAutowiringMetadata(clazz);
+					this.injectionMetadataCache.put(cacheKey, metadata);
+				}
+			}
+		}
+		return metadata;
+	}
+
+  /**
+   * 创建一个InjectionMetadata
+   */
+	private InjectionMetadata buildAutowiringMetadata(final Class<?> clazz) {
+		if (!AnnotationUtils.isCandidateClass(clazz, this.autowiredAnnotationTypes)) {
+			return InjectionMetadata.EMPTY;
+		}
+
+		List<InjectionMetadata.InjectedElement> elements = new ArrayList<>();
+		Class<?> targetClass = clazz;
+
+    // 依次递归的对成员变量进行注入，找寻父类，父类的父类，递归下去找，（这是个do-while，看循环最后一行）
+		do {
+			final List<InjectionMetadata.InjectedElement> currElements = new ArrayList<>();
+
+			ReflectionUtils.doWithLocalFields(targetClass, field -> {
+				MergedAnnotation<?> ann = findAutowiredAnnotation(field);
+				if (ann != null) {
+					if (Modifier.isStatic(field.getModifiers())) {
+						if (logger.isInfoEnabled()) {
+							logger.info("Autowired annotation is not supported on static fields: " + field);
+						}
+						return;
+					}
+					boolean required = determineRequiredStatus(ann);
+					currElements.add(new AutowiredFieldElement(field, required));
+				}
+			});
+
+			ReflectionUtils.doWithLocalMethods(targetClass, method -> {
+				Method bridgedMethod = BridgeMethodResolver.findBridgedMethod(method);
+				if (!BridgeMethodResolver.isVisibilityBridgeMethodPair(method, bridgedMethod)) {
+					return;
+				}
+				MergedAnnotation<?> ann = findAutowiredAnnotation(bridgedMethod);
+				if (ann != null && method.equals(ClassUtils.getMostSpecificMethod(method, clazz))) {
+					if (Modifier.isStatic(method.getModifiers())) {
+						if (logger.isInfoEnabled()) {
+							logger.info("Autowired annotation is not supported on static methods: " + method);
+						}
+						return;
+					}
+					if (method.getParameterCount() == 0) {
+						if (logger.isInfoEnabled()) {
+							logger.info("Autowired annotation should only be used on methods with parameters: " +
+									method);
+						}
+					}
+					boolean required = determineRequiredStatus(ann);
+					PropertyDescriptor pd = BeanUtils.findPropertyForMethod(bridgedMethod, clazz);
+					currElements.add(new AutowiredMethodElement(method, required, pd));
+				}
+			});
+
+			elements.addAll(0, currElements);
+			targetClass = targetClass.getSuperclass();
+		}
+		while (targetClass != null && targetClass != Object.class);
+
+		return InjectionMetadata.forElements(elements, clazz);
+	}
+
+	private final Set<Class<? extends Annotation>> autowiredAnnotationTypes = new LinkedHashSet<>(4);
+
+/**
+ * 启动的时候，往autowiredAnnotationTypes这个LinkedHashSet里面初始化了2个注解，以后扫描的时候就会去处理这两个注解
+ * Create a new {@code AutowiredAnnotationBeanPostProcessor} for Spring's
+ * standard {@link Autowired @Autowired} and {@link Value @Value} annotations.
+ * <p>Also supports JSR-330's {@link javax.inject.Inject @Inject} annotation,
+ * if available.
+ */
+@SuppressWarnings("unchecked")
+public AutowiredAnnotationBeanPostProcessor() {
+   this.autowiredAnnotationTypes.add(Autowired.class);
+   this.autowiredAnnotationTypes.add(Value.class);
+   try {
+      this.autowiredAnnotationTypes.add((Class<? extends Annotation>)
+            ClassUtils.forName("javax.inject.Inject", AutowiredAnnotationBeanPostProcessor.class.getClassLoader()));
+      logger.trace("JSR-330 'javax.inject.Inject' annotation found and supported for autowiring");
+   }
+   catch (ClassNotFoundException ex) {
+      // JSR-330 API not available - simply skip.
+   }
+}
+```
+
+
 
 
 
@@ -130,6 +272,126 @@ CommonAnnotationBeanPostProcessor
 - 生命周期注解
   - javax.annotation.PostConstruct
   - javax.annotation.PreDestroy
+
+
+
+> ####  @PostConstruct注入原理
+
+> 99 | Spring Bean初始化阶段：@PostConstruct、InitializingBean以及自定义方法
+
+- 在bean初始化前阶段initializeBean()对应的applyBeanPostProcessorsBeforeInitialization()方法中执行完自定义的MyInstantiationAwareBeanPostProcessor的postProcessBeforeInitialization()方法
+- 同时会执行CommonAnnotationBeanPostProcessor的postProcessBeforeInitialization方法
+- 最后执行@PostConstruct修饰的initPostConstructor方法
+
+
+
+`org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory`
+
+```java
+	protected Object initializeBean(String beanName, Object bean, @Nullable RootBeanDefinition mbd) {
+		if (System.getSecurityManager() != null) {
+			AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
+				invokeAwareMethods(beanName, bean);
+				return null;
+			}, getAccessControlContext());
+		}
+		else {
+			invokeAwareMethods(beanName, bean);
+		}
+
+		Object wrappedBean = bean;
+		if (mbd == null || !mbd.isSynthetic()) {
+      // BeanPostProcessors回调
+			wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);
+		}
+
+		try {
+			invokeInitMethods(beanName, wrappedBean, mbd);
+		}
+		catch (Throwable ex) {
+			throw new BeanCreationException(
+					(mbd != null ? mbd.getResourceDescription() : null),
+					beanName, "Invocation of init method failed", ex);
+		}
+		if (mbd == null || !mbd.isSynthetic()) {
+			wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
+		}
+
+		return wrappedBean;
+	}
+
+@Override
+public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName)
+      throws BeansException {
+
+   Object result = existingBean;
+   for (BeanPostProcessor processor : getBeanPostProcessors()) {
+     // 遍历所有的BeanPostProcessor实现类
+      Object current = processor.postProcessBeforeInitialization(result, beanName);
+      if (current == null) {
+         return result;
+      }
+      result = current;
+   }
+   return result;
+}
+```
+
+
+
+`org.springframework.beans.factory.annotation.InitDestroyAnnotationBeanPostProcessor`类实现了`MergedBeanDefinitionPostProcessor`，而`MergedBeanDefinitionPostProcessor extends BeanPostProcessor`
+
+```java
+@Override
+public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+   LifecycleMetadata metadata = findLifecycleMetadata(bean.getClass());
+   try {
+     //
+      metadata.invokeInitMethods(bean, beanName);
+   }
+   catch (InvocationTargetException ex) {
+      throw new BeanCreationException(beanName, "Invocation of init method failed", ex.getTargetException());
+   }
+   catch (Throwable ex) {
+      throw new BeanCreationException(beanName, "Failed to invoke init method", ex);
+   }
+   return bean;
+}
+
+
+// LifecycleMetadata是本类的内部类
+public void invokeInitMethods(Object target, String beanName) throws Throwable {
+  Collection<LifecycleElement> checkedInitMethods = this.checkedInitMethods;
+  Collection<LifecycleElement> initMethodsToIterate =
+    (checkedInitMethods != null ? checkedInitMethods : this.initMethods);
+  if (!initMethodsToIterate.isEmpty()) {
+    for (LifecycleElement element : initMethodsToIterate) {
+      if (logger.isTraceEnabled()) {
+        logger.trace("Invoking init method on bean '" + beanName + "': " + element.getMethod());
+      }
+      // 反射调用
+      element.invoke(target);
+    }
+  }
+}
+```
+
+
+
+`org.springframework.context.annotation.CommonAnnotationBeanPostProcessor`
+
+```java
+public CommonAnnotationBeanPostProcessor() {
+   setOrder(Ordered.LOWEST_PRECEDENCE - 3);
+   setInitAnnotationType(PostConstruct.class);
+   setDestroyAnnotationType(PreDestroy.class);
+   ignoreResourceType("javax.xml.ws.WebServiceContext");
+}
+```
+
+同时`CommonAnnotationBeanPostProcessor`继承自`InitDestroyAnnotationBeanPostProcessor`
+
+
 
 
 
@@ -170,7 +432,14 @@ CommonAnnotationBeanPostProcessor
 
   - getBean(String,Class)
 
-  
+
+
+
+// todo 搞明白具体查找的流程，是去哪里查的
+
+
+
+
 
 > #### 集合类型依赖查找
 
@@ -208,6 +477,12 @@ CommonAnnotationBeanPostProcessor
 
 
 
+// 双亲委派的查找模式？
+
+
+
+
+
 > #### 延迟依赖查找
 
 Bean 延迟依赖查找接口
@@ -227,6 +502,12 @@ Bean 延迟依赖查找接口
 ### BeanFactory
 
 ### ApplicationContext
+
+// todo 太长了，整理一下
+
+// @PostConstruct的实现
+
+
 
 ### 生命周期
 
@@ -2416,7 +2697,23 @@ ApplicationContext:提供框架的实现，包括BeanFactory的所有功能
 
 > #### Spring循环依赖的三种方式
 
-//todo
+Spring容器会将每一个正在创建的Bean 标识符放在一个“当前创建Bean池”中，Bean标识符在创建过程中将一直保持在这个池中。
+
+因此如果在创建Bean过程中发现自己已经在“当前创建Bean池”里时将抛出BeanCurrentlyInCreationException异常表示循环依赖；而对于创建完毕的Bean将从“当前创建Bean池”中清除掉。
+
+
+
+bean几种常见的实例化方式：
+
+第一种：构造器参数循环依赖。一般是无解，直接抛出异常。
+
+第二种：setter方式单例，默认方式。
+
+从bean的实例化流程中可知，Spring是先将Bean对象实例化之后再设置对象属性的。Spring先是用构造函数实例化Bean对象 ，此时Spring会将这个实例化结束的对象放到一个Map中，并且Spring提供了获取这个未设置属性的实例化对象引用的方法。 
+
+第三种：setter方式原型，prototype。
+
+原型模式就报错了呢，对于“prototype”作用域Bean，Spring容器无法完成依赖注入，因为“prototype”作用域的Bean，Spring容器不进行缓存，因此无法提前暴露一个创建中的Bean。
 
 
 
