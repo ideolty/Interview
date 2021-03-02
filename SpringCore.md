@@ -34,12 +34,6 @@ IOC容器部分是网上别人的文章的一个自己的总结，基本与别�
 
 
 
-# Spring 创建流程
-
-// todo
-
-
-
 # Spring IOC容器
 
 
@@ -1217,7 +1211,7 @@ Bean 延迟依赖查找接口
 
 // todo 太长了，整理一下
 
-// @PostConstruct的实现
+
 
 
 
@@ -1238,7 +1232,7 @@ AbstractApplicationContext#prepareRefresh()方法
 
 > #### BeanFactory创建阶段
 
-AbstractApplicati onCon text#obta inF reshBea nF actory()方法
+AbstractApplicationContext#obtainFreshBeanFactory()方法
 
 - 刷新 Spring 应用上下文底层 BeanFactory - refreshBeanFactory()
   - 销毁或关闭BeanFactory,如果已存在的话
@@ -1278,11 +1272,11 @@ Applicationcontext
 
 > #### BeanFactory后置处理阶段
 
-AbstractApplicati onCon text#postProcessBea nF actory(C on figurableListableBea nF actory)方法
+AbstractApplicationContext#postProcessBeanFactory(ConfigurableListableBeanFactory)方法
 
 - 由子类覆盖该方法
 
-AbstractApplicati onCon text#i nvokeBea nF actoryPostProcessors(C on figurableListableBea nF act
+AbstractApplicationCon text#invokeBeanFactoryPostProcessors(ConfigurableListableBea nF act
 
 ory方法
 
@@ -1367,7 +1361,7 @@ AbstractApplicati onCon text#fi nishBea nF actoryl nitializati on (Con figurable
 
 > #### Spring应用上下文刷新完成阶段
 
-AbstractApplicati onCon text#finishRefresh()方法
+AbstractApplicationCon text#finishRefresh()方法
 
 - 清除 ResourceLoader 缓存-clearResourceCaches() @since 5.0
 
@@ -1435,6 +1429,12 @@ AbstractApplicationContext#close()方法
 
 
 # Spring Bean
+
+## 创建流程
+
+// todo
+
+
 
 ## 结构（BeanDefinition）
 
@@ -1541,7 +1541,7 @@ BeanFactory 的默认实现为 DefaultListableBeanFactory，其中 Bean生命周
 - BeanDefinition 合并阶段 - getMergedBeanDefinition 
 - Bean 实例化前阶段 - resolveBeforeInstantiation 
 - Bean 实例化阶段 - createBeanInstance 
-- Bean 初始化后阶段 - populateBean 
+- Bean 实例化后阶段 - populateBean 
 - Bean 属性赋值前阶段 - populateBean 
 - Bean 属性赋值阶段 - populateBean 
 - Bean Aware 接口回调阶段 - initializeBean 
@@ -3080,6 +3080,18 @@ Spring切面可以应用5种类型的通知：
 ## 应用
 
 比如事务，通知，aspectJ，slf4j的原理
+
+
+
+## 原理
+
+> [springboot启动流程（十一）aop切面处理过程](https://www.cnblogs.com/lay2017/p/11519411.html)
+
+自动配置的核心就是为了导入一个AnnotationAwareAspectJAutoProxyCreator，该类实现了BeanPostProcessor。所以在创建Bean实例对象之前会触发解析@Aspect切面对象，获取Advisor。在生成Bean实例对象之后，会再触发该类对Bean实例对象做代理增强，增强的Advisor来自之前的解析结果。代理增强的实现有cglib和jdk动态代理两种。
+
+最后，增强过的代理Bean如果是单例，将跟以前一样添加到缓存对象中。
+
+
 
 
 
