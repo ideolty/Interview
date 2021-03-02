@@ -109,9 +109,139 @@ IOC容器部分是网上别人的文章的一个自己的总结，基本与别�
 
 
 
-在bean的创建阶段中，存在一个合并的过程，在`org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean`方法中调用了`applyMergedBeanDefinitionPostProcessors`方法
+
+
+> #### @Autowired原理
+
+> [深入理解@Autowired注解以及Spring加载Bean的机制](https://blog.csdn.net/nuomizhende45/article/details/84960303)
+>
+> [Autowired实现原理](https://blog.csdn.net/qq_34707456/article/details/108972215)
+
+
+
+实例化bean的调用链如下  ：
+
+> DefaultListbleBeanFactory.getBean() 
+> ——》AbstractBeanFactory.doGetBean()
+> ————》DefaultSingletonBeanRegistry.getSingleton()
+> ——————》AbstractAutowireCapableBeanFactory.createBean()
+> ————————》AbstractAutowireCapableBeanFactory.doCreateBean()
+> ——————————》AbstractAutowireCapableBeanFactory.createBeanInstance()
+> ————————————》AbstractAutowireCapableBeanFactory.applyMergedBeanDefinitionPostProcessors()
+> 都在这个类里面完成的，省略了。。。。
+
+
+
+在bean的创建过程中，存在一个合并的阶段，在`org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean`方法中调用了`applyMergedBeanDefinitionPostProcessors`方法
 
 ```java
+protected Object doCreateBean(String beanName, RootBeanDefinition mbd, @Nullable Object[] args)
+  throws BeanCreationException {
+
+  // Instantiate the bean.
+  BeanWrapper instanceWrapper = null;
+  if (mbd.isSingleton()) {
+    //先尝试从缓存中取
+    instanceWrapper = this.factoryBeanInstanceCache.remove(beanName);
+  }
+  //如果缓存没有则根据对应的策略创建实例
+  if (instanceWrapper == null) {
+    instanceWrapper = createBeanInstance(beanName, mbd, args);
+  }
+  Object bean = instanceWrapper.getWrappedInstance();
+  Class<?> beanType = instanceWrapper.getWrappedClass();
+  if (beanType != NullBean.class) {
+    mbd.resolvedTargetType = beanType;
+  }
+
+  // Allow post-processors to modify the merged bean definition.
+  synchronized (mbd.postProcessingLock) {
+    // 调用MergedBeanDefinitionPostProcessor 后处理器，合并bean的定义信息
+    // @Autowire注解的解析就是在这一步完成，并且将解析后的数据结构放入缓存
+    if (!mbd.postProcessed) {
+      try {
+        applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
+      }
+      catch (Throwable ex) {
+        throw new BeanCreationException(mbd.getResourceDescription(), beanName,
+                                        "Post-processing of merged bean definition failed", ex);
+      }
+      mbd.postProcessed = true;
+    }
+  }
+
+  // Eagerly cache singletons to be able to resolve circular references
+  // even when triggered by lifecycle interfaces like BeanFactoryAware.
+  boolean earlySingletonExposure = (mbd.isSingleton() && this.allowCircularReferences &&
+                                    isSingletonCurrentlyInCreation(beanName));
+  if (earlySingletonExposure) {
+    if (logger.isTraceEnabled()) {
+      logger.trace("Eagerly caching bean '" + beanName +
+                   "' to allow for resolving potential circular references");
+    }
+    addSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, mbd, bean));
+  }
+
+  // Initialize the bean instance.
+  Object exposedObject = bean;
+  try {
+    // 对bean属性进行填充，注入bean中的属性，会递归初始化依赖的bean
+    populateBean(beanName, mbd, instanceWrapper);
+    // 调用初始化方法，比如init-method、注入Aware对象
+    exposedObject = initializeBean(beanName, exposedObject, mbd);
+  }
+  catch (Throwable ex) {
+    if (ex instanceof BeanCreationException && beanName.equals(((BeanCreationException) ex).getBeanName())) {
+      throw (BeanCreationException) ex;
+    }
+    else {
+      throw new BeanCreationException(
+        mbd.getResourceDescription(), beanName, "Initialization of bean failed", ex);
+    }
+  }
+
+  if (earlySingletonExposure) {
+    Object earlySingletonReference = getSingleton(beanName, false);
+    if (earlySingletonReference != null) {
+      if (exposedObject == bean) {
+        exposedObject = earlySingletonReference;
+      }
+      else if (!this.allowRawInjectionDespiteWrapping && hasDependentBean(beanName)) {
+        String[] dependentBeans = getDependentBeans(beanName);
+        Set<String> actualDependentBeans = new LinkedHashSet<>(dependentBeans.length);
+        for (String dependentBean : dependentBeans) {
+          if (!removeSingletonIfCreatedForTypeCheckOnly(dependentBean)) {
+            actualDependentBeans.add(dependentBean);
+          }
+        }
+        if (!actualDependentBeans.isEmpty()) {
+          throw new BeanCurrentlyInCreationException(beanName,
+                                                     "Bean with name '" + beanName + "' has been injected into other beans [" +
+                                                     StringUtils.collectionToCommaDelimitedString(actualDependentBeans) +
+                                                     "] in its raw version as part of a circular reference, but has eventually been " +
+                                                     "wrapped. This means that said other beans do not use the final version of the " +
+                                                     "bean. This is often the result of over-eager type matching - consider using " +
+                                                     "'getBeanNamesForType' with the 'allowEagerInit' flag turned off, for example.");
+        }
+      }
+    }
+  }
+
+  // Register bean as disposable.
+  try {
+    registerDisposableBeanIfNecessary(beanName, bean, mbd);
+  }
+  catch (BeanDefinitionValidationException ex) {
+    throw new BeanCreationException(
+      mbd.getResourceDescription(), beanName, "Invalid destruction signature", ex);
+  }
+
+  return exposedObject;
+}
+
+/**
+* 依次处理每一个PostProcessor
+*/
 protected void applyMergedBeanDefinitionPostProcessors(RootBeanDefinition mbd, Class<?> beanType, String beanName) {
    for (BeanPostProcessor bp : getBeanPostProcessors()) {
       if (bp instanceof MergedBeanDefinitionPostProcessor) {
@@ -122,17 +252,15 @@ protected void applyMergedBeanDefinitionPostProcessors(RootBeanDefinition mbd, C
 }
 ```
 
-此方法开始处理`MergedBeanDefinitionPostProcessor`，其中`org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor`类实现了此PostProcessor接口，所以开始处理
+在`applyMergedBeanDefinitionPostProcessors`方法中开始处理`MergedBeanDefinitionPostProcessor`，其中`org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor`类实现了此PostProcessor接口，所以开始处理
 
 
 
 `org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor`
 
 ```java
-
-
   /**
-   * 依赖注入的调用入口
+   * 依赖注入的调用入口，完成@Autowired注解的预解析的动作
    */
 	@Override
 	public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
@@ -142,6 +270,7 @@ protected void applyMergedBeanDefinitionPostProcessors(RootBeanDefinition mbd, C
 
   /**
    * 首先尝试从缓存中拿元信息，如果没有就创建一个
+   * InjectionMetadata存储了有哪些属性需要被自动装配，狭隘的说就是查找被@Autowired注解标记的元素
    */
 	private InjectionMetadata findAutowiringMetadata(String beanName, Class<?> clazz, @Nullable PropertyValues pvs) {
 		// Fall back to class name as cache key, for backwards compatibility with custom callers.
@@ -177,10 +306,12 @@ protected void applyMergedBeanDefinitionPostProcessors(RootBeanDefinition mbd, C
     // 依次递归的对成员变量进行注入，找寻父类，父类的父类，递归下去找，（这是个do-while，看循环最后一行）
 		do {
 			final List<InjectionMetadata.InjectedElement> currElements = new ArrayList<>();
-
+      // 遍历这个类的所有的field去寻找有Autowired修饰的field
 			ReflectionUtils.doWithLocalFields(targetClass, field -> {
-				MergedAnnotation<?> ann = findAutowiredAnnotation(field);
+        // 判断field字段上面是否有@Autowired或者@Inject等注解
+				MergedAnnotation<?> ann = findAutowiredAnnotation(field字段是吗是否有@au);
 				if (ann != null) {
+          // 如果是静态变量则不支持注入
 					if (Modifier.isStatic(field.getModifiers())) {
 						if (logger.isInfoEnabled()) {
 							logger.info("Autowired annotation is not supported on static fields: " + field);
@@ -192,6 +323,7 @@ protected void applyMergedBeanDefinitionPostProcessors(RootBeanDefinition mbd, C
 				}
 			});
 
+      // 遍历方法，进行方法注入
 			ReflectionUtils.doWithLocalMethods(targetClass, method -> {
 				Method bridgedMethod = BridgeMethodResolver.findBridgedMethod(method);
 				if (!BridgeMethodResolver.isVisibilityBridgeMethodPair(method, bridgedMethod)) {
@@ -199,6 +331,7 @@ protected void applyMergedBeanDefinitionPostProcessors(RootBeanDefinition mbd, C
 				}
 				MergedAnnotation<?> ann = findAutowiredAnnotation(bridgedMethod);
 				if (ann != null && method.equals(ClassUtils.getMostSpecificMethod(method, clazz))) {
+          // 静态方法不处理
 					if (Modifier.isStatic(method.getModifiers())) {
 						if (logger.isInfoEnabled()) {
 							logger.info("Autowired annotation is not supported on static methods: " + method);
@@ -248,6 +381,251 @@ public AutowiredAnnotationBeanPostProcessor() {
    }
 }
 ```
+
+其实到此仅仅是完成了对标签的预解析，标签的注入在`org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#populateBean`方法中。
+
+```java
+protected void populateBean(String beanName, RootBeanDefinition mbd, @Nullable BeanWrapper bw) {
+   if (bw == null) {
+      if (mbd.hasPropertyValues()) {
+         throw new BeanCreationException(
+               mbd.getResourceDescription(), beanName, "Cannot apply property values to null instance");
+      }
+      else {
+         // Skip property population phase for null instance.
+         return;
+      }
+   }
+
+   // 根据InstantiationAwareBeanPostProcessor 判断是否继续给该bean配置属性
+   // Give any InstantiationAwareBeanPostProcessors the opportunity to modify the
+   // state of the bean before properties are set. This can be used, for example,
+   // to support styles of field injection.
+   if (!mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
+      for (BeanPostProcessor bp : getBeanPostProcessors()) {
+         if (bp instanceof InstantiationAwareBeanPostProcessor) {
+            InstantiationAwareBeanPostProcessor ibp = (InstantiationAwareBeanPostProcessor) bp;
+            if (!ibp.postProcessAfterInstantiation(bw.getWrappedInstance(), beanName)) {
+               return;
+            }
+         }
+      }
+   }
+
+   PropertyValues pvs = (mbd.hasPropertyValues() ? mbd.getPropertyValues() : null);
+
+   int resolvedAutowireMode = mbd.getResolvedAutowireMode();
+   // 根据BY_NAME与BY_TYPE方式来查找bean
+   if (resolvedAutowireMode == AUTOWIRE_BY_NAME || resolvedAutowireMode == AUTOWIRE_BY_TYPE) {
+      MutablePropertyValues newPvs = new MutablePropertyValues(pvs);
+      // Add property values based on autowire by name if applicable.
+      if (resolvedAutowireMode == AUTOWIRE_BY_NAME) {
+         autowireByName(beanName, mbd, bw, newPvs);
+      }
+      // Add property values based on autowire by type if applicable.
+      if (resolvedAutowireMode == AUTOWIRE_BY_TYPE) {
+         autowireByType(beanName, mbd, bw, newPvs);
+      }
+      pvs = newPvs;
+   }
+
+   boolean hasInstAwareBpps = hasInstantiationAwareBeanPostProcessors();
+   boolean needsDepCheck = (mbd.getDependencyCheck() != AbstractBeanDefinition.DEPENDENCY_CHECK_NONE);
+
+   PropertyDescriptor[] filteredPds = null;
+   if (hasInstAwareBpps) {
+      if (pvs == null) {
+         pvs = mbd.getPropertyValues();
+      }
+      for (BeanPostProcessor bp : getBeanPostProcessors()) {
+         if (bp instanceof InstantiationAwareBeanPostProcessor) {
+            InstantiationAwareBeanPostProcessor ibp = (InstantiationAwareBeanPostProcessor) bp;
+           	// 循环处理BeanPostProcessor，处理InstantiationAwareBeanPostProcessor接口的实现类
+           	// AutowiredAnnotationBeanPostProcessor实现了此接口，此处代用他的具体实现方法，完成注入
+            PropertyValues pvsToUse = ibp.postProcessProperties(pvs, bw.getWrappedInstance(), beanName);
+            if (pvsToUse == null) {
+               if (filteredPds == null) {
+                  filteredPds = filterPropertyDescriptorsForDependencyCheck(bw, mbd.allowCaching);
+               }
+               pvsToUse = ibp.postProcessPropertyValues(pvs, filteredPds, bw.getWrappedInstance(), beanName);
+               if (pvsToUse == null) {
+                  return;
+               }
+            }
+           	// 保存依赖查找到的propertyName - bean
+            pvs = pvsToUse;
+         }
+      }
+   }
+   if (needsDepCheck) {
+      if (filteredPds == null) {
+         filteredPds = filterPropertyDescriptorsForDependencyCheck(bw, mbd.allowCaching);
+      }
+      checkDependencies(beanName, mbd, filteredPds, pvs);
+   }
+
+   if (pvs != null) {
+      applyPropertyValues(beanName, mbd, bw, pvs);
+   }
+}
+
+	/**
+	 * Fill in any missing property values with references to
+	 * other beans in this factory if autowire is set to "byName".
+	 * @param beanName the name of the bean we're wiring up.
+	 * Useful for debugging messages; not used functionally.
+	 * @param mbd bean definition to update through autowiring
+	 * @param bw the BeanWrapper from which we can obtain information about the bean
+	 * @param pvs the PropertyValues to register wired objects with
+	 */
+	protected void autowireByName(
+			String beanName, AbstractBeanDefinition mbd, BeanWrapper bw, MutablePropertyValues pvs) {
+		// 主要作用是遍历bean的所有的属性，将满足条件的属性筛选出来
+		String[] propertyNames = unsatisfiedNonSimpleProperties(mbd, bw);
+		for (String propertyName : propertyNames) {
+			if (containsBean(propertyName)) {
+        // 依赖查找 又回到了第二步的AbstractBeanFactory.doGetBean()
+				Object bean = getBean(propertyName);
+				pvs.add(propertyName, bean);
+				registerDependentBean(propertyName, beanName);
+				if (logger.isTraceEnabled()) {
+					logger.trace("Added autowiring by name from bean name '" + beanName +
+							"' via property '" + propertyName + "' to bean named '" + propertyName + "'");
+				}
+			}
+			else {
+				if (logger.isTraceEnabled()) {
+					logger.trace("Not autowiring property '" + propertyName + "' of bean '" + beanName +
+							"' by name: no matching bean found");
+				}
+			}
+		}
+	}
+
+	/**
+	 * Abstract method defining "autowire by type" (bean properties by type) behavior.
+	 * <p>This is like PicoContainer default, in which there must be exactly one bean
+	 * of the property type in the bean factory. This makes bean factories simple to
+	 * configure for small namespaces, but doesn't work as well as standard Spring
+	 * behavior for bigger applications.
+	 * @param beanName the name of the bean to autowire by type
+	 * @param mbd the merged bean definition to update through autowiring
+	 * @param bw the BeanWrapper from which we can obtain information about the bean
+	 * @param pvs the PropertyValues to register wired objects with
+	 */
+	protected void autowireByType(
+			String beanName, AbstractBeanDefinition mbd, BeanWrapper bw, MutablePropertyValues pvs) {
+
+		TypeConverter converter = getCustomTypeConverter();
+		if (converter == null) {
+			converter = bw;
+		}
+
+		Set<String> autowiredBeanNames = new LinkedHashSet<>(4);
+		String[] propertyNames = unsatisfiedNonSimpleProperties(mbd, bw);
+		for (String propertyName : propertyNames) {
+			try {
+				PropertyDescriptor pd = bw.getPropertyDescriptor(propertyName);
+				// Don't try autowiring by type for type Object: never makes sense,
+				// even if it technically is a unsatisfied, non-simple property.
+				if (Object.class != pd.getPropertyType()) {
+					MethodParameter methodParam = BeanUtils.getWriteMethodParameter(pd);
+					// Do not allow eager init for type matching in case of a prioritized post-processor.
+					boolean eager = !(bw.getWrappedInstance() instanceof PriorityOrdered);
+					DependencyDescriptor desc = new AutowireByTypeDependencyDescriptor(methodParam, eager);
+					Object autowiredArgument = resolveDependency(desc, beanName, autowiredBeanNames, converter);
+					if (autowiredArgument != null) {
+						pvs.add(propertyName, autowiredArgument);
+					}
+					for (String autowiredBeanName : autowiredBeanNames) {
+						registerDependentBean(autowiredBeanName, beanName);
+						if (logger.isTraceEnabled()) {
+							logger.trace("Autowiring by type from bean name '" + beanName + "' via property '" +
+									propertyName + "' to bean named '" + autowiredBeanName + "'");
+						}
+					}
+					autowiredBeanNames.clear();
+				}
+			}
+			catch (BeansException ex) {
+				throw new UnsatisfiedDependencyException(mbd.getResourceDescription(), beanName, propertyName, ex);
+			}
+		}
+	}
+```
+
+在完成了依赖的查找之后，仍然是通过`AutowiredAnnotationBeanPostProcessor`进行依赖的注入。
+
+
+
+`org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor#postProcessProperties`
+
+```java
+@Override
+public PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName) {
+   InjectionMetadata metadata = findAutowiringMetadata(beanName, bean.getClass(), pvs);
+   try {
+      // 注入
+      metadata.inject(bean, beanName, pvs);
+   }
+   catch (BeanCreationException ex) {
+      throw ex;
+   }
+   catch (Throwable ex) {
+      throw new BeanCreationException(beanName, "Injection of autowired dependencies failed", ex);
+   }
+   return pvs;
+}
+```
+
+`org.springframework.beans.factory.annotation.InjectionMetadata#inject`
+
+```java
+public void inject(Object target, @Nullable String beanName, @Nullable PropertyValues pvs) throws Throwable {
+   Collection<InjectedElement> checkedElements = this.checkedElements;
+   Collection<InjectedElement> elementsToIterate =
+         (checkedElements != null ? checkedElements : this.injectedElements);
+   if (!elementsToIterate.isEmpty()) {
+      for (InjectedElement element : elementsToIterate) {
+         if (logger.isTraceEnabled()) {
+            logger.trace("Processing injected element of bean '" + beanName + "': " + element);
+         }
+         // 注入
+         element.inject(target, beanName, pvs);
+      }
+   }
+}
+
+		protected void inject(Object target, @Nullable String requestingBeanName, @Nullable PropertyValues pvs)
+				throws Throwable {
+
+			if (this.isField) {
+				Field field = (Field) this.member;
+				ReflectionUtils.makeAccessible(field);
+				field.set(target, getResourceToInject(target, requestingBeanName));
+			}
+			else {
+				if (checkPropertySkipping(pvs)) {
+					return;
+				}
+				try {
+					Method method = (Method) this.member;
+					ReflectionUtils.makeAccessible(method);
+					// 通过反射注入
+					method.invoke(target, getResourceToInject(target, requestingBeanName));
+				}
+				catch (InvocationTargetException ex) {
+					throw ex.getTargetException();
+				}
+			}
+		}
+```
+
+`InjectedElement`是一个抽象类，在`AutowiredAnnotationBeanPostProcessor`中有两个具体实现，`AutowiredFieldElement`与`AutowiredMethodElement`
+
+
+
+
 
 
 
