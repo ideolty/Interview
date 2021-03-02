@@ -332,6 +332,8 @@ Refletion）实例化为对应的标注了@Configuration的JavaConfig形式的Io
 
 # 启动流程
 
+// todo 使用源码分析，重写一下
+
 run方法最后调用的是`SpringApplication.run()`，首先会创建一个SpringApplication对象实例，然后调用这个创建好的SpringApplication的run方法。
 
 ```java
@@ -428,7 +430,7 @@ SpringApplication的构造方法如下
 
 [springboot之启动原理解析及源码阅读](https://www.cnblogs.com/shamo89/p/8184960.html)
 
-
+[springboot启动流程（目录）](https://www.cnblogs.com/lay2017/p/11478237.html)
 
 
 
