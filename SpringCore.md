@@ -30,6 +30,12 @@ IOC容器部分是网上别人的文章的一个自己的总结，基本与别�
 
 
 
+# Spring 创建流程
+
+// todo
+
+
+
 # Spring IOC容器
 
 
@@ -187,7 +193,7 @@ protected Object doCreateBean(String beanName, RootBeanDefinition mbd, @Nullable
   try {
     // 对bean属性进行填充，注入bean中的属性，会递归初始化依赖的bean
     populateBean(beanName, mbd, instanceWrapper);
-    // 调用初始化方法，比如init-method、注入Aware对象
+    // 调用初始化方法，比如init-method、对@PostConstruct注解的处理、注入Aware对象等等
     exposedObject = initializeBean(beanName, exposedObject, mbd);
   }
   catch (Throwable ex) {
@@ -656,8 +662,11 @@ CommonAnnotationBeanPostProcessor
 > ####  @PostConstruct注入原理
 
 > 99 | Spring Bean初始化阶段：@PostConstruct、InitializingBean以及自定义方法
+>
+> [@PostConstruct注解原理解析](https://www.cnblogs.com/lay2017/p/11735802.html)
 
-- 在bean初始化前阶段initializeBean()对应的applyBeanPostProcessorsBeforeInitialization()方法中执行完自定义的MyInstantiationAwareBeanPostProcessor的postProcessBeforeInitialization()方法
+- 在bean的创建阶段中当处理完成了依赖注入之后，还需要进行对象的相关初始化操作。
+- 在bean初始化前阶段initializeBean()对应的applyBeanPostProcessorsBeforeInitialization()方法中执行
 - 同时会执行CommonAnnotationBeanPostProcessor的postProcessBeforeInitialization方法
 - 最后执行@PostConstruct修饰的initPostConstructor方法
 
@@ -679,11 +688,12 @@ CommonAnnotationBeanPostProcessor
 
 		Object wrappedBean = bean;
 		if (mbd == null || !mbd.isSynthetic()) {
-      // BeanPostProcessors回调
+      // 初始化前置处理 BeanPostProcessors回调
 			wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);
 		}
 
 		try {
+      // 调用初始化方法
 			invokeInitMethods(beanName, wrappedBean, mbd);
 		}
 		catch (Throwable ex) {
@@ -692,6 +702,7 @@ CommonAnnotationBeanPostProcessor
 					beanName, "Invocation of init method failed", ex);
 		}
 		if (mbd == null || !mbd.isSynthetic()) {
+      // 初始化后置处理
 			wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
 		}
 
@@ -722,9 +733,10 @@ public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, S
 ```java
 @Override
 public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+   // 元数据解析找到被标记了@PostConstruct等注解的方法
    LifecycleMetadata metadata = findLifecycleMetadata(bean.getClass());
    try {
-     //
+     // 触发初始化方法
       metadata.invokeInitMethods(bean, beanName);
    }
    catch (InvocationTargetException ex) {
@@ -736,6 +748,69 @@ public Object postProcessBeforeInitialization(Object bean, String beanName) thro
    return bean;
 }
 
+// 找到需要反射调用的方法 与 注入时的思路很相似
+// 先查询缓存是否命中，如果没有则新建一个LifecycleMetadata
+private LifecycleMetadata findLifecycleMetadata(Class<?> clazz) {
+  if (this.lifecycleMetadataCache == null) {
+    // Happens after deserialization, during destruction...
+    return buildLifecycleMetadata(clazz);
+  }
+  // Quick check on the concurrent map first, with minimal locking.
+  LifecycleMetadata metadata = this.lifecycleMetadataCache.get(clazz);
+  if (metadata == null) {
+    synchronized (this.lifecycleMetadataCache) {
+      metadata = this.lifecycleMetadataCache.get(clazz);
+      if (metadata == null) {
+        metadata = buildLifecycleMetadata(clazz);
+        this.lifecycleMetadataCache.put(clazz, metadata);
+      }
+      return metadata;
+    }
+  }
+  return metadata;
+}
+
+	// 循环递归查找方法上是否有指定的标签 
+	private LifecycleMetadata buildLifecycleMetadata(final Class<?> clazz) {
+		if (!AnnotationUtils.isCandidateClass(clazz, Arrays.asList(this.initAnnotationType, this.destroyAnnotationType))) {
+			return this.emptyLifecycleMetadata;
+		}
+
+		List<LifecycleElement> initMethods = new ArrayList<>();
+		List<LifecycleElement> destroyMethods = new ArrayList<>();
+		Class<?> targetClass = clazz;
+
+		do {
+			final List<LifecycleElement> currInitMethods = new ArrayList<>();
+			final List<LifecycleElement> currDestroyMethods = new ArrayList<>();
+
+			ReflectionUtils.doWithLocalMethods(targetClass, method -> {
+        // 判断一下当前方法上是不是有initAnnotationType里面的方法，也就是@PostConstruct
+				if (this.initAnnotationType != null && method.isAnnotationPresent(this.initAnnotationType)) {
+					LifecycleElement element = new LifecycleElement(method);
+					currInitMethods.add(element);
+					if (logger.isTraceEnabled()) {
+						logger.trace("Found init method on class [" + clazz.getName() + "]: " + method);
+					}
+				}
+        // 判断一下当前方法上是不是有destroyAnnotationType里面的方法，也就是@PreDestroy
+				if (this.destroyAnnotationType != null && method.isAnnotationPresent(this.destroyAnnotationType)) {
+					currDestroyMethods.add(new LifecycleElement(method));
+					if (logger.isTraceEnabled()) {
+						logger.trace("Found destroy method on class [" + clazz.getName() + "]: " + method);
+					}
+				}
+			});
+
+			initMethods.addAll(0, currInitMethods);
+			destroyMethods.addAll(currDestroyMethods);
+			targetClass = targetClass.getSuperclass();
+		}
+		while (targetClass != null && targetClass != Object.class);
+
+		return (initMethods.isEmpty() && destroyMethods.isEmpty() ? this.emptyLifecycleMetadata :
+				new LifecycleMetadata(clazz, initMethods, destroyMethods));
+	}
 
 // LifecycleMetadata是本类的内部类
 public void invokeInitMethods(Object target, String beanName) throws Throwable {
@@ -747,7 +822,7 @@ public void invokeInitMethods(Object target, String beanName) throws Throwable {
       if (logger.isTraceEnabled()) {
         logger.trace("Invoking init method on bean '" + beanName + "': " + element.getMethod());
       }
-      // 反射调用
+      // 内部使用反射调用
       element.invoke(target);
     }
   }
