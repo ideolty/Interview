@@ -1276,7 +1276,7 @@ AbstractApplicationContext#postProcessBeanFactory(ConfigurableListableBeanFactor
 
 - 由子类覆盖该方法
 
-AbstractApplicationCon text#invokeBeanFactoryPostProcessors(ConfigurableListableBea nF act
+AbstractApplicationContext#invokeBeanFactoryPostProcessors(ConfigurableListableBea nF act
 
 ory方法
 
