@@ -884,11 +884,11 @@ protected <T> T doGetBean(final String name, @Nullable final Class<T> requiredTy
         @Nullable final Object[] args, boolean typeCheckOnly) throws BeansException {
     final String beanName = transformedBeanName(name);
     Object bean;
-    // 1. 从缓存中获取bean
+    // 从缓存中获取bean
     Object sharedInstance = getSingleton(beanName);
     if (sharedInstance != null && args == null) {
         bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
-    // 2. 从缓存不存在，则创建新的bean
+    // 从缓存不存在，则创建新的bean
     } else {
         // createBean(beanName, mbd, args) ...
     }
@@ -900,6 +900,10 @@ protected <T> T doGetBean(final String name, @Nullable final Class<T> requiredTy
     return (T) bean;
 }
 ```
+
+1. 从缓存中获取bean
+2. 缓存不存在，则创建新的bean
+3. 类型转换
 
 
 
@@ -1091,6 +1095,44 @@ private <T> NamedBeanHolder<T> resolveNamedBean(
     - getBeansWithAnnotation(Class)
   - Spring 3.0 获取指定名称 + 标注类型 Bean 实例 
     - findAnnotationOnBean(String,Class)
+
+
+
+**getBeanNamesForType 和 getBeansOfType 区别？**
+
+getBeanNamesForType 是根据 BeanDefinition 或 FactoryBean#getObjectType  判断对象类型，不会进行对象的初始化。而 getBeansOfType 可能将 bean 提前初始化，导致 bean 初始化不完全。
+
+```java
+@Override
+public String[] getBeanNamesForType(@Nullable Class<?> type) {
+    return getBeanNamesForType(type, true, true);
+}
+
+@Override
+public <T> Map<String, T> getBeansOfType(@Nullable Class<T> type) throws BeansException {
+    return getBeansOfType(type, true, true);
+}
+@Override
+public <T> Map<String, T> getBeansOfType(@Nullable Class<T> type, 
+        boolean includeNonSingletons, boolean allowEagerInit) throws BeansException {
+    String[] beanNames = getBeanNamesForType(type, includeNonSingletons, allowEagerInit);
+    Map<String, T> result = new LinkedHashMap<>(beanNames.length);
+    for (String beanName : beanNames) {
+        // 最大的不同在这里：getBean(beanName) 实例化对象
+        Object beanInstance = getBean(beanName);
+        if (!(beanInstance instanceof NullBean)) {
+            result.put(beanName, (T) beanInstance);
+        }
+    }
+    return result;
+}
+```
+
+**说明：** 无论是 getBeanNamesForType 还是 getBeansOfType 都会通过调用  getBeansOfType(type, true, true) 方法，根据类型查找 bean。不同的是 getBeansOfType  在查找到对应的 beanNames 后会调用 getBean(beanName) 实例化对象。
+
+
+
+
 
 
 
