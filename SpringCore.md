@@ -24,6 +24,10 @@ IOC容器部分是网上别人的文章的一个自己的总结，基本与别�
 
 
 
+> [Spring 核心编程思想目录](https://www.cnblogs.com/binarylei/p/12290153.html)
+
+
+
 # 重点类解析
 
 `org.springframework.beans.factory.support.DefaultListableBeanFactory`
@@ -863,16 +867,78 @@ public CommonAnnotationBeanPostProcessor() {
 
 ## 依赖查找
 
-> #### 单一类型依赖查找
+### 单一类型依赖查找
 
-单一类型依赖查找接口 - BeanFactory
+单一类型依赖查找接口 - BeanFactory，对于BeanFactory有很多具体实现，定位到`AbstractBeanFactory`中
 
 - 根据 Bean 名称查找	
 
   - getBean(String)
   - Spring 2.5 覆盖默认参数：getBean(String,Object...) 
 
+
+```java
+private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
+
+protected <T> T doGetBean(final String name, @Nullable final Class<T> requiredType,
+        @Nullable final Object[] args, boolean typeCheckOnly) throws BeansException {
+    final String beanName = transformedBeanName(name);
+    Object bean;
+    // 1. 从缓存中获取bean
+    Object sharedInstance = getSingleton(beanName);
+    if (sharedInstance != null && args == null) {
+        bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
+    // 2. 从缓存不存在，则创建新的bean
+    } else {
+        // createBean(beanName, mbd, args) ...
+    }
+    
+    // 3. 类型转换
+    if (requiredType != null && !requiredType.isInstance(bean)) {
+        return getTypeConverter().convertIfNecessary(bean, requiredType);
+    }
+    return (T) bean;
+}
+```
+
+
+
+`org.springframework.beans.factory.support.DefaultSingletonBeanRegistry#getSingleton(java.lang.String, boolean)`
+
+```java
+/** Cache of singleton objects: bean name to bean instance. */
+private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
+
+/** Cache of singleton factories: bean name to ObjectFactory. */
+private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);
+
+/** Cache of early singleton objects: bean name to bean instance. */
+private final Map<String, Object> earlySingletonObjects = new HashMap<>(16);
+
+protected Object getSingleton(String beanName, boolean allowEarlyReference) {
+   Object singletonObject = this.singletonObjects.get(beanName);
+   if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
+      synchronized (this.singletonObjects) {
+         singletonObject = this.earlySingletonObjects.get(beanName);
+         if (singletonObject == null && allowEarlyReference) {
+            ObjectFactory<?> singletonFactory = this.singletonFactories.get(beanName);
+            if (singletonFactory != null) {
+               singletonObject = singletonFactory.getObject();
+               this.earlySingletonObjects.put(beanName, singletonObject);
+               this.singletonFactories.remove(beanName);
+            }
+         }
+      }
+   }
+   return singletonObject;
+}
+```
+
+
+
 - 根据 Bean 类型查找
+
+  > [Spring IoC 依赖查找之类型自省](https://www.cnblogs.com/binarylei/p/12302235.html)
 
   - Bean 实时查找 
     - Spring 3.0 getBean(Class) 
@@ -881,6 +947,124 @@ public CommonAnnotationBeanPostProcessor() {
     - getBeanProvider(Class)
     - getBeanProvider(ResolvableType) 
 
+
+
+具体定位到`org.springframework.beans.factory.support.DefaultListableBeanFactory#resolveBean`
+
+```java
+@Nullable
+private <T> T resolveBean(ResolvableType requiredType, @Nullable Object[] args, boolean nonUniqueAsNull) {
+   // 根据类型查找
+   NamedBeanHolder<T> namedBean = resolveNamedBean(requiredType, args, nonUniqueAsNull);
+   if (namedBean != null) {
+      return namedBean.getBeanInstance();
+   }
+   // 如果没找到，则找到父容器，递归交给父容器查找
+   BeanFactory parent = getParentBeanFactory();
+   if (parent instanceof DefaultListableBeanFactory) {
+      return ((DefaultListableBeanFactory) parent).resolveBean(requiredType, args, nonUniqueAsNull);
+   }
+   else if (parent != null) {
+      ObjectProvider<T> parentProvider = parent.getBeanProvider(requiredType);
+      if (args != null) {
+         return parentProvider.getObject(args);
+      }
+      else {
+         return (nonUniqueAsNull ? parentProvider.getIfUnique() : parentProvider.getIfAvailable());
+      }
+   }
+   return null;
+}
+
+private <T> NamedBeanHolder<T> resolveNamedBean(
+  ResolvableType requiredType, @Nullable Object[] args, boolean nonUniqueAsNull) throws BeansException {
+
+  Assert.notNull(requiredType, "Required type must not be null");
+  // 1. 根据类型查找，找到的是bean的名字，而不是实例化的bean对象
+  String[] candidateNames = getBeanNamesForType(requiredType);
+
+  // 找到多个bean对象
+  if (candidateNames.length > 1) {
+    List<String> autowireCandidates = new ArrayList<>(candidateNames.length);
+    for (String beanName : candidateNames) {
+      // 如果容器中定义的beanDefinition.autowireCandidate=false（默认为true）则剔除
+      // ①没有定义该beanDefinition或②beanDefinition.autowireCandidate=true时合法
+      if (!containsBeanDefinition(beanName) || getBeanDefinition(beanName).isAutowireCandidate()) {
+        autowireCandidates.add(beanName);
+      }
+    }
+    if (!autowireCandidates.isEmpty()) {
+      candidateNames = StringUtils.toStringArray(autowireCandidates);
+    }
+  }
+
+  if (candidateNames.length == 1) {
+    String beanName = candidateNames[0];
+    return new NamedBeanHolder<>(beanName, (T) getBean(beanName, requiredType.toClass(), args));
+  }
+  else if (candidateNames.length > 1) {
+    Map<String, Object> candidates = new LinkedHashMap<>(candidateNames.length);
+    for (String beanName : candidateNames) {
+      if (containsSingleton(beanName) && args == null) {
+        // 使用bean的名字获取到bean实例
+        Object beanInstance = getBean(beanName);
+        candidates.put(beanName, (beanInstance instanceof NullBean ? null : beanInstance));
+      }
+      else {
+        candidates.put(beanName, getType(beanName));
+      }
+    }
+    // 查找 primary Bean，即 beanDefinition.primary=true
+    String candidateName = determinePrimaryCandidate(candidates, requiredType.toClass());
+    if (candidateName == null) {
+      // 比较 Bean 的优先级。@javax.annotation.Priority
+      candidateName = determineHighestPriorityCandidate(candidates, requiredType.toClass());
+    }
+    
+    // 过滤后只有一个符合条件，getBean(candidateName)实例化
+    if (candidateName != null) {
+      Object beanInstance = candidates.get(candidateName);
+      if (beanInstance == null || beanInstance instanceof Class) {
+        beanInstance = getBean(candidateName, requiredType.toClass(), args);
+      }
+      return new NamedBeanHolder<>(candidateName, (T) beanInstance);
+    }
+    if (!nonUniqueAsNull) {
+      throw new NoUniqueBeanDefinitionException(requiredType, candidates.keySet());
+    }
+  }
+
+  return null;
+}
+
+	/**
+	 * 根据bean的类型来查找所有匹配的bean名称
+	 */
+	@Override
+	public String[] getBeanNamesForType(@Nullable Class<?> type, boolean includeNonSingletons, boolean allowEagerInit) {
+		if (!isConfigurationFrozen() || type == null || !allowEagerInit) {
+			return doGetBeanNamesForType(ResolvableType.forRawClass(type), includeNonSingletons, allowEagerInit);
+		}
+		Map<Class<?>, String[]> cache =
+				(includeNonSingletons ? this.allBeanNamesByType : this.singletonBeanNamesByType);
+		String[] resolvedBeanNames = cache.get(type);
+		if (resolvedBeanNames != null) {
+			return resolvedBeanNames;
+		}
+		resolvedBeanNames = doGetBeanNamesForType(ResolvableType.forRawClass(type), includeNonSingletons, true);
+		if (ClassUtils.isCacheSafe(type, getBeanClassLoader())) {
+			cache.put(type, resolvedBeanNames);
+		}
+		return resolvedBeanNames;
+	}
+```
+
+根据 Bean 类型查找 Spring IoC 容器中所有符合条件的 Bean  名称，可能有多个。要注意的是，getBeanNamesForType 只会读取 BeanDefinition 信息或部分实例化  FactoryBean 来获取 Bean 的类型，但还没有实例化 Bean。
+
+查到了bean名称之后，最后还是转为了根据名称来查找bean。
+
+
+
 - 根据 Bean 名称 + 类型查找
 
   - getBean(String,Class)
@@ -888,13 +1072,9 @@ public CommonAnnotationBeanPostProcessor() {
 
 
 
-// todo 搞明白具体查找的流程，是去哪里查的
 
 
-
-
-
-> #### 集合类型依赖查找
+### 集合类型依赖查找
 
 集合类型依赖查找接口 - ListableBeanFactory
 
@@ -914,7 +1094,7 @@ public CommonAnnotationBeanPostProcessor() {
 
 
 
-> #### 层次性依赖查找
+### 层次性依赖查找
 
 层次性依赖查找接口 - HierarchicalBeanFactory
 
@@ -930,13 +1110,50 @@ public CommonAnnotationBeanPostProcessor() {
 
 
 
-// 双亲委派的查找模式？
+`org.springframework.beans.factory.BeanFactoryUtils`
+
+```java
+/**
+ * 调用的ListableBeanFactory，与集合类型的查找一致。
+ */
+public static <T> T beanOfType(ListableBeanFactory lbf, Class<T> type) throws BeansException {
+   Assert.notNull(lbf, "ListableBeanFactory must not be null");
+   Map<String, T> beansOfType = lbf.getBeansOfType(type);
+   return uniqueBean(type, beansOfType);
+}
+
+/**
+ * 先查本容器，再递归查询父类
+ */
+public static <T> Map<String, T> beansOfTypeIncludingAncestors(ListableBeanFactory lbf, Class<T> type)
+  throws BeansException {
+
+  Assert.notNull(lbf, "ListableBeanFactory must not be null");
+  Map<String, T> result = new LinkedHashMap<>(4);
+  result.putAll(lbf.getBeansOfType(type));
+  if (lbf instanceof HierarchicalBeanFactory) {
+    HierarchicalBeanFactory hbf = (HierarchicalBeanFactory) lbf;
+    if (hbf.getParentBeanFactory() instanceof ListableBeanFactory) {
+      Map<String, T> parentResult = beansOfTypeIncludingAncestors(
+        (ListableBeanFactory) hbf.getParentBeanFactory(), type);
+      parentResult.forEach((beanName, beanInstance) -> {
+        if (!result.containsKey(beanName) && !hbf.containsLocalBean(beanName)) {
+          result.put(beanName, beanInstance);
+        }
+      });
+    }
+  }
+  return result;
+}
+```
 
 
 
 
 
-> #### 延迟依赖查找
+
+
+### 延迟依赖查找
 
 Bean 延迟依赖查找接口
 
