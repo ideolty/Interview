@@ -615,7 +615,7 @@ JVM中对象头的方式有以下两种（以32位JVM为例）：
 
 ## 对象的访问定位
 
-对象的访问方式有虚拟机实现而定，目前主流的访问方式有**使用句柄**和**直接指针**两种
+对象的访问方式由虚拟机实现而定，目前主流的访问方式有**使用句柄**和**直接指针**两种
 
 - **句柄：** 如果使用句柄的话，那么Java堆中将会划分出一块内存来作为句柄池，reference 中存储的就是对象的句柄地址，而句柄中包含了对象实例数据与类型数据各自的具体地址信息
 
@@ -1210,11 +1210,44 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
 ## JDK监控和故障处理工具
 
 - **jps**：JVM Process Status Tool ,显示指定系统内所有的HotSpot虚拟机进程
+
 - **jstat**: JVM Statistics Monitoring Tool ,用于收集HotSpot虚拟机各方面的运行数据。
+
 - **jinfo**: Configuration Info forJava,显示虚拟机配置信息
+
 - **jmap**: Memory Map for Java，生成虚拟机的内存转储快照（heapdump文件）
+
 - **jhat**: JVM Heap Dump Browser ,用于分析heapdump文件，它会建立一个HTTP/HTML服务器，让用户可以在浏览器上查看分析结果
+
+  
+
 - **jstack**: Stack Trace forJava，显示虚拟机的线程快照
+
+  > [jstack命令解析](https://www.jianshu.com/p/8d5782bc596e)
+
+  ```shell
+  /opt/java8/bin/jstack
+  
+  Usage:
+      jstack [-l] <pid>
+          (to connect to running process) 连接活动线程
+      jstack -F [-m] [-l] <pid>
+          (to connect to a hung process) 连接阻塞线程
+      jstack [-m] [-l] <executable> <core>
+          (to connect to a core file) 连接dump的文件
+      jstack [-m] [-l] [server_id@]<remote server IP or hostname>
+          (to connect to a remote debug server) 连接远程服务器
+  
+  Options:
+      -F  to force a thread dump. Use when jstack <pid> does not respond (process is hung)
+      -m  to print both java and native frames (mixed mode)
+      -l  long listing. Prints additional information about locks
+      -h or -help to print this help message
+  ```
+  
+  根据线程号查出对应的java线程，进行处理`jstack -l 3033 > ./3033.stack`
+  
+
 
 
 

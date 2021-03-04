@@ -1012,6 +1012,22 @@ public class Driver extends NonRegisteringDriver implements java.sql.Driver {
 
 ## CPU100%
 
+> [【CPU100%排查】CPU100%问题排查方案](https://www.cnblogs.com/july-sunny/p/12611409.html)
+>
+> [【原创】谈谈线上CPU100%排查套路](https://www.cnblogs.com/rjzheng/p/10315250.html)
+
+1. 使用`top -c `查看CPU 占用情况 ，按P(大写)可以倒序查看占CPU占用率
+
+2. 找到占用率高的进程以后，再定位到具体线
+
+   比如 此时进程ID 14724 CPU占用高，进一步使用`top -Hp 14724`定位该进程内所有的线程使用情况
+
+3. 定位到该进程内，15153 的线程CPU占用高，进一步分析内存堆栈的情况
+
+   使用`jstack -l 14724 (进程id) > 14724.stack `将进程内的线程情况乱重定向到14724.stack这个文件，方便查看
+
+4. 之后可以把那个线程好转为16进制，这是因为最后文件里的线程号是16进制的方便grep定位
+
 
 
 ## 内存溢出
