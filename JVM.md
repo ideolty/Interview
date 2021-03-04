@@ -1213,6 +1213,30 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
 
 - **jstat**: JVM Statistics Monitoring Tool ,用于收集HotSpot虚拟机各方面的运行数据。
 
+  > [jstat命令查看jvm的GC情况 （以Linux为例）](http://blog.itpub.net/31543790/viewspace-2657093/)                 
+
+   jstat命令可以查看堆内存各部分的使用量，以及加载类的数量。命令的格式如下：
+
+  ```shell
+   jstat [-options] [vmid] [间隔时间/毫秒] [查询次数]
+   常见options
+  | class (类加载器) 
+| compiler (JIT) 
+  | gc (GC堆状态) 
+| gccapacity (各区大小) 
+  | gccause (最近一次GC统计和原因) 
+| gcnew (新区统计)
+  | gcnewcapacity (新区大小)
+| gcold (老区统计)
+  | gcoldcapacity (老区大小)
+| gcpermcapacity (永久区大小)
+  | gcutil (GC统计汇总)
+| printcompilation (HotSpot编译统计)
+  
+```
+
+
+
 - **jinfo**: Configuration Info forJava,显示虚拟机配置信息
 
 - **jmap**: Memory Map for Java，生成虚拟机的内存转储快照（heapdump文件）

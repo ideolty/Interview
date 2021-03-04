@@ -1002,11 +1002,11 @@ public class Driver extends NonRegisteringDriver implements java.sql.Driver {
 
 # 实操
 
-## 死锁
+## 数据库死锁
 
-见《jdk》中相关内容。
+常规死锁见《jdk》中相关内容。
 
-
+> [一次诡异的线上数据库的死锁问题排查过程](https://mp.weixin.qq.com/s/bRKcuUo3Pbfv6CPK82Y01A)
 
 
 
@@ -1032,9 +1032,31 @@ public class Driver extends NonRegisteringDriver implements java.sql.Driver {
 
 ## 内存溢出
 
+> [生产出现oom问题，怎么排查？](https://www.cnblogs.com/c-xiaohai/p/12489336.html)
+
+1. 使用ps命令查看到底是哪个进程内存溢出了，找到pid。
+
+2. 使用jstat命令。用`jstat -gcutil 20886 1000 10`命令，就是用jstat工具，对指定java进程（20886就是进程id，通过ps -aux | grep java命令就能找到），按照指定间隔，看一下统计信息，这里会每隔一段时间显示一下，包括新生代的两个S0、s1区、Eden区，以及老年代的内存使用率，还有young gc以及full gc的次数。
+
+   使用 `jstat -gcutil 8968 500 5 `表示每500毫秒打印一次Java堆状况（各个区的容量、使用容量、gc时间等信息），打印5次
+
+   ![img](截图/JVM/jstat.png)
+
+3. 使用jmap命令查看。执行`jmap  -histo pid`可以打印出当前堆中所有每个类的实例数量和内存占用，class  name是每个类的类名（[B是byte类型，[C是char类型，[I是int类型），bytes是这个类的所有示例占用内存大小，instances是这个类的实例数量。
+
+4. 把当前堆内存的快照转储到dumpfile_jmap.hprof文件中，然后对内存快照进行分析。使用`jmap -dump:format=b,file=文件名 [pid]`，就可以把指定java进程的堆内存快照搞到一个指定的文件里去，但是`jmap -dump:format`其实一般会比较慢一些，也可以用gcore工具来导出内存快照
+
+   例如：`jmap -dump:format=b,file=D:/log/jvm/dumpfile_jmap.hprof 20886`
+
+5. 使用**eclipse memory analyer**等MAT工具来进行详细的分析。
+
+线上jvm必须配置-XX:+HeapDumpOnOutOfMemoryError，-XX:HeapDumpPath=/path/heap/dump。因为这样就是说OOM的时候自动导出一份内存快照。
 
 
-## 接口相应慢
+
+
+
+## 接口响应慢
 
 
 
