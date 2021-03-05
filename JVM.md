@@ -633,6 +633,81 @@ JVM中对象头的方式有以下两种（以32位JVM为例）：
 
 
 
+> #### String类型的对象具体存在哪?
+
+`String s ="xxx";`String为字符串常量，当然放在常量池中。
+
+JDK6将常量池放在方法区中。方法区此时也是持久代。但是从JDK7开始, 常量池的实现已经从方法区中移出来放到堆内存里面了。
+
+
+
+```java
+public class StringTest {
+     public static void main(String[] args) {
+        //在main方法的栈中创建引用s1和引用s2，此引用s1和引用s2存放在栈（main方法的栈）中；编译时，在常量池中创建两个常量"hello"和"world"，s1和s2分别
+        //指向两个常量
+          String s1 = "hello";
+          String s2 = "world";
+          System.out.println(s1+"---"+s2);//1:hello---world
+          change(s1,s2);//引用s1和s2作为参数传递到change方法中
+          //change方法中的引用s1,s2和main方法中的引用s1,s2存放地址并不同，以下输出的是main方法栈中的s1和s2，并没有发生变化，故代码3有以下输出
+          System.out.println(s1+"---"+s2);//3:hello---world
+ 
+          //以下两行代码将会在main方法栈中创建引用sb1和sb2，并在堆内存中创建两个对象"hello"和"world",sb1和sb2分别指向两个对象
+          StringBuffer sb1 = new StringBuffer("hello");
+          StringBuffer sb2 = new StringBuffer("world");
+          System.out.println(sb1+"---"+sb2);//4:hello---world
+          change(sb1,sb2);//引用sb1和sb2作为参数传递到change方法中
+          //main方法中的sb1所指向的堆内存地址未发生变化，故仍为"hello"，而change(sb1,sb2)方法改变了main方法中sb2所指向的堆内存地址的内容，故代码6有以下输出
+          System.out.println(sb1+"---"+sb2);//6:hello---worldworld
+     }
+ 
+     public static void change(String s1, String s2) {//在change方法的栈中创建引用s1和s2,并指向常量池中的常量
+          s1 = s2;//将引用s1指向s2的常量池中的"world"
+          s2 = s1+s2;//在堆内存中创建"worldworld"对象，并将s2指向此堆内存地址
+          System.out.println("change(s1,s2)---"+s1+"---"+s2);//2:change(s1,s2)---world---worldworld
+     }
+ 
+     public static void change(StringBuffer sb1, StringBuffer sb2) {//在change方法的栈(和上面的change方法栈不同)中创建引用sb1和sb2,并指向main方法栈中sb1和sb2所指向的对象
+          sb1 = sb2;//将引用sb1指向sb2所引用的对象"world"
+          sb2.append(sb1);//引用sb2所指向的对象发生变化，变为"worldworld"，注意此时外部main方法中的sb2和此方法中的sb1均指向此堆内存地址,
+          //此地址内容发生变化后，外部main方法中的sb2指向的内容也跟着变化
+          System.out.println("change(sb1,sb2)---"+sb1+"---"+sb2);//5:change(sb1,sb2)---worldworld---worldworld
+     }
+}
+————————————————
+版权声明：本文为CSDN博主「BiggerLee」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/lixingtao0520/article/details/77978333
+```
+
+> [JVM内存模型及String对象内存分配](https://blog.csdn.net/lixingtao0520/article/details/77978333)
+
+
+
+> #### int类型的比较小的数据存哪?
+
+如果在[-128,+128]之间是从常量池的缓存里取。
+
+
+
+**对象存哪里的问题重点**
+
+- 成员变量 int a = 1, a作为变量名，在JVM中是以代码的形式存在，存放在方法区，当有线程执行到该代码的时候，会加载该代码进行执行，而1作为参数 a 的值在运行时存放在堆内存中，a指向该内存。
+
+- 对于局部变量，a存在局部变量表中，在这个例子中，`getValue()`的声明周期就是该方法对应的Java栈，执行到`a=1`时会将`iconst_1`放到操作数栈，然后通过`istore_1`存放局部变量变中1的位置，而从中可以知道，a的类型为int，所以在变量槽（Solt）中存在的就是数值1
+
+  所以，`int a=1`为局部变量的时候，这个时候a同样存在方法区的代码中，运行时a存在该方法对应的栈帧的局部变量表中，而该变量表中a的值为1，所以1存在栈内存中。
+
+详细见，讲的相当的透彻了↓
+
+[java中，成员变量 int a = 1, a存在哪, 1存在哪 (存在JVM哪)? - SevenLin澤耿的回答 - 知乎](https://www.zhihu.com/question/345241177/answer/821765039)
+
+
+
+所以这类的问题，需要分情况回答。
+
+
+
 # 运行字节码
 
 > #### Java 虚拟机具体是怎样运行 Java 字节码的？
