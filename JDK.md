@@ -890,9 +890,9 @@ TreeMap主要部分：
 
 **在1.7版本中**
 
-1. ConcurrentHashMap的数据结构是由一个**Segment**数组和多个HashEntry组成。ReentrantLock+Segment+HashEntry结构。
-2. Segment是一种**可重入锁**ReentrantLock，在ConcurrentHashMap里扮演锁的角色，HashEntry则用于存储键值对数据。
-3. Segment的结构和HashMap类似，是一种数**组和链表结构**， 一个Segment里包含一个HashEntry数组，每个HashEntry是一个链表结构的元素， 每个Segment守护者一个HashEntry数组里的元素
+1. ConcurrentHashMap的数据结构是由一个**Segment**数组+多个HashEntry数组+HashEntry链表组成。ReentrantLock+Segment+HashEntry结构。
+2. Segment继承自**可重入锁**ReentrantLock，在ConcurrentHashMap里扮演锁的角色，HashEntry则用于存储键值对数据。
+3. Segment的结构和HashMap类似，是一种数**组和链表结构**， 一个Segment里包含一个HashEntry数组，每个HashEntry是一个链表结构的元素， 每个Segment守护着一个HashEntry数组里的元素
 4. Segment数组的意义就是将一个大的table分割成多个小的table来进行加锁。
 5. Segment的大小size默认为16，每一个Segment元素下的HashEntry的初始化也是按照位于运算来计算，用cap来表示，cap的初始值为1，所以HashEntry最小的容量为2
 
@@ -908,7 +908,7 @@ TreeMap主要部分：
 static class Segment<K,V> extends ReentrantLock implements Serializable {...}
 ```
 
-从上Segment的继承体系可以看出，Segment实现了ReentrantLock,也就带有锁的功能，当执行put操作时，会进行第一次key的hash来定位Segment的位置，如果该Segment还没有初始化，即通过CAS操作进行赋值，然后进行第二次hash操作，找到相应的HashEntry的位置，这里会利用继承过来的锁的特性，在将数据插入指定的HashEntry位置时（链表的**尾端**），会通过继承ReentrantLock的tryLock（）方法尝试去获取锁，如果获取成功就直接插入相应的位置，如果已经有线程获取该Segment的锁，那当前线程会以**自旋**的方式去继续的调用tryLock（）方法去获取锁，**超过指定次数**就**挂起**，等待唤醒
+从上Segment的继承体系可以看出，Segment实现了ReentrantLock,也就带有锁的功能，当执行put操作时，会进行第一次key的hash来定位Segment的位置，如果该Segment还没有初始化，即通过CAS操作进行赋值，然后进行第二次hash操作，找到相应的HashEntry的位置，这里会利用继承过来的锁的特性，在将数据插入**指定的HashEntry位置时**（链表的**尾端**），会通过继承ReentrantLock的tryLock（）方法尝试去获取锁，如果获取成功就直接插入相应的位置，如果已经有线程获取该Segment的锁，那当前线程会以**自旋**的方式去继续的调用tryLock（）方法去获取锁，**超过指定次数**就**挂起**，等待唤醒
 
 **get操作**
 
@@ -1083,6 +1083,313 @@ JDK11
         return sum;
    }
 ```
+
+
+
+JDK8 扩容
+
+> [深入分析ConcurrentHashMap1.8的扩容实现](https://www.jianshu.com/p/f6730d5784ad)
+
+```java
+final V putVal(K key, V value, boolean onlyIfAbsent) {
+    if (key == null || value == null) throw new NullPointerException();
+    int hash = spread(key.hashCode());
+    int binCount = 0;
+    for (Node<K,V>[] tab = table;;) {
+        ……
+            if (binCount != 0) {
+                if (binCount >= TREEIFY_THRESHOLD)
+                  	// 链表的数量如果超过8，转化为红黑树
+                    treeifyBin(tab, i);
+                if (oldVal != null)
+                    return oldVal;
+                break;
+            }
+        }
+    }
+		// 计算总数
+    addCount(1L, binCount);
+    return null;
+}
+```
+
+扩容的操作发生在了2个情况下
+
+1. put操作时，当链表转为树的时候，会对数组长度进行判断，如果数组长度n小于阈值`MIN_TREEIFY_CAPACITY`，默认是64，则会调用`tryPresize`方法把数组长度扩大到原来的两倍，并触发`transfer`方法，重新调整节点的位置。
+
+   当需要转树的时候，`treeifyBin`方法中会优先通过扩容的方式来缓解链表过长的问题，超过64之后再转为红黑树。
+
+2. 新增节点之后，会调用`addCount`方法记录元素个数，并检查是否需要进行扩容，当数组元素个数达到阈值时，会触发`transfer`方法，重新调整节点的位置。
+
+
+
+<img src="截图/JDK/concurrentHashMap扩容.png" alt="img" style="zoom:80%;" />
+
+
+
+`java.util.concurrent.ConcurrentHashMap#transfer`
+
+```java
+// 扩容逻辑
+private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
+    int n = tab.length, stride;
+  	// 每核处理的量小于16，则强制赋值16
+    if ((stride = (NCPU > 1) ? (n >>> 3) / NCPU : n) < MIN_TRANSFER_STRIDE)
+        stride = MIN_TRANSFER_STRIDE; // subdivide range
+    // 初始化新的node数据组
+  	if (nextTab == null) {            // initiating
+        try {
+            @SuppressWarnings("unchecked")
+          	// 大小为原来的2倍
+            Node<K,V>[] nt = (Node<K,V>[])new Node<?,?>[n << 1];
+            nextTab = nt;
+        } catch (Throwable ex) {      // try to cope with OOME
+            sizeCtl = Integer.MAX_VALUE;
+            return;
+        }
+        nextTable = nextTab;
+        transferIndex = n;
+    }
+    int nextn = nextTab.length;
+  	// 初始化ForwardingNode节点，其中保存了新数组nextTable的引用
+  	// 在处理完每个槽位的节点之后当做占位节点，表示该槽位已经处理过了
+    ForwardingNode<K,V> fwd = new ForwardingNode<K,V>(nextTab);
+  	// 当advance == true时，表明该节点已经处理过了
+    boolean advance = true;
+    boolean finishing = false; // to ensure sweep before committing nextTab
+  	// i指当前处理的槽位序号，bound指需要处理的槽位边界，先处理槽位15的节点
+    for (int i = 0, bound = 0;;) {
+        Node<K,V> f; int fh;
+        while (advance) {
+            int nextIndex, nextBound;
+          	// 两个退出条件，先不管，第一次遍历都不符合
+            if (--i >= bound || finishing)
+                advance = false;
+            else if ((nextIndex = transferIndex) <= 0) {
+                i = -1;
+                advance = false;
+            }
+          	// 通过CAS设置transferIndex属性值，并初始化i和bound值
+          	// nextIndex当前是等于旧数组长度
+            else if (U.compareAndSwapInt
+                     (this, TRANSFERINDEX, nextIndex,
+                      nextBound = (nextIndex > stride ?
+                                   nextIndex - stride : 0))) {
+              	// 意味着从数组的尾部开始处理
+                bound = nextBound;
+                i = nextIndex - 1;
+                advance = false;
+            }
+        }
+      	// n = tab.length 为旧数组的长度
+      	// nextn = nextTab.length 为新数组的大小
+        if (i < 0 || i >= n || i + n >= nextn) {
+            int sc;
+          	// 已经完成所有节点复制了
+            if (finishing) {
+                nextTable = null;
+              	// table 指向nextTable
+                table = nextTab;
+              	// sizeCtl阈值为原来的1.5倍
+                sizeCtl = (n << 1) - (n >>> 1);
+                return;
+            }
+          	// CAS 更扩容阈值，在这里面sizectl值减一，说明新加入一个线程参与到扩容操作
+            if (U.compareAndSwapInt(this, SIZECTL, sc = sizeCtl, sc - 1)) {
+                if ((sc - 2) != resizeStamp(n) << RESIZE_STAMP_SHIFT)
+                    return;
+                finishing = advance = true;
+                i = n; // recheck before commit
+            }
+        }
+      	// 如果刚刚好这个槽是空的，则不需要处理，把ForwardingNode<K,V> fwd节点放进去
+        else if ((f = tabAt(tab, i)) == null)
+            advance = casTabAt(tab, i, null, fwd);
+      	// 如果槽位已经被别的线程处理了，那么当前线程处理到这个节点时，取到该节点的hash值应该为MOVED，值为-1
+      	// 直接跳过，继续处理下一个槽位的节点；
+        else if ((fh = f.hash) == MOVED)
+            advance = true; // already processed
+        else {
+          	// 加锁，锁的是node数组槽位中的头结点
+            synchronized (f) {
+              	// 正式开始对一个槽里面的链表（树）结构进行rehash
+                if (tabAt(tab, i) == f) {
+                  	// 定义2个节点，lowNode highNode 分别保存hash值的第X位为0和1的节点
+                    Node<K,V> ln, hn;
+                  	// fh = f.hash >=0 说明是链表
+                    if (fh >= 0) {
+                        // hash & tab.length 确定头结点的x为是1还是0，作为个采样
+                        int runBit = fh & n;
+                      	// 槽的头结点
+                        Node<K,V> lastRun = f;
+                      	// 遍历这个链表
+                        for (Node<K,V> p = f.next; p != null; p = p.next) {
+                            // 由于n是2的倍数，那么这个n的二进制应该是只有一位是1，其余都是0
+                            // 与操作之后就可以分为那一位为1的和为0的2个链表
+                            int b = p.hash & n;
+                          	// runBit与lastRun记录的是最后一次发生1、0变换的那个节点
+                            if (b != runBit) {
+                                runBit = b;
+                                lastRun = p;
+                            }
+                        }
+                        if (runBit == 0) {
+                            ln = lastRun;
+                            hn = null;
+                        }
+                        else {
+                            hn = lastRun;
+                            ln = null;
+                        }
+                      	// 重新再遍历一次链表
+                        for (Node<K,V> p = f; p != lastRun; p = p.next) {
+                            int ph = p.hash; K pk = p.key; V pv = p.val;
+                          	// 这里会生成一个正序一个逆序的链表
+                            if ((ph & n) == 0)
+                                ln = new Node<K,V>(ph, pk, pv, ln);
+                            else
+                                hn = new Node<K,V>(ph, pk, pv, hn);
+                        }
+                      	// 在新数组nextTable i 位置处插上链表
+                        setTabAt(nextTab, i, ln);
+                      	// 在新数组nextTable i+n 位置处插上链表 n是旧数组长度
+                        setTabAt(nextTab, i + n, hn);
+                      	// 在旧数组的槽里面放上fwd，代表已经扩容过的节点了，fwd里面放了新数组的引用，所以可以找过去
+                        setTabAt(tab, i, fwd);
+                      	// 可以继续下一个槽
+                        advance = true;
+                    }
+                    else if (f instanceof TreeBin) {
+                        TreeBin<K,V> t = (TreeBin<K,V>)f;
+                        TreeNode<K,V> lo = null, loTail = null;
+                        TreeNode<K,V> hi = null, hiTail = null;
+                        int lc = 0, hc = 0;
+                        for (Node<K,V> e = t.first; e != null; e = e.next) {
+                            int h = e.hash;
+                            TreeNode<K,V> p = new TreeNode<K,V>
+                                (h, e.key, e.val, null, null);
+                            if ((h & n) == 0) {
+                                if ((p.prev = loTail) == null)
+                                    lo = p;
+                                else
+                                    loTail.next = p;
+                                loTail = p;
+                                ++lc;
+                            }
+                            else {
+                                if ((p.prev = hiTail) == null)
+                                    hi = p;
+                                else
+                                    hiTail.next = p;
+                                hiTail = p;
+                                ++hc;
+                            }
+                        }
+                        ln = (lc <= UNTREEIFY_THRESHOLD) ? untreeify(lo) :
+                            (hc != 0) ? new TreeBin<K,V>(lo) : t;
+                        hn = (hc <= UNTREEIFY_THRESHOLD) ? untreeify(hi) :
+                            (lc != 0) ? new TreeBin<K,V>(hi) : t;
+                        setTabAt(nextTab, i, ln);
+                        setTabAt(nextTab, i + n, hn);
+                        setTabAt(tab, i, fwd);
+                        advance = true;
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+关键步骤整理：
+
+1. 根据当前数组长度n，新建一个两倍长度的数组`nextTable`；
+
+2. 初始化`ForwardingNode`节点，其中保存了新数组`nextTable`的引用，在处理完每个槽位的节点之后当做占位节点，表示该槽位已经处理过了；
+
+3. 通过`for`自循环处理每个槽位中的链表元素，初始化`i`和`bound`值，`i`指当前处理的槽位序号，`bound`指需要处理的槽位边界；
+
+4. 如果槽位没有节点，则通过CAS插入在第二步中初始化的`ForwardingNode`节点，用于告诉其它线程该槽位已经处理过了；如果槽位15已经被线程A处理了，那么线程B处理到这个节点时，取到该节点的hash值应该为`MOVED`，值为`-1`，则直接跳过，继续处理下一个槽位14的节点；
+
+5. 处理槽位14的节点，是一个链表结构，先定义两个变量节点`lowNode`和`highNode`，分别保存hash值的第X位为0和1的节点；
+
+6. 使用`fn&n`可以快速把链表中的元素区分成两类，A类是hash值的第X位为0，B类是hash值的第X位为1，并通过`lastRun`记录最后需要处理的节点。
+
+7. 通过CAS把ln链表设置到新数组的i位置，hn链表设置到i+n的位置；
+
+8. 如果该槽位是红黑树结构，则构造树节点`lo`和`hi`，遍历红黑树中的节点，同样根据`hash&n`算法，把节点分为两类，分别插入到`lo`和`hi`为头的链表中，根据`lo`和`hi`链表中的元素个数分别生成`ln`和`hn`节点，其中`ln`节点的生成逻辑如下：
+    （1）如果`lo`链表的元素个数小于等于`UNTREEIFY_THRESHOLD`，默认为6，则通过`untreeify`方法把树节点链表转化成普通节点链表；
+    （2）否则判断`hi`链表中的元素个数是否等于0：如果等于0，表示`lo`链表中包含了所有原始节点，则设置原始红黑树给`ln`，否则根据`lo`链表重新构造红黑树。
+
+   
+
+
+
+JDK8 帮助扩容
+
+```java
+    final V putVal(K key, V value, boolean onlyIfAbsent) {
+        if (key == null || value == null) throw new NullPointerException();
+        int hash = spread(key.hashCode());
+        int binCount = 0;
+        for (Node<K,V>[] tab = table;;) {
+            Node<K,V> f; int n, i, fh;
+            if (tab == null || (n = tab.length) == 0)
+                tab = initTable();
+            else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+                if (casTabAt(tab, i, null,
+                             new Node<K,V>(hash, key, value, null)))
+                    break;                   // no lock when adding to empty bin
+            }
+            else if ((fh = f.hash) == MOVED)
+                // 在找到对应的node节点，准备开始遍历链表（红黑树）的时候，发现头节点的hash值是-1时，触发
+                tab = helpTransfer(tab, f);
+            else {
+               ……
+            }
+        }
+    }
+
+
+    final Node<K,V>[] helpTransfer(Node<K,V>[] tab, Node<K,V> f) {
+        Node<K,V>[] nextTab; int sc;
+      	// 如果旧数组不为空 并且 对应槽的头部节点是ForwardingNode节点 并且 ForwardingNode内指向的新数组不为空
+        if (tab != null && (f instanceof ForwardingNode) &&
+            (nextTab = ((ForwardingNode<K,V>)f).nextTable) != null) {
+            int rs = resizeStamp(tab.length);
+            while (nextTab == nextTable && table == tab &&
+                   (sc = sizeCtl) < 0) {
+                if ((sc >>> RESIZE_STAMP_SHIFT) != rs || sc == rs + 1 ||
+                    sc == rs + MAX_RESIZERS || transferIndex <= 0)
+                    break;
+                if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1)) {
+                  	// 扩容去吧
+                    transfer(tab, nextTab);
+                    break;
+                }
+            }
+            return nextTab;
+        }
+        return table;
+    }
+
+```
+
+在尝试插入数据时，发现有hash碰撞，此时判断一下当前node是不是正在被扩容。
+
+
+
+**扩容相关问题**
+
+> 《深入分析ConcurrentHashMap1.8的扩容实现》评论区24楼
+>
+> 如果槽位15已经被线程A处理了，那么线程B处理到这个节点时，取到该节点的hash值应该为MOVED，值为-1，则直接跳过，继续处理下一个槽位14的节点；
+
+我想问一下，线程B在分配迁移槽的时候并不会分配之前分配过的啊，通过了transferindex， 那么这边理论上不会出现某个线程检测到自己要处理的范围有已经被其他线程处理过的啊？不知道你知道这个条件在什么时候有用？
+
+你好，我一开始也有跟你一样的疑问，确实扩容时每个线程处理的范围不会重叠，其实这个MOVED标志是给在扩容的同时准备put的其他线程用的。put的时候如果遇到MOVED,说明正在扩容并且当前的ENTRY已经被处理过了，所以put线程加入一起扩容。如果没有遇到MOVED，说明当前ENTRY没有被处理过，即使正在扩容也不管，直接锁住当前ENTRY,先put完再判断当前是否在扩容，是的话put线程也会加入一起扩容。所以1.8中扩容和PUT操作是可以并发执行的，Doug Lea大神真是把CAS玩的出神入化。
+
+
 
 
 
@@ -1859,7 +2166,7 @@ public enum State {
 
   　　1. 保证了不同线程对这个变量进行操作时的可见性，即一个线程修改了某个变量的值，这新值对其他线程来说是立即可见的。
 
-  　　2. 禁止进行指令重排序。
+    　　2. 禁止进行指令重排序。
 
 
 
@@ -1913,7 +2220,7 @@ volatile的性质
 1. 它确保指令重排序时不会把其后面的指令排到内存屏障之前的位置，也不会把前面的指令排到内存屏障的后面；即在执行到内存屏障这句指令时，在它前面的操作已经全部完成；
 
      　　2. 它会强制将对缓存的修改操作**立即**写入主存；
-  　　3. 如果是**写操作**，它会导致其他CPU中对应的缓存行无效。
+      　　3. 如果是**写操作**，它会导致其他CPU中对应的缓存行无效。
 
 具体场景是对于一个volatile变量：
 
