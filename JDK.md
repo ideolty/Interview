@@ -1,4 +1,4 @@
-  
+   
 
 # 综述
 
@@ -1026,6 +1026,22 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
 
 
 
+看一下hash函数
+
+```java
+static final int spread(int h) {
+    return (h ^ (h >>> 16)) & HASH_BITS;
+}
+```
+
+思考一个问题，为什么要这么设计？
+
+首先，假设一个32位的hash值，要散列到大小为16的数组里面，那么做法是对16取模，模的值为[0,15]，换成二进制就相当于对15进行位运算，也就等于取32位的最后4位。那么如果单纯的取后4位，hash冲突会比较大，不能很平均的散到16个格子内。所以这里右移16位，取了高16位与原值进行异或，再与上`0x7fffffff`（最高位为0，其余为1），尽量避免hash冲突。
+
+同时这里也解释了为什么要大小为$2^n$，因为这样才能快速的通过位运算`h & (n-1)`，找到hash值在数组下标中的位置。
+
+
+
 **get操作**
 
 1. 计算hash值，定位到该table索引位置，如果是首节点符合就返回
@@ -1089,6 +1105,8 @@ JDK11
 JDK8 扩容
 
 > [深入分析ConcurrentHashMap1.8的扩容实现](https://www.jianshu.com/p/f6730d5784ad)
+>
+> B站找到了一个非常好的视频[大神架构师解析：ConcurrentHashMap的底层数据结构、put操作详解、扩容原理、数据迁移操作、并发是如何实现的、源码](https://www.bilibili.com/video/BV1bp4y1k7KB)，这个视频除了源码讲解，把整体思路讲清楚了，明白了为什么要这样做。
 
 ```java
 final V putVal(K key, V value, boolean onlyIfAbsent) {
@@ -1111,6 +1129,48 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
     addCount(1L, binCount);
     return null;
 }
+
+    private final void addCount(long x, int check) {
+        CounterCell[] as; long b, s;
+      	// 判断当前的cell数有多少，就是node数组的长度
+        if ((as = counterCells) != null ||
+            // cas的对BASECOUNT进行+1操作，因为一次只能put一个
+            !U.compareAndSwapLong(this, BASECOUNT, b = baseCount, s = b + x)) {
+            CounterCell a; long v; int m;
+            boolean uncontended = true;
+            if (as == null || (m = as.length - 1) < 0 ||
+                (a = as[ThreadLocalRandom.getProbe() & m]) == null ||
+                !(uncontended =
+                  U.compareAndSwapLong(a, CELLVALUE, v = a.value, v + x))) {
+                fullAddCount(x, uncontended);
+                return;
+            }
+            if (check <= 1)
+                return;
+            s = sumCount();
+        }
+        if (check >= 0) {
+            Node<K,V>[] tab, nt; int n, sc;
+          	// 如果sizeCtl > 0则代表着扩容的阈值 例如 16*0.75=12 的那个12，这里是判断当前cell数有没有超过12，超过了就需要扩容
+            while (s >= (long)(sc = sizeCtl) && (tab = table) != null &&
+                   (n = tab.length) < MAXIMUM_CAPACITY) {
+              	// 
+                int rs = resizeStamp(n);
+                if (sc < 0) {
+                    if ((sc >>> RESIZE_STAMP_SHIFT) != rs || sc == rs + 1 ||
+                        sc == rs + MAX_RESIZERS || (nt = nextTable) == null ||
+                        transferIndex <= 0)
+                        break;
+                    if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1))
+                        transfer(tab, nt);
+                }
+                else if (U.compareAndSwapInt(this, SIZECTL, sc,
+                                             (rs << RESIZE_STAMP_SHIFT) + 2))
+                    transfer(tab, null);
+                s = sumCount();
+            }
+        }
+    }
 ```
 
 扩容的操作发生在了2个情况下
@@ -1127,13 +1187,14 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
 
 
 
-`java.util.concurrent.ConcurrentHashMap#transfer`
+`java.util.concurrent.ConcurrentHashMap#transfer`，这块代码非常的厉害，思路很巧妙。
 
 ```java
 // 扩容逻辑
 private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
     int n = tab.length, stride;
-  	// 每核处理的量小于16，则强制赋值16
+  	// 每核处理的量小于16，则强制赋值16，因为对于大的map，例如128 -> 256单线程去扩容有点慢，那么分治，每个线程处理一部分
+  	// 如果数量比较少例如12，12<16单线程就够了
     if ((stride = (NCPU > 1) ? (n >>> 3) / NCPU : n) < MIN_TRANSFER_STRIDE)
         stride = MIN_TRANSFER_STRIDE; // subdivide range
     // 初始化新的node数据组
@@ -1148,21 +1209,23 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
             return;
         }
         nextTable = nextTab;
+      	// 字面理解转移下标，假如以前大小16，扩容到32，那么转移下标就是旧数组长度16，由后向前进行遍历，也可以理解为新旧数组的分解
         transferIndex = n;
     }
     int nextn = nextTab.length;
-  	// 初始化ForwardingNode节点，其中保存了新数组nextTable的引用
+  	// 初始化ForwardingNode节点，指定了hash值为-1，并且保存了新数组nextTable的引用
   	// 在处理完每个槽位的节点之后当做占位节点，表示该槽位已经处理过了
     ForwardingNode<K,V> fwd = new ForwardingNode<K,V>(nextTab);
   	// 当advance == true时，表明该节点已经处理过了
     boolean advance = true;
     boolean finishing = false; // to ensure sweep before committing nextTab
-  	// i指当前处理的槽位序号，bound指需要处理的槽位边界，先处理槽位15的节点
+  	// i指当前处理的槽位序号，bound指需要处理的槽位最小边界，先处理槽位15的节点
     for (int i = 0, bound = 0;;) {
         Node<K,V> f; int fh;
         while (advance) {
             int nextIndex, nextBound;
           	// 两个退出条件，先不管，第一次遍历都不符合
+          	// --i，所以是倒着走的
             if (--i >= bound || finishing)
                 advance = false;
             else if ((nextIndex = transferIndex) <= 0) {
@@ -1171,12 +1234,15 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
             }
           	// 通过CAS设置transferIndex属性值，并初始化i和bound值
           	// nextIndex当前是等于旧数组长度
+          	// 这地方只有第一次能进来
             else if (U.compareAndSwapInt
                      (this, TRANSFERINDEX, nextIndex,
                       nextBound = (nextIndex > stride ?
                                    nextIndex - stride : 0))) {
-              	// 意味着从数组的尾部开始处理
+              	// 因为是从数组的尾部开始处理，原node数组是分块多线程处理的
+              	// 所以，这里bound代表了要处理的最小下标
                 bound = nextBound;
+              	// i为最大下标
                 i = nextIndex - 1;
                 advance = false;
             }
@@ -1216,13 +1282,14 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                 if (tabAt(tab, i) == f) {
                   	// 定义2个节点，lowNode highNode 分别保存hash值的第X位为0和1的节点
                     Node<K,V> ln, hn;
-                  	// fh = f.hash >=0 说明是链表
+                  	// fh = f.hash 当前节点存的hash值 >=0 说明是链表
                     if (fh >= 0) {
                         // hash & tab.length 确定头结点的x为是1还是0，作为个采样
                         int runBit = fh & n;
                       	// 槽的头结点
                         Node<K,V> lastRun = f;
-                      	// 遍历这个链表
+                      	// 遍历这个链表，这个for主要是为了确定lastRun的值，lastRun为一个分界节点
+                      	// lastRun之后的值在第n位的值都是相同的（可以都是0，或者都是1）
                         for (Node<K,V> p = f.next; p != null; p = p.next) {
                             // 由于n是2的倍数，那么这个n的二进制应该是只有一位是1，其余都是0
                             // 与操作之后就可以分为那一位为1的和为0的2个链表
@@ -1234,23 +1301,27 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                             }
                         }
                         if (runBit == 0) {
+                          	// runBit后续的节点第n位都是0，为0的这些节点留在原位置，不用迁移，所以低位链表头记一下为lastRun
                             ln = lastRun;
                             hn = null;
                         }
                         else {
+                          	// 后面都是为1的接单，需要迁移到新数组中去，高位为lastRun
                             hn = lastRun;
                             ln = null;
                         }
                       	// 重新再遍历一次链表
                         for (Node<K,V> p = f; p != lastRun; p = p.next) {
                             int ph = p.hash; K pk = p.key; V pv = p.val;
-                          	// 这里会生成一个正序一个逆序的链表
+                          	// 这里会生成一个正序一个逆序的链表，顺序也不能说是完全顺序，只是部分顺序
                             if ((ph & n) == 0)
+                              	// 低位为0的放ln链上
                                 ln = new Node<K,V>(ph, pk, pv, ln);
                             else
+                              	// 高位为1的放hn链上
                                 hn = new Node<K,V>(ph, pk, pv, hn);
                         }
-                      	// 在新数组nextTable i 位置处插上链表
+                      	// 在新数组nextTable i 位置（原位置）处插上链表
                         setTabAt(nextTab, i, ln);
                       	// 在新数组nextTable i+n 位置处插上链表 n是旧数组长度
                         setTabAt(nextTab, i + n, hn);
@@ -1304,24 +1375,15 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
 关键步骤整理：
 
 1. 根据当前数组长度n，新建一个两倍长度的数组`nextTable`；
-
 2. 初始化`ForwardingNode`节点，其中保存了新数组`nextTable`的引用，在处理完每个槽位的节点之后当做占位节点，表示该槽位已经处理过了；
-
 3. 通过`for`自循环处理每个槽位中的链表元素，初始化`i`和`bound`值，`i`指当前处理的槽位序号，`bound`指需要处理的槽位边界；
-
 4. 如果槽位没有节点，则通过CAS插入在第二步中初始化的`ForwardingNode`节点，用于告诉其它线程该槽位已经处理过了；如果槽位15已经被线程A处理了，那么线程B处理到这个节点时，取到该节点的hash值应该为`MOVED`，值为`-1`，则直接跳过，继续处理下一个槽位14的节点；
-
 5. 处理槽位14的节点，是一个链表结构，先定义两个变量节点`lowNode`和`highNode`，分别保存hash值的第X位为0和1的节点；
-
 6. 使用`fn&n`可以快速把链表中的元素区分成两类，A类是hash值的第X位为0，B类是hash值的第X位为1，并通过`lastRun`记录最后需要处理的节点。
-
 7. 通过CAS把ln链表设置到新数组的i位置，hn链表设置到i+n的位置；
-
 8. 如果该槽位是红黑树结构，则构造树节点`lo`和`hi`，遍历红黑树中的节点，同样根据`hash&n`算法，把节点分为两类，分别插入到`lo`和`hi`为头的链表中，根据`lo`和`hi`链表中的元素个数分别生成`ln`和`hn`节点，其中`ln`节点的生成逻辑如下：
     （1）如果`lo`链表的元素个数小于等于`UNTREEIFY_THRESHOLD`，默认为6，则通过`untreeify`方法把树节点链表转化成普通节点链表；
     （2）否则判断`hi`链表中的元素个数是否等于0：如果等于0，表示`lo`链表中包含了所有原始节点，则设置原始红黑树给`ln`，否则根据`lo`链表重新构造红黑树。
-
-   
 
 
 
@@ -1390,6 +1452,23 @@ JDK8 帮助扩容
 你好，我一开始也有跟你一样的疑问，确实扩容时每个线程处理的范围不会重叠，其实这个MOVED标志是给在扩容的同时准备put的其他线程用的。put的时候如果遇到MOVED,说明正在扩容并且当前的ENTRY已经被处理过了，所以put线程加入一起扩容。如果没有遇到MOVED，说明当前ENTRY没有被处理过，即使正在扩容也不管，直接锁住当前ENTRY,先put完再判断当前是否在扩容，是的话put线程也会加入一起扩容。所以1.8中扩容和PUT操作是可以并发执行的，Doug Lea大神真是把CAS玩的出神入化。
 
 
+
+> #### 为什么要去判断hash值的第X位为0，B类是hash值的第X位为1，然后为1的迁移去新位置，0的留在旧位置？为什么不重新散列，而是要取第X位？
+
+这里先举个例子
+
+```txx
+// 假如有3个对象，他们经过spread散列函数之后得到的hash值分别为
+1011 0011 1100 1100
+1011 0011 1101 1100
+1011 0011 1111 1100
+```
+
+- 当map数组大小为16的时候，取模值相当于直接取后4位，那么发现这3个是都是1100，hash碰撞了，组成一个链表。
+- 当map进行扩容，大小为32时，那么相当于看后5位，但是由于后4位的值没有变化，所以完全没有必要重新计算 h&(n-1)来进行rehash，只需要看第5位是0，还是1。
+  - 如果等于0，则表示跟原数组位置一致。
+  - 如果等于1，则表示在原数组的位置上加上原数组的整体长度。
+- 所以这里也是侧面要求数组的大小为$2^n$。
 
 
 
