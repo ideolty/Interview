@@ -1308,6 +1308,7 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
   | gcutil (GC统计汇总)
 | printcompilation (HotSpot编译统计)
   
+  ```
 ```
 
 
@@ -1342,10 +1343,10 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
       -m  to print both java and native frames (mixed mode)
       -l  long listing. Prints additional information about locks
       -h or -help to print this help message
-  ```
-  
+```
+
   根据线程号查出对应的java线程，进行处理`jstack -l 3033 > ./3033.stack`
-  
+
 
 
 
@@ -1815,6 +1816,16 @@ JDK 提供了一个实现`Processor`接口的抽象类**`AbstractProcessor`**。
 [Goroutine（协程）为何能处理大并发？](http://blog.51cto.com/yuhongchun/2059574)
 
 [进程和线程、协程的区别](https://www.cnblogs.com/lxmhhy/p/6041001.html)
+
+
+
+
+
+# 肉眼读字节码
+
+> [深入理解JVM字节码执行引擎](https://mp.weixin.qq.com/s/rXdd7zEJxY4SBSSAg5Dw3w)
+
+// todo
 
 
 

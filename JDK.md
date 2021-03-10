@@ -3494,6 +3494,10 @@ public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
 
 
 
+### 源码解析
+
+> [线程池源码解析 Jdk 1.8](https://www.jianshu.com/p/bf4a9e0b9e60)
+
 - **ThreadFactory**
 
 Executors.defaultThreadFactory()，生成了一个默认的线程工厂(DefaultThreadFactory)，线程池里的线程都是由这个工厂来创建的。
