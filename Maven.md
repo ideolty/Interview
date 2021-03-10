@@ -26,3 +26,22 @@
 - Maven clean 清除上一次Maven执行的结果
 - Maven generate-sources会根据pom配置去生成源代码格式的包
 - Maven install将项目输出构件部署到本地仓库
+
+
+
+# 依赖冲突
+
+maven在依赖冲突管理中有一下几个原则：
+
+1. 依赖是使用Maven坐标来定位的，而Maven坐标主要由GAV（groupId, artifactId, version）构成。如果两个相同的依赖包，如果groupId, artifactId, version不同，那么maven也认为这两个是不同的。
+2. 依赖会传递，A依赖了B，B依赖了C，那么A的依赖中就会出现B和C。
+3. Maven对同一个groupId, artifactId的冲突仲裁，不是以version越大越保留，而是依赖路径越短越优先，然后进行保留。
+4. 依赖的scope会影响依赖的影响范围。
+
+
+
+**仲裁过程**
+
+对于依赖某个组件的多个版本，maven的仲裁过程，并不是简单的使用高版本，而是根据从根节点到各个组件节点之间的路径深度，路径短的组件优先，如果路径深度相同，则是先发现的那个。类似一棵树的广度遍历。
+
+如果两条路都是一样长的时候呢？看Classloader的加载顺序了，假设Classloader先加载X_1.0，而它就不会再加载X_2.0了。
