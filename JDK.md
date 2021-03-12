@@ -3289,6 +3289,36 @@ private volatile boolean allowCoreThreadTimeOut;
 private volatile int corePoolSize;
 // 最大池大小
 private volatile int maximumPoolSize;
+
+
+/*
+ * two conceptual fields
+ *   workerCount, indicating the effective number of threads
+ *   runState,    indicating whether running, shutting down etc
+ *  使用ctl来进行状态控制，高三位为线程池状态，后面为线程池中工作线程数
+ */
+private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
+
+/**
+ * 1
+ * 0000 0000 0000 0001
+ * 1 << 29 - 1
+ * 0001 1111 1111 1111
+ */
+private static final int COUNT_BITS = Integer.SIZE - 3;
+private static final int CAPACITY   = (1 << COUNT_BITS) - 1;
+
+// runState is stored in the high-order bits
+private static final int RUNNING    = -1 << COUNT_BITS;
+private static final int SHUTDOWN   =  0 << COUNT_BITS;
+private static final int STOP       =  1 << COUNT_BITS;
+private static final int TIDYING    =  2 << COUNT_BITS;
+private static final int TERMINATED =  3 << COUNT_BITS;
+/**
+ * Set containing all worker threads in pool. Accessed only when
+ * holding mainLock.
+ */
+private final HashSet<Worker> workers = new HashSet<Worker>();
 ```
 
 
@@ -3586,7 +3616,7 @@ public void execute(Runnable command) {
     // 获取ctl对应的int值。该int值保存了"线程池中任务的数量"和"线程池状态"信息
     int c = ctl.get();
     // 当线程池中的任务数量 < "核心池大小"时，即线程池中少于corePoolSize个任务。
-    // 则通过addWorker(command, true)新建一个线程，并将任务(command)添加到该线程中；然后，启动该     // 线程从而执行任务。
+    // 则通过addWorker(command, true)新建一个线程，并将任务(command)添加到该线程中；然后，启动该线程从而执行任务。
     if (workerCountOf(c) < corePoolSize) {
         if (addWorker(command, true))
             return;
@@ -3611,9 +3641,10 @@ public void execute(Runnable command) {
 ```
 
 execute()的作用是将任务添加到线程池中执行。它会分为3种情况进行处理：
-​              1.  如果"线程池中任务数量" < "核心池大小"时，即线程池中少于corePoolSize个任务；此时就新建一个线程，并将该任务添加到线程中进行执行。
-​              2.   如果"线程池中任务数量" >= "核心池大小"，并且"线程池是允许状态"；此时，则将任务添加到阻塞队列中阻塞等待。在该情况下，会再次确认"线程池的状态"，如果"第2次读到的线程池状态"和"第1次读到的线程池状态"不同，则从阻塞队列中删除该任务。
-​              3.  非以上两种情况。在这种情况下，尝试新建一个线程，并将该任务添加到线程中进行执行。如果执行失败，则通过reject()拒绝该任务。
+
+1. 如果"线程池中任务数量" < "核心池大小"时，即线程池中少于corePoolSize个任务；此时就新建一个线程，并将该任务添加到线程中进行执行。
+2. 如果"线程池中任务数量" >= "核心池大小"，并且"线程池是允许状态"；此时，则将任务添加到阻塞队列中阻塞等待。在该情况下，会再次确认"线程池的状态"，如果"第2次读到的线程池状态"和"第1次读到的线程池状态"不同，则从阻塞队列中删除该任务。
+3. 非以上两种情况。在这种情况下，尝试新建一个线程，并将该任务添加到线程中进行执行。如果执行失败，则通过reject()拒绝该任务。
 
 
 
@@ -3711,6 +3742,154 @@ private boolean addWorker(Runnable firstTask, boolean core) {
 4. 线程池在添加任务时，会创建任务对应的Worker对象；而一个Worker对象包含一个Thread对象。
 5. 通过将Worker对象添加到"线程的workers集合"中，从而实现将任务添加到线程池中。
    ad线程，则执行该任务。
+
+
+
+- **worker的工作流程**
+
+```java
+    private final class Worker
+        extends AbstractQueuedSynchronizer
+        implements Runnable
+    {
+       ……
+        /** Thread this worker is running in.  Null if factory fails. */
+        final Thread thread;
+        /** Initial task to run.  Possibly null. */
+        Runnable firstTask;
+        /** Per-thread task counter */
+        volatile long completedTasks;
+
+        /**
+         * Creates with given first task and thread from ThreadFactory.
+         * @param firstTask the first task (null if none)
+         */
+        Worker(Runnable firstTask) {
+            setState(-1); // inhibit interrupts until runWorker
+            this.firstTask = firstTask;
+            this.thread = getThreadFactory().newThread(this);
+        }
+      
+        /** Delegates main run loop to outer runWorker  */
+        public void run() {
+            runWorker(this);
+        }
+    }
+```
+
+worker是线程池的一个内部类，同时他继承了AQS，实现了Runnable接口。
+
+
+
+执行任务
+
+```java
+  final void runWorker(Worker w) {
+        //在添加worker的流程中执行thread.start()之后真实执行的方法
+        Thread wt = Thread.currentThread();
+        Runnable task = w.firstTask; // 获取当前worker携带的任务
+        w.firstTask = null;
+        /**
+         * 直接unlock？？？在unlock之前一定要lock吗？从这里我们可以看出不一定
+         */
+        w.unlock(); // 修改state为0，将占用锁的线程设为null（第一次执行之前没有线程占用）
+        boolean completedAbruptly = true;
+        try {
+            // 自旋。先执行自己携带的任务，然后从阻塞队列中获取一个任务直到无法获取任务
+            while (task != null || (task = getTask()) != null) {
+                // 将state修改为1，设置占有锁的线程为自己
+                w.lock();
+                /**
+                 * check线程池的状态，如果状态为stop以上(stop以上不执行任务)，则中断当前线程
+                 * 如果当前线程已被中断（其他线程并发的调用线程池的shutdown()或shutdownNow()方法），则check线程池状态是否为stop以上
+                 * 最后如果当前线程未被中断则中断当前线程（不可能！笔者还未想到此种场景）
+                 */
+                if ((runStateAtLeast(ctl.get(), STOP) || (Thread.interrupted() && runStateAtLeast(ctl.get(), STOP))) && !wt.isInterrupted())
+                    wt.interrupt();
+                try {
+                    beforeExecute(wt, task);// 空方法，留给子类实现
+                    Throwable thrown = null;
+                    try {
+                        task.run(); //执行外部提交的任务，通过try-catch来保证异常不会影响线程池本身的功能
+                    } catch (RuntimeException x) {
+                        thrown = x; throw x;
+                    } catch (Error x) {
+                        thrown = x; throw x;
+                    } catch (Throwable x) {
+                        thrown = x; throw new Error(x);
+                    } finally {
+                        afterExecute(task, thrown);// 空方法，留给子类实现
+                    }
+                } finally {
+                    task = null;
+                    w.completedTasks++; //已完成任务数量统计
+                    w.unlock();
+                }
+            }
+            // 如果执行到这里代表非核心线程在keepAliveTime内无法获取任务而退出
+            completedAbruptly = false;
+        } finally {
+            /**
+             * 从上面可以看出如果实际业务(外部提交的Runnable)出现异常会导致当前worker终止
+             * completedAbruptly 此时为true意味着worker是突然完成，不是正常退出
+             */
+            processWorkerExit(w, completedAbruptly);// 执行worker退出收尾工作
+        }
+    }
+```
+
+
+
+- **获取任务**
+
+```java
+  private Runnable getTask() {
+        boolean timedOut = false; // Did the last poll() time out?
+        // 自旋获取任务(因为是多线程环境)
+        for (;;) {
+            int c = ctl.get();// 读取最新的clt
+            int rs = runStateOf(c);
+            /**
+             * 1、线程池状态为shutdown并且任务队列为空
+             * 2、线程池状态为stop状态以上
+             * 这2种情况直接减少worker数量，并且返回null从而保证外部获取任务的worker进行正常退出
+             */
+            if (rs >= SHUTDOWN && (rs >= STOP || workQueue.isEmpty())) {
+                decrementWorkerCount();
+                return null;
+            }
+            int wc = workerCountOf(c);
+            /**
+             * 1、允许核心线程退出
+             * 2、当前的线程数量超过核心线程数
+             * 这时获取任务的机制切换为poll(keepAliveTime)
+             */
+            boolean timed = allowCoreThreadTimeOut || wc > corePoolSize;
+            /**
+             * 1、线程数大于maximumPoolSize(什么时候会出现这种情况？ 当maximumPoolSize初始设置为0或者其他线程通过set方法对其进行修改)
+             * 2、线程数未超过maximumPoolSize但是timed为true(允许核心线程退出或者线程数量超过核心线程)
+             * 并且上次获取任务超时(没获取到任务,我们推测本次依旧会超时)
+             * 3、在满足条件1或者条件2的情况下进行check：运行线程数大于1或者任务队列没有任务
+             */
+            if ((wc > maximumPoolSize || (timed && timedOut))
+                && (wc > 1 || workQueue.isEmpty())) {
+                if (compareAndDecrementWorkerCount(c)) // CAS进行worker数量-1，成功则返回null进行worker退出流程，失败则继续自旋
+                    return null;
+                continue;
+            }
+            try {
+                // 如果允许超时退出，则调用poll(keepAliveTime)获取任务，否则则通过take()一直阻塞等待直到有任务提交到队列
+                Runnable r = timed ? workQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) : workQueue.take();
+                if (r != null)
+                    return r;
+                timedOut = true;// 当等待超过keepAliveTime时间未获取到任务时，标记为true。在下次自旋时会进入销毁流程
+            } catch (InterruptedException retry) {
+                // 什么时候会抛出异常？当调用shutdown或者shutdownNow方法触发worker内的Thread调用interrupt方法时会执行到此处
+                timedOut = false;
+            }
+        }
+    }
+```
 
 
 
