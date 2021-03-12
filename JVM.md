@@ -1309,7 +1309,7 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
 | printcompilation (HotSpot编译统计)
   
   ```
-```
+
 
 
 
@@ -1318,8 +1318,6 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
 - **jmap**: Memory Map for Java，生成虚拟机的内存转储快照（heapdump文件）
 
 - **jhat**: JVM Heap Dump Browser ,用于分析heapdump文件，它会建立一个HTTP/HTML服务器，让用户可以在浏览器上查看分析结果
-
-  
 
 - **jstack**: Stack Trace forJava，显示虚拟机的线程快照
 
@@ -1343,7 +1341,8 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
       -m  to print both java and native frames (mixed mode)
       -l  long listing. Prints additional information about locks
       -h or -help to print this help message
-```
+  ```
+
 
   根据线程号查出对应的java线程，进行处理`jstack -l 3033 > ./3033.stack`
 
@@ -1351,7 +1350,9 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
 
 
 
-// todo 30  Java虚拟机的监控及诊断工具（命令行篇）| 31 Java虚拟机的监控及诊断工具（GUI篇）
+// todo 
+
+30  Java虚拟机的监控及诊断工具（命令行篇）| 31 Java虚拟机的监控及诊断工具（GUI篇）
 
 
 
@@ -1566,11 +1567,13 @@ JVMTIAgent其实就是一个动态库，利用JVMTI暴露出来的一些接口�
 JNIEXPORT jint JNICALL
 Agent_OnLoad(JavaVM *vm, char *options, void *reserved);
 
+
 JNIEXPORT jint JNICALL
 Agent_OnAttach(JavaVM* vm, char* options, void* reserved);
 
 JNIEXPORT void JNICALL
 Agent_OnUnload(JavaVM *vm); 
+
 ```
 
 - Agent_OnLoad函数，如果agent是在启动时加载的，也就是在vm参数里通过-agentlib来指定的，那在启动过程中就会去执行这个agent里的Agent_OnLoad函数。
