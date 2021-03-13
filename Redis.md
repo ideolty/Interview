@@ -56,6 +56,16 @@ string
 
 
 
+## Key - Value 存储模型
+
+redis的基本数据结构都是值的底层实现，键和值本身之间，Redis 使用了一个哈希表来保存所有键值对。
+
+一个哈希表，其实就是一个数组，数组的每个元素称为一个哈希桶。所以一个哈希表是由多个哈希桶组成的，每个哈希桶中保存了键值对数据。哈希桶中的元素保存的并不是值本身，而是保存了\*key和\*value指针，分别指向了实际的键和值。这也就是说，不管值是 String，还是集合类型，哈希桶中的元素都是指向它们的指针。
+
+<img src="截图/Redis/全局hash表.jpg" alt="img" style="zoom:50%;" />
+
+
+
 # 编码转化
 
 Redis 使用对象（redisObject）来表示数据库中的键值，当我们在 Redis 中创建一个键值对时，至少创建两个对象，一个对象是**键对象**，另一个是**值对象**。
@@ -87,7 +97,11 @@ ptr 指针字段指向对象底层实现的数据结构，而这些数据结构�
 
 # 基本数据类型
 
-// todo 还有至少3种
+<img src="截图/Redis/Redis数据类型与底层数据结构关系.jpg" alt="img"  />
+
+这里需要分清楚编码与结构。
+
+
 
 ## String: 字符串
 
@@ -185,7 +199,7 @@ Set 对象的编码可以是 intset 或 hashtable，intset 编码的对象使用
 	常用命令：zadd,zrange,zrem,zcard等
 	ZADD key score1 member1 [score2 member2]
 	ZRANK key member
-    ZREM key member [member ...]
+  ZREM key member [member ...]
 ```
 
 > #### 实现方式：
@@ -230,6 +244,36 @@ Zset 中的 dict 字典为集合创建了一个从成员到分值之间的映射
 Zset 中的 zsl 跳跃表适合范围操作，比如 ZRANK、ZRANGE 等，程序使用 zkiplist。
 
 另外，虽然 Zset 中使用了 dict 和 skiplist 存储数据，但这两种数据结构都会通过指针来共享相同的内存，所以没有必要担心内存的浪费。
+
+
+
+## 扩展数据类型
+
+### Bitmap
+
+Bitmap 本身是用 String  类型作为底层数据结构实现的一种统计二值状态的数据类型。String 类型是会保存为二进制的字节数组，所以，Redis 就把字节数组的每个 bit 位利用起来，用来表示一个元素的二值状态。你可以把 Bitmap 看作是一个 bit 数组。
+
+Bitmap 提供了 GETBIT/SETBIT 操作，使用一个偏移值 offset 对 bit 数组的某一个 bit 位进行读和写。不过，需要注意的是，Bitmap 的偏移量是从 0  开始算的，也就是说 offset 的最小值是 0。当使用 SETBIT 对一个 bit 位进行写操作时，这个 bit 位会被设置为  1。Bitmap 还提供了 BITCOUNT 操作，用来统计这个 bit 数组中所有“1”的个数。
+
+
+
+### HyperLogLog
+
+HyperLogLog 是一种用于统计基数的数据集合类型，它的最大优势就在于，当集合元素数量非常多时，它计算基数所需的空间总是固定的，而且还很小。不过，有一点需要注意一下，HyperLogLog 的统计规则是基于概率完成的，所以它给出的统计结果是有一定误差的，标准误算率是 0.81%。这也就意味着，你使用 HyperLogLog 统计的 UV 是 100 万，但实际的 UV 可能是 101 万。虽然误差率不算大，但是，如果你需要精确统计结果的话，最好还是继续用 Set 或  Hash 类型。
+
+
+
+### GEO
+
+
+
+
+
+## 自定义类型
+
+> 13 | GEO是什么？还可以定义新的数据类型吗？
+
+
 
 
 
