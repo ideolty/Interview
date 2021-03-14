@@ -444,7 +444,7 @@ redo log是InnoDB引擎特有的日志，而Server层也有自己的日志，称
 
 其实，binlog的写入逻辑比较简单：事务执行过程中，先把日志写到binlog cache，事务提交的时候，再把binlog cache写到binlog文件中。
 
-一个事务的binlog是不能被拆开的，因此不论这个事务多大，也要确保一次性写入。这就涉及到了binlog cache的保存问题。
+**一个事务的binlog是不能被拆开的，因此不论这个事务多大，也要确保一次性写入。**这就涉及到了binlog cache的保存问题。
 
 系统给binlog cache分配了一片内存，每个线程一个，参数 binlog_cache_size用于控制单个线程内binlog cache所占内存的大小。如果超过了这个参数规定的大小，就要暂存到磁盘。
 
@@ -471,7 +471,7 @@ write 和fsync的时机，是由参数sync_binlog控制的：
 
 ## undolog（回滚日志）
 
-// todo
+
 
 ### 格式
 

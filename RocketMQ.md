@@ -559,8 +559,6 @@ reputMessageService.start()负责启动reputMessageService，负责读取commitL
 
 
 
-
-
 # 常见面试题
 
 > [RocketMQ在面试中那些常见问题及答案+汇总](https://www.cnblogs.com/javazhiyin/p/13327925.html)
@@ -625,3 +623,6 @@ Consumer首次请求Broker
 **超时：**如果超过回查次数，默认回滚消息。
 
 也就是他并未真正进入Topic的queue，而是用了临时queue来放所谓的half message，等提交事务后才会真正的将half message转移到topic下的queue。
+
+
+
