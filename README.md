@@ -3,8 +3,8 @@
 ## 项目介绍
 - 项目用于保存平时我对各种知识点的总结和一些源码分析，同时此文档也是平时收集的面试复习资料。
 - 难度范围
-  - 双非2-3年工作经验。
-  - 985/211软件相关学科，本科应届毕业生水平。
+  - 双非3-5年工作经验。
+  - 985/211软件相关学科，本科3年左右水平。
 - 文档内有大量的不同网站的引用，同时我也参考了github上大量的面试指南，如[JavaGuide](https://github.com/Snailclimb/JavaGuide)、[JCSprout](https://github.com/crossoverJie/JCSprout) 等等。在每一部分的下方都留有引用原地址的链接，表明上方文字的参考、引用来源。如果有任何遗漏或者侵权，请联系我添加引用或删除。
 - 文档目的是为了知识的总结与分享。
 - 我所做的工作很大程度是收集并且把引用的文章用自己的语言再重新表达一遍，达到一个知识梳理的目的。
@@ -69,6 +69,6 @@
   - Flume
   - [Flink](https://github.com/ideolty/Interview/blob/master/Flink.md)
   - Spark
-- 面试题
-- ~~软件等级考试 - 系统架构设计师~~
+- [面试题](https://github.com/ideolty/Interview/blob/master/%E9%9D%A2%E8%AF%95%E9%A2%98.md)
+- [软件等级考试 - 系统架构设计师](https://github.com/ideolty/Interview/tree/master/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E5%B8%88)
 
