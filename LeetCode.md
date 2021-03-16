@@ -4,6 +4,8 @@
 
 - cn与com都会涉及。
 
+- 先把简单与中等的处理了，最后再处理困难
+
   
 
 所有题目来源：力扣（LeetCode）
@@ -361,3 +363,215 @@ class Solution {
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 ```
 
+
+
+# [4. 寻找两个正序数组的中位数](https://leetcode-cn.com/problems/median-of-two-sorted-arrays/)
+
+
+
+# [5. 最长回文子串](https://leetcode-cn.com/problems/longest-palindromic-substring/)
+
+给你一个字符串 `s`，找到 `s` 中最长的回文子串。
+
+**示例 1：**
+
+```
+输入：s = "babad"
+输出："bab"
+解释："aba" 同样是符合题意的答案。
+```
+
+**示例 2：**
+
+```
+输入：s = "cbbd"
+输出："bb"
+```
+
+**示例 3：**
+
+```
+输入：s = "a"
+输出："a"
+```
+
+**示例 4：**
+
+```
+输入：s = "ac"
+输出："a"
+```
+
+**提示：**
+
+- `1 <= s.length <= 1000`
+- `s` 仅由数字和英文字母（大写和/或小写）组成
+
+
+
+又要想起被KMP支配的恐惧，对我来说算法里面的字符串处理是最困难的。
+
+回文是指正着与逆着都一样的字符串。
+
+
+
+多年前写的，思路早都忘记了，看代码应该是确定了一头一尾2个指针，一个从前往后，一个从后往前的开始遍历。当遇到不相等的时候，就说明当前的字符串肯定不是回文。然后向前移动一格，继续下一轮比较，如果移动的超出了原字符的最大长度，则缩短一下期待的回文字符串长度，然后又从第一个字符开始判断。
+
+由于是从最大的字符串开始比较的，所以一旦找到一个回文串，那么肯定就是最长的。这样看起来，还是一个滑动窗口，只不过窗口在逐渐的减小。
+
+```java
+class Solution {
+    public String longestPalindrome(String s) {
+        char[] charArray = s.toCharArray();
+
+        int head = 0;
+        int scape = s.length();
+
+        while (scape != 0){
+            int tail = head + scape;
+
+            boolean f = true;
+            for (int i = 0; i < scape/2; i++){
+                if (charArray[i + head] != charArray[tail - i - 1]){
+                    f = false;
+                    break;
+                }
+            }
+
+            if (f){
+                StringBuilder result = new StringBuilder();
+                for (int i = head; i <= tail - 1; i++){
+                    result.append(charArray[i]);
+                }
+
+                return result.toString();
+            }else {
+                if (tail < s.length()){
+                    head ++;
+                }else {
+                    head = 0;
+                    scape--;
+                }
+            }
+        }
+
+        return "";
+    }
+}
+```
+
+
+
+官方
+
+给出了4种解法，并且出视频。看几个重要的
+
+- 方法一（暴力解法）
+- 方法二（中心扩散）
+- 方法三（动态规划）
+- 方法四（Manacher 算法）
+
+
+
+**动态规划**
+
+对于一个子串而言，如果它是回文串，并且长度大于 $2$，那么将它首尾的两个字母去除之后，它仍然是个回文串。例如对于字符串 $ababa$，如果我们已经知道 $bab$是回文串，那么 $ababa$ 一定是回文串，这是因为它的首尾两个字母都是$a$。
+
+根据这样的思路，我们就可以用动态规划的方法解决本题。我们用 $P(i,j) $表示字符串 $s$ 的第 $i$ 到 $j$ 个字母组成的串（下文表示成 $s[i:j]$是否为回文串：
+$$
+P(i,j)=\begin{cases} true，如果子串 Si​…Sj​ 是回文串\\ false， 其他情况\end{cases}
+$$
+这里的「其它情况」包含两种可能性：
+
+- $s[i,j]$本身不是一个回文串；
+- $i>j$，此时 $s[i,j]$本身不合法。
+
+那么我们就可以写出动态规划的状态转移方程：
+$$
+P(i,j)=P(i+1,j−1)∧(Si​==Sj​)
+$$
+也就是说，只有 $s[i+1:j−1]$是回文串，并且 $s$的第 $i$ 和 $j$ 个字母相同时，$s[i:j]$ 才会是回文串。
+
+上文的所有讨论是建立在子串长度大于 2 的前提之上的，我们还需要考虑动态规划中的边界条件，即子串的长度为 1 或 2。对于长度为 1 的子串，它显然是个回文串；对于长度为 2 的子串，只要它的两个字母相同，它就是一个回文串。因此我们就可以写出动态规划的边界条件：
+
+$$
+\begin{cases} P(i,i) = true\\ P(i, i+1) = (Si​==Sj​)\end{cases}
+$$
+根据这个思路，我们就可以完成动态规划了，最终的答案即为所有 $P(i,j)=true$中 $j−i+1$（即子串长度）的最大值。注意：在状态转移方程中，我们是从长度较短的字符串向长度较长的字符串进行转移的，因此一定要注意动态规划的循环顺序。
+
+```java
+class Solution {
+    public String longestPalindrome(String s) {
+        int n = s.length();
+        boolean[][] dp = new boolean[n][n];
+        String ans = "";
+        for (int l = 0; l < n; ++l) {
+            for (int i = 0; i + l < n; ++i) {
+                int j = i + l;
+                if (l == 0) {
+                    dp[i][j] = true;
+                } else if (l == 1) {
+                    dp[i][j] = (s.charAt(i) == s.charAt(j));
+                } else {
+                    dp[i][j] = (s.charAt(i) == s.charAt(j) && dp[i + 1][j - 1]);
+                }
+                if (dp[i][j] && l + 1 > ans.length()) {
+                    ans = s.substring(i, i + l + 1);
+                }
+            }
+        }
+        return ans;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/longest-palindromic-substring/solution/zui-chang-hui-wen-zi-chuan-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+这里的`int l`应该是回文的预期长度。
+
+
+
+**方法二：中心扩展算法**
+
+边界情况为子串长度为 1 或 2 的情况。我们枚举每一种边界情况，并从对应的子串开始不断地向两边扩展。如果两边的字母相同，我们就可以继续扩展，例如从 $P(i+1,j-1)$ 扩展到 $P(i,j)$；如果两边的字母不同，我们就可以停止扩展，因为在这之后的子串都不能是回文串了。
+
+「边界情况」对应的子串实际上就是我们「扩展」出的回文串的「回文中心」。方法二的本质即为：我们枚举所有的「回文中心」并尝试「扩展」，直到无法扩展为止，此时的回文串长度即为此「回文中心」下的最长回文串长度。我们对所有的长度求出最大值，即可得到最终的答案。
+
+```java
+class Solution {
+    public String longestPalindrome(String s) {
+        if (s == null || s.length() < 1) {
+            return "";
+        }
+        int start = 0, end = 0;
+        for (int i = 0; i < s.length(); i++) {
+            int len1 = expandAroundCenter(s, i, i);
+            int len2 = expandAroundCenter(s, i, i + 1);
+            int len = Math.max(len1, len2);
+            if (len > end - start) {
+                start = i - (len - 1) / 2;
+                end = i + len / 2;
+            }
+        }
+        return s.substring(start, end + 1);
+    }
+
+    public int expandAroundCenter(String s, int left, int right) {
+        while (left >= 0 && right < s.length() && s.charAt(left) == s.charAt(right)) {
+            --left;
+            ++right;
+        }
+        return right - left - 1;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/longest-palindromic-substring/solution/zui-chang-hui-wen-zi-chuan-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
