@@ -876,3 +876,292 @@ class Solution {
 
 
 
+# [17. 电话号码的字母组合](https://leetcode-cn.com/problems/letter-combinations-of-a-phone-number/)
+
+给定一个仅包含数字 2-9 的字符串，返回所有它能表示的字母组合。答案可以按 任意顺序 返回。
+
+给出数字到字母的映射如下（与电话按键相同）。注意 1 不对应任何字母。
+
+<img src="截图/leetCode/17_telephone_keypad.png" alt="img" style="zoom:50%;" />
+
+**示例 1：**
+
+```
+输入：digits = "23"
+输出：["ad","ae","af","bd","be","bf","cd","ce","cf"]
+```
+
+**示例 2：**
+
+```
+输入：digits = ""
+输出：[]
+```
+
+**示例 3：**
+
+```
+输入：digits = "2"
+输出：["a","b","c"]
+```
+
+**提示：**
+
+- `0 <= digits.length <= 4`
+- `digits[i]` 是范围 `['2', '9']` 的一个数字。
+
+
+
+哦，暴力遍历，内存中存了一下电话盘。
+
+```java
+class Solution {
+     public List<String> twoNumber(int n, List<String> list){
+        Map<Integer, String[]> map = new HashMap<>();
+        map.put(2, new String[]{"a", "b", "c"});
+        map.put(3, new String[]{"d", "e", "f"});
+        map.put(4, new String[]{"g", "h", "i"});
+        map.put(5, new String[]{"j", "k", "l"});
+        map.put(6, new String[]{"m", "n", "o"});
+        map.put(7, new String[]{"p", "q", "r", "s"});
+        map.put(8, new String[]{"t", "u", "v"});
+        map.put(9, new String[]{"w", "x", "y", "z"});
+
+        String[] alpha = map.get(n);
+        if (list.size() == 0){
+            for (String s : alpha) {
+                list.add(s);
+            }
+
+            return list;
+        }
+
+        List<String> temp = new ArrayList<>();
+        for (String s : alpha) {
+            for (String s1 : list) {
+                s1 = s1 + s;
+                temp.add(s1);
+            }
+        }
+
+        return temp;
+    }
+
+    
+    
+    public List<String> letterCombinations(String digits) {
+        List<String> result = new ArrayList<>();
+
+        for (int index = 0; index < digits.length(); index ++) {
+          	// 这里拿到的是ascii码 减去0对应的ascii码 得到对应的数字
+            result = twoNumber(digits.charAt(index) - '0', result);
+        }
+
+        return result;
+        
+    }
+}
+```
+
+
+
+官方
+
+**回溯**
+
+首先使用哈希表存储每个数字对应的所有可能的字母，然后进行回溯操作。
+
+回溯过程中维护一个字符串，表示已有的字母排列（如果未遍历完电话号码的所有数字，则已有的字母排列是不完整的）。该字符串初始为空。每次取电话号码的一位数字，从哈希表中获得该数字对应的所有可能的字母，并将其中的一个字母插入到已有的字母排列后面，然后继续处理电话号码的后一位数字，直到处理完电话号码中的所有数字，即得到一个完整的字母排列。然后进行回退操作，遍历其余的字母排列。
+
+回溯算法用于寻找所有的可行解，如果发现一个解不可行，则会舍弃不可行的解。在这道题中，由于每个数字对应的每个字母都可能进入字母组合，因此不存在不可行的解，直接穷举所有的解即可。
+
+```java
+class Solution {
+    public List<String> letterCombinations(String digits) {
+        List<String> combinations = new ArrayList<String>();
+        if (digits.length() == 0) {
+            return combinations;
+        }
+        Map<Character, String> phoneMap = new HashMap<Character, String>() {{
+            put('2', "abc");
+            put('3', "def");
+            put('4', "ghi");
+            put('5', "jkl");
+            put('6', "mno");
+            put('7', "pqrs");
+            put('8', "tuv");
+            put('9', "wxyz");
+        }};
+        backtrack(combinations, phoneMap, digits, 0, new StringBuffer());
+        return combinations;
+    }
+
+    public void backtrack(List<String> combinations, Map<Character, String> phoneMap, String digits, int index, StringBuffer combination) {
+        if (index == digits.length()) {
+            combinations.add(combination.toString());
+        } else {
+            char digit = digits.charAt(index);
+            String letters = phoneMap.get(digit);
+            int lettersCount = letters.length();
+            for (int i = 0; i < lettersCount; i++) {
+                combination.append(letters.charAt(i));
+                backtrack(combinations, phoneMap, digits, index + 1, combination);
+                combination.deleteCharAt(index);
+            }
+        }
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/letter-combinations-of-a-phone-number/solution/dian-hua-hao-ma-de-zi-mu-zu-he-by-leetcode-solutio/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+# [19. 删除链表的倒数第 N 个结点](https://leetcode-cn.com/problems/remove-nth-node-from-end-of-list/)
+
+给你一个链表，删除链表的倒数第 `n` 个结点，并且返回链表的头结点。
+
+**进阶：**你能尝试使用一趟扫描实现吗？
+
+**示例 1：**
+
+![img](截图/leetCode/remove_ex1.jpg)
+
+```
+输入：head = [1,2,3,4,5], n = 2
+输出：[1,2,3,5]
+```
+
+**示例 2：**
+
+```
+输入：head = [1], n = 1
+输出：[]
+```
+
+**示例 3：**
+
+```
+输入：head = [1,2], n = 1
+输出：[1]
+```
+
+**提示：**
+
+- 链表中结点的数目为 `sz`
+- `1 <= sz <= 30`
+- `0 <= Node.val <= 100`
+- `1 <= n <= sz`
+
+
+
+非常典型的**快慢指针问题**，两个指针中间保持n的距离，快指针走到底的时候，慢指针所指的节点就是需要踢掉的节点。
+
+几年前用的是空间换时间的做法，用map来缓存节点位置。
+
+```java
+/**
+ * Definition for singly-linked list.
+ * public class ListNode {
+ *     int val;
+ *     ListNode next;
+ *     ListNode(int x) { val = x; }
+ * }
+ */
+class Solution {
+    public ListNode removeNthFromEnd(ListNode head, int n) {
+        Map<Integer, ListNode> map = new HashMap<>();
+
+        int i = 0;
+        while (head != null){
+            i++;
+            map.put(i, head);
+            head = head.next;
+        }
+
+        if (i == n){
+            //删除头结点
+            return map.get(2);
+        }else if (n == 1){
+            //删除位结点
+            map.get(i - 1).next = null;
+        }else {
+            map.get(i - n).next = map.get(i - n + 2);
+        }
+        return map.get(1);
+    }
+}
+```
+
+
+
+官方
+
+前言
+
+在对链表进行操作时，一种常用的技巧是添加一个哑节点（dummy node），它的 next\textit{next}next 指针指向链表的头节点。这样一来，我们就不需要对头节点进行特殊的判断了。
+
+例如，在本题中，如果我们要删除节点 yyy，我们需要知道节点 yyy 的前驱节点 xxx，并将 xxx 的指针指向 yyy 的后继节点。但由于头节点不存在前驱节点，因此我们需要在删除头节点时进行特殊判断。但如果我们添加了哑节点，那么头节点的前驱节点就是哑节点本身，此时我们就只需要考虑通用的情况即可。
+
+特别地，在某些语言中，由于需要自行对内存进行管理。因此在实际的面试中，对于「是否需要释放被删除节点对应的空间」这一问题，我们需要和面试官进行积极的沟通以达成一致。下面的代码中默认不释放空间。
+
+
+
+**方法一：计算链表长度**
+
+一种容易想到的方法是，我们首先从头节点开始对链表进行一次遍历，得到链表的长度 LLL。随后我们再从头节点开始对链表进行一次遍历，当遍历到第 L−n+1L-n+1L−n+1 个节点时，它就是我们需要删除的节点。
+
+
+
+**方法二：栈**
+
+思路与算法
+
+我们也可以在遍历链表的同时将所有节点依次入栈。根据栈「先进后出」的原则，我们弹出栈的第 n 个节点就是需要删除的节点，并且目前栈顶的节点就是待删除节点的前驱节点。这样一来，删除操作就变得十分方便了。
+
+
+
+**方法三：双指针**
+
+思路与算法
+
+我们也可以在不预处理出链表的长度，以及使用常数空间的前提下解决本题。
+
+由于我们需要找到倒数第 $n$ 个节点，因此我们可以使用两个指针 $first$ 和 $second$ 同时对链表进行遍历，并且  $first$  比 $second$  超前 n 个节点。当 $first$ 遍历到链表的末尾时，$second$ 就恰好处于倒数第 n 个节点。
+
+具体地，初始时 $first$ 和 $second$均指向头节点。我们首先使用 $first $ 对链表进行遍历，遍历的次数为 $n$。此时，$first$ 和 $second$之间间隔了 $n-1$ 个节点，即 $first$ 比 $second$超前了 $n$ 个节点。
+
+在这之后，我们同时使用 $first$ 和 $second$对链表进行遍历。当 $first$ 遍历到链表的末尾（即 $first$ 为空指针）时，$second$恰好指向倒数第 $n$ 个节点。
+
+根据方法一和方法二，如果我们能够得到的是倒数第 $n$ 个节点的前驱节点而不是倒数第 $n$ 个节点的话，删除操作会更加方便。因此我们可以考虑在初始时将 $second$指向哑节点，其余的操作步骤不变。这样一来，当 $first$ 遍历到链表的末尾时，$second$的下一个节点就是我们需要删除的节点。
+
+```java
+class Solution {
+    public ListNode removeNthFromEnd(ListNode head, int n) {
+        ListNode dummy = new ListNode(0, head);
+        ListNode first = head;
+        ListNode second = dummy;
+        for (int i = 0; i < n; ++i) {
+            first = first.next;
+        }
+        while (first != null) {
+            first = first.next;
+            second = second.next;
+        }
+        second.next = second.next.next;
+        ListNode ans = dummy.next;
+        return ans;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/remove-nth-node-from-end-of-list/solution/shan-chu-lian-biao-de-dao-shu-di-nge-jie-dian-b-61/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
