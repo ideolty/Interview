@@ -1420,3 +1420,277 @@ class Solution {
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 ```
 
+
+
+# [22. 括号生成](https://leetcode-cn.com/problems/generate-parentheses/)
+
+数字 `n` 代表生成括号的对数，请你设计一个函数，用于能够生成所有可能的并且 **有效的** 括号组合。
+
+**示例 1：**
+
+```
+输入：n = 3
+输出：["((()))","(()())","(())()","()(())","()()()"]
+```
+
+**示例 2：**
+
+```
+输入：n = 1
+输出：["()"]
+```
+
+**提示：**
+
+- `1 <= n <= 8`
+
+
+
+第一直觉就是动态规划。
+
+
+
+官方的没怎么看懂，评论区高赞的：
+
+> 递归（深度优先）+ 剪枝
+>
+> 剩余左括号总数要小于等于右括号。 递归把所有符合要求的加上去就行了
+
+```java
+		class Solution {
+        List<String> res = new ArrayList<>();
+        public List<String> generateParenthesis(int n) {
+            if(n <= 0){
+                return res;
+            }
+            getParenthesis("",n,n);
+            return res;
+        }
+
+        private void getParenthesis(String str,int left, int right) {
+            if(left == 0 && right == 0 ){
+                res.add(str);
+                return;
+            }
+            if(left == right){
+                //剩余左右括号数相等，下一个只能用左括号
+                getParenthesis(str+"(",left-1,right);
+            }else if(left < right){
+                //剩余左括号小于右括号，下一个可以用左括号也可以用右括号
+                if(left > 0){
+                    getParenthesis(str+"(",left-1,right);
+                }
+                getParenthesis(str+")",left,right-1);
+            }
+        }
+    }
+
+https://leetcode-cn.com/problems/generate-parentheses/solution/gua-hao-sheng-cheng-by-leetcode-solution/540232
+```
+
+
+
+当然也可以使用广度优先
+
+```java
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+
+public class Solution {
+
+    class Node {
+        /**
+         * 当前得到的字符串
+         */
+        private String res;
+        /**
+         * 剩余左括号数量
+         */
+        private int left;
+        /**
+         * 剩余右括号数量
+         */
+        private int right;
+
+        public Node(String str, int left, int right) {
+            this.res = str;
+            this.left = left;
+            this.right = right;
+        }
+    }
+
+    public List<String> generateParenthesis(int n) {
+        List<String> res = new ArrayList<>();
+        if (n == 0) {
+            return res;
+        }
+        Queue<Node> queue = new LinkedList<>();
+        queue.offer(new Node("", n, n));
+
+        while (!queue.isEmpty()) {
+            Node curNode = queue.poll();
+            if (curNode.left == 0 && curNode.right == 0) {
+                res.add(curNode.res);
+            }
+            if (curNode.left > 0) {
+                queue.offer(new Node(curNode.res + "(", curNode.left - 1, curNode.right));
+            }
+            if (curNode.right > 0 && curNode.left < curNode.right) {
+                queue.offer(new Node(curNode.res + ")", curNode.left, curNode.right - 1));
+            }
+        }
+        return res;
+    }
+}
+
+
+作者：liweiwei1419
+链接：https://leetcode-cn.com/problems/generate-parentheses/solution/hui-su-suan-fa-by-liweiwei1419/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+作为对比，贴一个同样写法的深度优先，仅仅是把 `Queue` 换成了 `Stack` ，广度优先遍历就改成了深度优先遍历。）
+
+```java
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.Stack;
+
+public class Solution {
+
+    class Node {
+        /**
+         * 当前得到的字符串
+         */
+        private String res;
+        /**
+         * 剩余左括号数量
+         */
+        private int left;
+        /**
+         * 剩余右括号数量
+         */
+        private int right;
+
+        public Node(String str, int left, int right) {
+            this.res = str;
+            this.left = left;
+            this.right = right;
+        }
+    }
+    
+    // 注意：这是深度优先遍历
+
+    public List<String> generateParenthesis(int n) {
+        List<String> res = new ArrayList<>();
+        if (n == 0) {
+            return res;
+        }
+
+        // 查看了 Stack 源码，官方推荐使用 Deque 对象，
+        // 注意：只使用栈相关的接口，即只使用 `addLast()` 和 `removeLast()`
+        Deque<Node> stack = new ArrayDeque<>();
+        stack.addLast(new Node("", n, n));
+
+        while (!stack.isEmpty()) {
+
+            Node curNode = stack.removeLast();
+            if (curNode.left == 0 && curNode.right == 0) {
+                res.add(curNode.res);
+            }
+            if (curNode.left > 0) {
+                stack.addLast(new Node(curNode.res + "(", curNode.left - 1, curNode.right));
+            }
+            if (curNode.right > 0 && curNode.left < curNode.right) {
+                stack.addLast(new Node(curNode.res + ")", curNode.left, curNode.right - 1));
+            }
+        }
+        return res;
+    }
+}
+
+
+作者：liweiwei1419
+链接：https://leetcode-cn.com/problems/generate-parentheses/solution/hui-su-suan-fa-by-liweiwei1419/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+dp
+
+$(a)b$  
+
+// todo 大蘑菇
+
+> 思路：
+>
+> 当我们清楚所有 i<n 时括号的可能生成排列后，对与 i=n 的情况，我们考虑整个括号排列中最左边的括号。
+> 它一定是一个左括号，那么它可以和它对应的右括号组成一组完整的括号 "( )"，我们认为这一组是相比 n-1 增加进来的括号。
+>
+> 那么，剩下 n-1 组括号有可能在哪呢？
+>
+> 【这里是重点，请着重理解】
+>
+> 剩下的括号要么在这一组新增的括号内部，要么在这一组新增括号的外部（右侧）。
+>
+> 既然知道了 i<n 的情况，那我们就可以对所有情况进行遍历：
+>
+> "(" + 【i=p时所有括号的排列组合】 + ")" + 【i=q时所有括号的排列组合】
+>
+> 其中 p + q = n-1，且 p q 均为非负整数。
+>
+> 事实上，当上述 p 从 0 取到 n-1，q 从 n-1 取到 0 后，所有情况就遍历完了。
+>
+> 注：上述遍历是没有重复情况出现的，即当 (p1,q1)≠(p2,q2) 时，按上述方式取的括号组合一定不同。
+>
+> 作者：yuyu-13
+> 链接：https://leetcode-cn.com/problems/generate-parentheses/solution/zui-jian-dan-yi-dong-de-dong-tai-gui-hua-bu-lun-da/
+> 来源：力扣（LeetCode）
+> 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+```java
+    public List<String> generateParenthesis(int n) {
+        LinkedList<LinkedList<String>> result = new LinkedList<LinkedList<String>>();
+        if (n == 0)
+            return result.get(0);
+        LinkedList<String> list0 = new LinkedList<String>();
+        list0.add("");
+        result.add(list0);
+        LinkedList<String> list1 = new LinkedList<String>();
+        list1.add("()");
+        result.add(list1);
+        for (int i = 2; i <= n; i++) {
+            LinkedList<String> temp = new LinkedList<String>();
+            for (int j = 0; j < i; j++) {
+                List<String> str1 = result.get(j);
+                List<String> str2 = result.get(i - 1 - j);
+                for (String s1 : str1) {
+                    for (String s2 : str2) {
+                        String el = "(" + s1 + ")" + s2;
+                        temp.add(el);
+                    }
+                }
+
+            }
+            result.add(temp);
+        }
+        return result.get(n);
+    }
+
+作者：蓝亚之舟
+链接：https://leetcode-cn.com/problems/generate-parentheses/solution/zui-jian-dan-yi-dong-de-dong-tai-gui-hua-bu-lun-da/125850
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
