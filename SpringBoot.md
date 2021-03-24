@@ -311,7 +311,7 @@ org.springframework.boot.autoconfigure.web.servlet.JspTemplateAvailabilityProvid
 
 根据上面的代码，其实他以`org.springframework.boot.autoconfigure.EnableAutoConfiguration`为key从map中获取一些类的名称，从上面的配置中也可以看到这个key下面有配置了一群类。debug看了一下共获取到了	118个，之后就开始一个个加载这些类里面定义的bean。
 
-所以，@EnableAutoConfiguration自动配置就是，从classpath中搜寻所有的META-INF/spring.factories配置文件，并将其中org.springframework.boot.autoconfigure.EnableutoConfiguration对应的配置项通过反射（Java
+所以，@EnableAutoConfiguration自动配置就是，从classpath中搜寻所有的META-INF/spring.factories配置文件，并将其中org.springframework.boot.autoconfigure.EnableAutoConfiguration对应的配置项通过反射（Java
 Refletion）实例化为对应的标注了@Configuration的JavaConfig形式的IoC容器配置类，然后汇总为一个并加载到IoC容器。
 
 
@@ -322,7 +322,7 @@ Refletion）实例化为对应的标注了@Configuration的JavaConfig形式的Io
 
 
 
-# 实现一个自定义startor
+# 实现一个自定义starter
 
 
 
@@ -365,10 +365,6 @@ SpringApplication的构造方法如下
 
 两段代码是同一段，上面那个是编译后的.class文件的。感觉还是class文件看的更舒服
 
-
-
-
-
 蓝色选中部分为重点，他做了这么4件事
 
 1. 服务应用类型推断：根据classpath里面是否存在某个特征类（org.springframework.web.context.ConfigurableWebApplicationContext）来决定是否应该创建一个为Web应用使用的ApplicationContext类型。
@@ -378,51 +374,124 @@ SpringApplication的构造方法如下
 
 
 
-`run`方法
+## run方法
+
+以下使用`2.3.2.RELEASE`版本的代码
+
+```xml
+<parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>2.3.2.RELEASE</version>
+    <relativePath/> <!-- lookup parent from repository -->
+</parent>
+```
+
+
+
+`org.springframework.boot.SpringApplication#run(java.lang.String...)`
 
 ```java
-	 public ConfigurableApplicationContext run(String... args) {
-        StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
-        ConfigurableApplicationContext context = null;
-        Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList();
-        this.configureHeadlessProperty();
-        SpringApplicationRunListeners listeners = this.getRunListeners(args);
-        listeners.starting();
+	public ConfigurableApplicationContext run(String... args) {
+    // 初始化一个计时器
+		StopWatch stopWatch = new StopWatch();
+		stopWatch.start();
+		ConfigurableApplicationContext context = null;
+		Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
+    // 设置系统属性『java.awt.headless』，为true则启用headless模式支持
+		configureHeadlessProperty();
+    // 通过SpringFactoriesLoader 检索 META-INF/spring.factories，
+    // 找到声明的所有SpringApplicationRunListener的实现类并将其实例化，
+    // 之后逐个调用其started()方法，广播SpringBoot要开始执行了
+		SpringApplicationRunListeners listeners = getRunListeners(args);
+    // 发布应用启动事件
+		listeners.starting();
+		try {
+      // 初始化参数
+			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+      // 创建并配置当前SpringBoot应用将要使用的Environment（包括配置要使用的PropertySource以及Profile）,
+      // 并遍历调用所有的SpringApplicationRunListener的environmentPrepared()方法，广播Environment准备完毕。
+			ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
+			configureIgnoreBeanInfo(environment);
+      // 打印banner
+			Banner printedBanner = printBanner(environment);
+      // 创建应用上下文
+			context = createApplicationContext();
+      // 通过*SpringFactoriesLoader*检索*META-INF/spring.factories*，获取并实例化异常分析器
+			exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
+					new Class[] { ConfigurableApplicationContext.class }, context);
+      
+      // 为ApplicationContext加载environment，之后逐个执行ApplicationContextInitializer的initialize()方法来进一步封装ApplicationContext，
+      // 并调用所有的SpringApplicationRunListener的contextPrepared()方法，【EventPublishingRunListener只提供了一个空的contextPrepared()方法】，
+      // 之后初始化IoC容器，并调用SpringApplicationRunListener的contextLoaded()方法，广播ApplicationContext的IoC加载完成，
+      // 这里就包括通过**@EnableAutoConfiguration**导入的各种自动配置类。
+			prepareContext(context, environment, listeners, applicationArguments, printedBanner);
+      // 刷新上下文
+			refreshContext(context);
+      // 再一次刷新上下文,其实是空方法,可能是为了后续扩展。
+			afterRefresh(context, applicationArguments);
+			stopWatch.stop();
+			if (this.logStartupInfo) {
+				new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
+			}
+      // 发布应用已经启动的事件
+			listeners.started(context);
+      // 遍历所有注册的ApplicationRunner和CommandLineRunner，并执行其run()方法。
+      // 我们可以实现自己的ApplicationRunner或者CommandLineRunner，来对SpringBoot的启动过程进行扩展。
+			callRunners(context, applicationArguments);
+		}
+		catch (Throwable ex) {
+			handleRunFailure(context, ex, exceptionReporters, listeners);
+			throw new IllegalStateException(ex);
+		}
 
-        Collection exceptionReporters;
-        try {
-            ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
-            ConfigurableEnvironment environment = this.prepareEnvironment(listeners, applicationArguments);
-            this.configureIgnoreBeanInfo(environment);
-            Banner printedBanner = this.printBanner(environment);
-            context = this.createApplicationContext();
-            exceptionReporters = this.getSpringFactoriesInstances(SpringBootExceptionReporter.class, new Class[]{ConfigurableApplicationContext.class}, context);
-            this.prepareContext(context, environment, listeners, applicationArguments, printedBanner);
-            this.refreshContext(context);
-            this.afterRefresh(context, applicationArguments);
-            stopWatch.stop();
-            if (this.logStartupInfo) {
-                (new StartupInfoLogger(this.mainApplicationClass)).logStarted(this.getApplicationLog(), stopWatch);
-            }
-
-            listeners.started(context);
-            this.callRunners(context, applicationArguments);
-        } catch (Throwable var10) {
-            this.handleRunFailure(context, var10, exceptionReporters, listeners);
-            throw new IllegalStateException(var10);
-        }
-
-        try {
-            listeners.running(context);
-            return context;
-        } catch (Throwable var9) {
-            this.handleRunFailure(context, var9, exceptionReporters, (SpringApplicationRunListeners)null);
-            throw new IllegalStateException(var9);
-        }
-    }
-
+		try {
+      // 发布应用已经启动完成的事件
+			listeners.running(context);
+		}
+		catch (Throwable ex) {
+			handleRunFailure(context, ex, exceptionReporters, null);
+			throw new IllegalStateException(ex);
+		}
+		return context;
+	}
 ```
+
+总结一下
+
+1. 配置属性        
+
+   `configureHeadlessProperty()`，设置系统属性『java.awt.headless』，为true则启用headless模式支持。
+
+2. 获取监听器，发布应用开始启动事件
+
+   通过 `SpringFactoriesLoader` 检索 `META-INF/spring.factories`，找到声明的所有 `SpringApplicationRunListener` 的实现类并将其实例化，之后逐个调用其`started()`方法，广播SpringBoot要开始执行了
+
+3. 初始化输入参数
+
+4. 配置环境，输出banner
+
+   创建并配置当前SpringBoot应用将要使用的Environment（包括配置要使用的PropertySource以及Profile），并遍历调用所有的`SpringApplicationRunListener` 的 `environmentPrepared()` 方法，广播Environment准备完毕。
+
+5. 创建上下文
+
+   `createApplicationContext();`
+
+6. 预处理上下文
+
+   为 `ApplicationContext` 加载environment，之后逐个执行` ApplicationContextInitializer` 的 `initialize()` 方法来进一步封装` ApplicationContext` ，并调用所有的 `SpringApplicationRunListener` 的 `contextPrepared()` 方法，【EventPublishingRunListener只提供了一个空的contextPrepared()方法】，之后初始化IoC容器，并调用SpringApplicationRunListener的 `contextLoaded()` 方法，广播ApplicationContext的IoC加载完成，这里就包括通过**@EnableAutoConfiguration**导入的各种自动配置类。
+
+7. 刷新上下文
+
+8. 再刷新上下文
+
+9. 发布应用已经启动事件
+
+10. 发布应用启动完成事件
+
+
+
+
 
 
 
@@ -431,6 +500,195 @@ SpringApplication的构造方法如下
 [springboot之启动原理解析及源码阅读](https://www.cnblogs.com/shamo89/p/8184960.html)
 
 [springboot启动流程（目录）](https://www.cnblogs.com/lay2017/p/11478237.html)
+
+
+
+
+
+# 如何启动Tomcat容器
+
+> [Tomcat在SpringBoot中是如何启动的](https://juejin.cn/post/6844903910784630792)
+
+在springboot的启动流程中，有一步是创建spring应用上下文容器`context = createApplicationContext();`
+
+```java
+public static final String DEFAULT_SERVLET_WEB_CONTEXT_CLASS = "org.springframework.boot."
+      + "web.servlet.context.AnnotationConfigServletWebServerApplicationContext";
+
+protected ConfigurableApplicationContext createApplicationContext() {
+   Class<?> contextClass = this.applicationContextClass;
+   if (contextClass == null) {
+      try {
+         switch (this.webApplicationType) {
+         case SERVLET:
+            contextClass = Class.forName(DEFAULT_SERVLET_WEB_CONTEXT_CLASS);
+            break;
+         case REACTIVE:
+            contextClass = Class.forName(DEFAULT_REACTIVE_WEB_CONTEXT_CLASS);
+            break;
+         default:
+            contextClass = Class.forName(DEFAULT_CONTEXT_CLASS);
+         }
+      }
+      catch (ClassNotFoundException ex) {
+         throw new IllegalStateException(
+               "Unable create a default ApplicationContext, please specify an ApplicationContextClass", ex);
+      }
+   }
+   return (ConfigurableApplicationContext) BeanUtils.instantiateClass(contextClass);
+}
+```
+
+当使用servlet的情况下，确定了使用的是 `AnnotationConfigServletWebServerApplicationContext`
+
+
+
+后续有一步为刷新上下文 `refreshContext(context);`
+
+```java
+private void refreshContext(ConfigurableApplicationContext context) {
+   refresh((ApplicationContext) context);
+   if (this.registerShutdownHook) {
+      try {
+         context.registerShutdownHook();
+      }
+      catch (AccessControlException ex) {
+         // Not allowed in some environments.
+      }
+   }
+}
+
+	protected void refresh(ConfigurableApplicationContext applicationContext) {
+		applicationContext.refresh();
+	}
+```
+
+在这里会直接调用容器的`refresh()`方法，`ConfigurableApplicationContext`是一个接口，`AbstractApplicationContext` 是接口的一个具体实现类，而  `AnnotationConfigServletWebServerApplicationContext` 是实现类的一个子类。所以这里调用的是`AbstractApplicationContext` 的 `refresh()` 方法。
+
+
+
+`org.springframework.context.support.AbstractApplicationContext#refresh`
+
+```java
+public void refresh() throws BeansException, IllegalStateException {
+   synchronized (this.startupShutdownMonitor) {
+      // Prepare this context for refreshing.
+      prepareRefresh();
+
+      // Tell the subclass to refresh the internal bean factory.
+      ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+
+      // Prepare the bean factory for use in this context.
+      prepareBeanFactory(beanFactory);
+
+      try {
+         // Allows post-processing of the bean factory in context subclasses.
+         postProcessBeanFactory(beanFactory);
+
+         // Invoke factory processors registered as beans in the context.
+         invokeBeanFactoryPostProcessors(beanFactory);
+
+         // Register bean processors that intercept bean creation.
+         registerBeanPostProcessors(beanFactory);
+
+         // Initialize message source for this context.
+         initMessageSource();
+
+         // Initialize event multicaster for this context.
+         initApplicationEventMulticaster();
+
+         // Initialize other special beans in specific context subclasses.
+         onRefresh();
+
+         // Check for listener beans and register them.
+         registerListeners();
+
+         // Instantiate all remaining (non-lazy-init) singletons.
+         finishBeanFactoryInitialization(beanFactory);
+
+         // Last step: publish corresponding event.
+         finishRefresh();
+      }
+
+      catch (BeansException ex) {
+         if (logger.isWarnEnabled()) {
+            logger.warn("Exception encountered during context initialization - " +
+                  "cancelling refresh attempt: " + ex);
+         }
+
+         // Destroy already created singletons to avoid dangling resources.
+         destroyBeans();
+
+         // Reset 'active' flag.
+         cancelRefresh(ex);
+
+         // Propagate exception to caller.
+         throw ex;
+      }
+
+      finally {
+         // Reset common introspection caches in Spring's core, since we
+         // might not ever need metadata for singleton beans anymore...
+         resetCommonCaches();
+      }
+   }
+}
+```
+
+这里是在初始化spring容器，在`onRefresh();`步骤中，`AbstractApplicationContext `方法本身是一个空方法，是由子类来实现的，在当前的继承结构中，这个方法的实现在 `ServletWebServerApplicationContext ` 类当中。
+
+`org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext#onRefresh`
+
+```java
+@Override
+protected void onRefresh() {
+   super.onRefresh();
+   try {
+      createWebServer();
+   }
+   catch (Throwable ex) {
+      throw new ApplicationContextException("Unable to start web server", ex);
+   }
+}
+```
+
+在这里，他创建了web的服务器。
+
+```java
+private void createWebServer() {
+   WebServer webServer = this.webServer;
+   ServletContext servletContext = getServletContext();
+   if (webServer == null && servletContext == null) {
+      ServletWebServerFactory factory = getWebServerFactory();
+      this.webServer = factory.getWebServer(getSelfInitializer());
+      getBeanFactory().registerSingleton("webServerGracefulShutdown",
+            new WebServerGracefulShutdownLifecycle(this.webServer));
+      getBeanFactory().registerSingleton("webServerStartStop",
+            new WebServerStartStopLifecycle(this, this.webServer));
+   }
+   else if (servletContext != null) {
+      try {
+         getSelfInitializer().onStartup(servletContext);
+      }
+      catch (ServletException ex) {
+         throw new ApplicationContextException("Cannot initialize servlet context", ex);
+      }
+   }
+   initPropertySources();
+}
+```
+
+通过 `ServletWebServerFactory` 工厂，创建了 `WebServer` 对象，此时只是创建，还没有启动。`ServletWebServerFactory` 本身是一个接口，Tomcat/Jetty/Undertow等容器都实现了此接口。
+
+// todo 没找到在哪启动的
+
+
+
+> #### 多容器如何最终确定用哪个？
+
+在 `ServletWebServerFactoryConfiguration` 这个类中，这里面会配置三个容器，从上到下执行，`@ConditionalOnMissingBean` 这个注解就是会判断如果没有的话就执行，那么按照类中的顺序，优先级就是Tomcat>jetty>Undertow。所以多容器的时候就是按照这个优先级选择的。
+
+
 
 
 
