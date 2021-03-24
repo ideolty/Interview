@@ -680,7 +680,186 @@ private void createWebServer() {
 
 通过 `ServletWebServerFactory` 工厂，创建了 `WebServer` 对象，此时只是创建，还没有启动。`ServletWebServerFactory` 本身是一个接口，Tomcat/Jetty/Undertow等容器都实现了此接口。
 
-// todo 没找到在哪启动的
+
+
+`org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory#getWebServer`
+
+```java
+	@Override
+	public WebServer getWebServer(ServletContextInitializer... initializers) {
+		if (this.disableMBeanRegistry) {
+			Registry.disableRegistry();
+		}
+		Tomcat tomcat = new Tomcat();
+		File baseDir = (this.baseDirectory != null) ? this.baseDirectory : createTempDir("tomcat");
+		tomcat.setBaseDir(baseDir.getAbsolutePath());
+		Connector connector = new Connector(this.protocol);
+		connector.setThrowOnFailure(true);
+		tomcat.getService().addConnector(connector);
+		customizeConnector(connector);
+		tomcat.setConnector(connector);
+		tomcat.getHost().setAutoDeploy(false);
+		configureEngine(tomcat.getEngine());
+		for (Connector additionalConnector : this.additionalTomcatConnectors) {
+			tomcat.getService().addConnector(additionalConnector);
+		}
+		prepareContext(tomcat.getHost(), initializers);
+		return getTomcatWebServer(tomcat);
+	}	
+
+	protected TomcatWebServer getTomcatWebServer(Tomcat tomcat) {
+		return new TomcatWebServer(tomcat, getPort() >= 0, getShutdown());
+	}
+```
+
+1. 创建一个tomcat容器对象。
+2. 添加连接器，添加引擎。这些是tomcat内部的概念。
+3. 拿到一个`TomcatWebServer`
+
+继续看一下这个new出来的 `TomcatWebServer` 的内部结构。
+
+
+
+`org.springframework.boot.web.embedded.tomcat.TomcatWebServer`
+
+```java
+	public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
+		Assert.notNull(tomcat, "Tomcat Server must not be null");
+		this.tomcat = tomcat;
+		this.autoStart = autoStart;
+		this.gracefulShutdown = (shutdown == Shutdown.GRACEFUL) ? new GracefulShutdown(tomcat) : null;
+		initialize();
+	}
+
+	private void initialize() throws WebServerException {
+    // 控制台常见的提示打印
+		logger.info("Tomcat initialized with port(s): " + getPortsDescription(false));
+		synchronized (this.monitor) {
+			try {
+				addInstanceIdToEngineName();
+
+				Context context = findContext();
+				context.addLifecycleListener((event) -> {
+					if (context.equals(event.getSource()) && Lifecycle.START_EVENT.equals(event.getType())) {
+						// Remove service connectors so that protocol binding doesn't
+						// happen when the service is started.
+						removeServiceConnectors();
+					}
+				});
+
+				// Start the server to trigger initialization listeners
+				this.tomcat.start();
+
+				// We can re-throw failure exception directly in the main thread
+				rethrowDeferredStartupExceptions();
+
+				try {
+					ContextBindings.bindClassLoader(context, context.getNamingToken(), getClass().getClassLoader());
+				}
+				catch (NamingException ex) {
+					// Naming is not enabled. Continue
+				}
+
+				// Unlike Jetty, all Tomcat threads are daemon threads. We create a
+				// blocking non-daemon to stop immediate shutdown
+				startDaemonAwaitThread();
+			}
+			catch (Exception ex) {
+				stopSilently();
+				destroySilently();
+				throw new WebServerException("Unable to start embedded Tomcat", ex);
+			}
+		}
+	}
+```
+
+`this.tomcat.start();` 这里出现了一个 `start()` 方法，这个方法是启动容器吗？
+
+
+
+这是再回头回顾容器的 `refresh()` 方法，之前是 从`onRefresh()` 方法深入的，现在来看一下 `finishRefresh()` 方法。
+
+`org.springframework.context.support.AbstractApplicationContext#finishRefresh`
+
+```java
+	protected void finishRefresh() {
+		// Clear context-level resource caches (such as ASM metadata from scanning).
+		clearResourceCaches();
+
+		// Initialize lifecycle processor for this context.
+		initLifecycleProcessor();
+
+		// Propagate refresh to lifecycle processor first.
+		getLifecycleProcessor().onRefresh();
+
+		// Publish the final event.
+		publishEvent(new ContextRefreshedEvent(this));
+
+		// Participate in LiveBeansView MBean, if active.
+		LiveBeansView.registerApplicationContext(this);
+	}
+```
+
+`getLifecycleProcessor().onRefresh();` 找到所有实现了 `LifecycleProcessor` 生命周期接口的类，调用刷新方法。在这里有一个 `WebServerStartStopLifecycle` 类，他实现了生命周期接口。
+
+
+
+`org.springframework.boot.web.servlet.context.WebServerStartStopLifecycle`
+
+```java
+	@Override
+	public void start() {
+		this.webServer.start();
+		this.running = true;
+		this.applicationContext
+				.publishEvent(new ServletWebServerInitializedEvent(this.webServer, this.applicationContext));
+	}
+```
+
+在这个 `Processor` 中，启动了容器，这里的webServer就是之前创建的tomcat。
+
+
+
+`org.springframework.boot.web.embedded.tomcat.TomcatWebServer#start`
+
+```java
+	@Override
+	public void start() throws WebServerException {
+		synchronized (this.monitor) {
+			if (this.started) {
+				return;
+			}
+			try {
+				addPreviouslyRemovedConnectors();
+				Connector connector = this.tomcat.getConnector();
+				if (connector != null && this.autoStart) {
+					performDeferredLoadOnStartup();
+				}
+				checkThatConnectorsHaveStarted();
+				this.started = true;
+        // 时常能够在日志打印中看的
+				logger.info("Tomcat started on port(s): " + getPortsDescription(true) + " with context path '"
+						+ getContextPath() + "'");
+			}
+			catch (ConnectorStartFailedException ex) {
+				stopSilently();
+				throw ex;
+			}
+			catch (Exception ex) {
+				PortInUseException.throwIfPortBindingException(ex, () -> this.tomcat.getConnector().getPort());
+				throw new WebServerException("Unable to start embedded Tomcat server", ex);
+			}
+			finally {
+				Context context = findContext();
+				ContextBindings.unbindClassLoader(context, context.getNamingToken(), getClass().getClassLoader());
+			}
+		}
+	}
+```
+
+到了这个地方应该能够认为tomcat已经启动成功了。
+
+
 
 
 
