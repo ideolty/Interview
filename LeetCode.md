@@ -6,7 +6,7 @@
 
 - 先把简单与中等的处理了，最后再处理困难
 
-  
+- :star: — 金典题|:fearful: — hard题
 
 所有题目来源：力扣（LeetCode）
 著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
@@ -2244,6 +2244,48 @@ public class Solution {
 - 如果目标值落在了递增的一边，则算法转为二分查找。
 - 否则再去另外一边重复上述操作。
 
+```java
+class Solution {
+    public int search(int[] nums, int target) {
+        if (nums == null || nums.length == 0) return -1;
+
+        int leftIndex = 0;
+        int rightIndex = nums.length - 1;
+
+        while (leftIndex <= rightIndex){
+            int midIndex = (leftIndex + rightIndex) / 2;
+            int mid = nums[midIndex];
+            if (mid == target){
+                return midIndex;
+            }
+            if (rightIndex - leftIndex == 1){
+                if (nums[rightIndex] == target){
+                    return rightIndex;
+                }
+                if (nums[leftIndex] == target){
+                    return leftIndex;
+                }
+            }
+
+            if (nums[leftIndex] < mid){
+                if (target >= nums[leftIndex] && target < mid){
+                    rightIndex = midIndex - 1;
+                }else {
+                    leftIndex = midIndex + 1;
+                }
+            }else {
+                if (target > mid && target <= nums[nums.length - 1]){
+                    leftIndex = midIndex + 1;
+                }else {
+                    rightIndex = midIndex - 1;
+                }
+            }
+        }
+        return -1;
+    }
+}
+```
+
 
 
 
@@ -3592,4 +3634,300 @@ exection -> execution (插入 'u')
 
 
 这个不是一个排序吗？任意一种排序算法即可。
+
+
+
+# [76. 最小覆盖子串](https://leetcode-cn.com/problems/minimum-window-substring/) :fearful:
+
+给你一个字符串 s 、一个字符串 t 。返回 s 中涵盖 t 所有字符的最小子串。如果 s 中不存在涵盖 t 所有字符的子串，则返回空字符串 "" 。
+
+注意：如果 s 中存在这样的子串，我们保证它是唯一的答案。
+
+ 
+
+示例 1：
+
+```
+输入：s = "ADOBECODEBANC", t = "ABC"
+输出："BANC"
+```
+
+
+
+示例 2：
+
+```
+输入：s = "a", t = "a"
+输出："a"
+```
+
+ 
+
+提示：
+
+- 1 <= s.length, t.length <= 105
+- s 和 t 由英文字母组成
+
+
+
+滑动窗口？没啥想法……
+
+
+
+# [78. 子集](https://leetcode-cn.com/problems/subsets/)
+
+给你一个整数数组 nums ，数组中的元素 互不相同 。返回该数组所有可能的子集（幂集）。
+
+解集 不能 包含重复的子集。你可以按 任意顺序 返回解集。
+
+ 
+
+示例 1：
+
+```
+输入：nums = [1,2,3]
+输出：[[],[1],[2],[1,2],[3],[1,3],[2,3],[1,2,3]]
+```
+
+
+
+示例 2：
+
+```
+输入：nums = [0]
+输出：[[],[0]]
+```
+
+ 
+
+提示：
+
+- 1 <= nums.length <= 10
+- -10 <= nums[i] <= 10
+- nums 中的所有元素 互不相同
+
+
+
+dfs，走一个全排列，把所有的可能都枚举出来。
+
+
+
+官方
+
+**方法一：迭代法实现子集枚举**
+
+思路与算法
+
+记原序列中元素的总数为 nnn。原序列中的每个数字 aia_iai 的状态可能有两种，即「在子集中」和「不在子集中」。我们用 111 表示「在子集中」，000 表示不在子集中，那么每一个子集可以对应一个长度为 nnn 的 0/10/10/1 序列，第 iii 位表示 aia_iai 是否在子集中。例如，n=3n = 3n=3 ，a={5,2,9}a = \{ 5, 2, 9 \}a={5,2,9} 时：
+
+| 0/1 序列 | 子集    | 0/10/10/1 序列对应的二进制数 |
+| -------- | ------- | ---------------------------- |
+| 000      | { }     | 0                            |
+| 001      | { 9 }   | 1                            |
+| 010      | {2}     | 2                            |
+| 011      | {2,9}   | 3                            |
+| 100      | {5}     | 4                            |
+| 101      | {5,9}   | 5                            |
+| 110      | {5,2}   | 6                            |
+| 111      | {5,2,9} | 7                            |
+
+可以发现 0/1序列对应的二进制数正好从 0 到 $2^n - 1$。我们可以枚举 $\textit{mask} \in [0, 2^n - 1]$，$\textit{mask}$ 的二进制表示是一个 0/1 序列，我们可以按照这个 0/1 序列在原集合当中取数。当我们枚举完所有 $2^n$ 个 $\textit{mask}$，我们也就能构造出所有的子集。
+
+```java
+class Solution {
+    List<Integer> t = new ArrayList<Integer>();
+    List<List<Integer>> ans = new ArrayList<List<Integer>>();
+
+    public List<List<Integer>> subsets(int[] nums) {
+        int n = nums.length;
+        for (int mask = 0; mask < (1 << n); ++mask) {
+            t.clear();
+            for (int i = 0; i < n; ++i) {
+                if ((mask & (1 << i)) != 0) {
+                    t.add(nums[i]);
+                }
+            }
+            ans.add(new ArrayList<Integer>(t));
+        }
+        return ans;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/subsets/solution/zi-ji-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+**方法二：递归法实现子集枚举**
+
+思路与算法
+
+我们也可以用递归来实现子集枚举。
+
+假设我们需要找到一个长度为 n 的序列 a 的所有子序列，代码框架是这样的：
+
+```c++
+vector<int> t;
+void dfs(int cur, int n) {
+    if (cur == n) {
+        // 记录答案
+        // ...
+        return;
+    }
+    // 考虑选择当前位置
+    t.push_back(cur);
+    dfs(cur + 1, n, k);
+    t.pop_back();
+    // 考虑不选择当前位置
+    dfs(cur + 1, n, k);
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/subsets/solution/zi-ji-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+上面的代码中，$dfs(cur,n)$ 参数表示当前位置是 $textit{cur}$，原序列总长度为 n。原序列的每个位置在答案序列中的状态有被选中和不被选中两种，我们用 ttt 数组存放已经被选出的数字。在进入 $\text{dfs}(\textit{cur}, n)$ 之前 $[0,cur−1]$ 位置的状态是确定的，而 $[cur,n−1]$内位置的状态是不确定的，$dfs(cur,n)$ 需要确定 $cur$ 位置的状态，然后求解子问题 $dfs(cur+1,n)$。对于 $cur$ 位置，我们需要考虑 $a[cur]$ 取或者不取，如果取，我们需要把 $a[cur]$ 放入一个临时的答案数组中（即上面代码中的 t），再执行 $dfs(cur+1,n)$，执行结束后需要对 ttt 进行回溯；如果不取，则直接执行 $dfs(cur+1,n)$。在整个递归调用的过程中，$\textit{cur}$ 是从小到大递增的，当 $\textit{cur}$ 增加到 n 的时候，记录答案并终止递归。可以看出二进制枚举的时间复杂度是 $O(2 ^ n)$。
+
+```java
+class Solution {
+    List<Integer> t = new ArrayList<Integer>();
+    List<List<Integer>> ans = new ArrayList<List<Integer>>();
+
+    public List<List<Integer>> subsets(int[] nums) {
+        dfs(0, nums);
+        return ans;
+    }
+
+    public void dfs(int cur, int[] nums) {
+        if (cur == nums.length) {
+            ans.add(new ArrayList<Integer>(t));
+            return;
+        }
+        t.add(nums[cur]);
+        dfs(cur + 1, nums);
+        t.remove(t.size() - 1);
+        dfs(cur + 1, nums);
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/subsets/solution/zi-ji-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+# [79. 单词搜索](https://leetcode-cn.com/problems/word-search/) :star:
+
+给定一个二维网格和一个单词，找出该单词是否存在于网格中。
+
+单词必须按照字母顺序，通过相邻的单元格内的字母构成，其中“相邻”单元格是那些水平相邻或垂直相邻的单元格。同一个单元格内的字母不允许被重复使用。
+
+ 
+
+示例:
+
+```
+board =
+[
+  ['A','B','C','E'],
+  ['S','F','C','S'],
+  ['A','D','E','E']
+]
+
+给定 word = "ABCCED", 返回 true
+给定 word = "SEE", 返回 true
+给定 word = "ABCB", 返回 false
+```
+
+ 
+
+提示：
+
+- board 和 word 中只包含大写和小写英文字母。
+- 1 <= board.length <= 200
+- 1 <= board[i].length <= 200
+- 1 <= word.length <= 10^3
+
+
+
+思路
+
+非常金典的dfs + 回溯。
+
+
+
+官方
+
+**方法一：深度优先搜索**
+
+思路与算法
+
+设函数 $check(i,j,k)$ 判断以网格的 $(i, j)$ 位置出发，能否搜索到单词 $word[k..]$，其中 $word[k..]$ 表示字符串 $word$ 从第 k 个字符开始的后缀子串。如果能搜索到，则返回 $true$，反之返回 $false$。函数 $check(i,j,k)$ 的执行步骤如下：
+
+- 如果 $board[i][j]≠s[k]$，当前字符不匹配，直接返回 $false$。
+- 如果当前已经访问到字符串的末尾，且对应字符依然匹配，此时直接返回 $true$。
+- 否则，遍历当前位置的所有相邻位置。如果从某个相邻位置出发，能够搜索到子串 $word[k+1..]$，则返回 $true$，否则返回 $false$。
+
+这样，我们对每一个位置 $(i,j)$ 都调用函数 $check(i,j,0)$ 进行检查：只要有一处返回 $true$，就说明网格中能够找到相应的单词，否则说明不能找到。
+
+为了防止重复遍历相同的位置，需要额外维护一个与 $board$ 等大的 $visited$ 数组，用于标识每个位置是否被访问过。每次遍历相邻位置时，需要跳过已经被访问的位置。
+
+```java
+class Solution {
+    public boolean exist(char[][] board, String word) {
+        int h = board.length, w = board[0].length;
+        boolean[][] visited = new boolean[h][w];
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                boolean flag = check(board, visited, i, j, word, 0);
+                if (flag) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean check(char[][] board, boolean[][] visited, int i, int j, String s, int k) {
+        if (board[i][j] != s.charAt(k)) {
+            return false;
+        } else if (k == s.length() - 1) {
+            return true;
+        }
+        visited[i][j] = true;
+        int[][] directions = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+        boolean result = false;
+        for (int[] dir : directions) {
+            int newi = i + dir[0], newj = j + dir[1];
+            if (newi >= 0 && newi < board.length && newj >= 0 && newj < board[0].length) {
+                if (!visited[newi][newj]) {
+                    boolean flag = check(board, visited, newi, newj, s, k + 1);
+                    if (flag) {
+                        result = true;
+                        break;
+                    }
+                }
+            }
+        }
+        visited[i][j] = false;
+        return result;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/word-search/solution/dan-ci-sou-suo-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
 
