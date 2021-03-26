@@ -3862,7 +3862,60 @@ board =
 
 思路
 
-非常金典的dfs + 回溯。
+非常经典的dfs + 回溯。
+
+```java
+    public static boolean exist(char[][] board, String word) {
+        boolean[][] visited = new boolean[board.length][board[0].length];
+        for (int i = 0; i < board.length; i++) {
+            for (int j = 0; j < board[0].length; j++) {
+                if (check(i, j, 0, board, word, visited)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+
+    public static boolean check(int i, int j, int k, char[][] board, String word, boolean[][] visited) {
+        if (board[i][j] != word.charAt(k)){
+            return false;
+        }
+        if (word.length() - 1 == k){
+            return true;
+        }
+
+        visited[i][j] = true;
+
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        boolean result = false;
+        for (int[] direction : directions) {
+            int newRow = i + direction[0];
+            int newCol = j + direction[1];
+
+            // 判断是否超出4个边界
+            if (newRow < 0 || newCol < 0 || newRow >= board.length || newCol >= board[0].length){
+                continue;
+            }
+
+            // 走回头路了
+            if (visited[newRow][newCol]){
+                continue;
+            }
+
+            if (check(newRow, newCol, k + 1, board, word, visited)){
+                result = true;
+                break;
+            }
+        }
+
+        visited[i][j] = false;
+        return result;
+    }
+```
+
+
 
 
 
