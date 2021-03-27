@@ -4244,7 +4244,7 @@ class Solution {
 
 
 
-# [96. 不同的二叉搜索树](https://leetcode-cn.com/problems/unique-binary-search-trees/)
+# [96. 不同的二叉搜索树](https://leetcode-cn.com/problems/unique-binary-search-trees/) :new_moon_with_face: !!!
 
 给定一个整数 *n*，求以 1 ... *n* 为节点组成的二叉搜索树有多少种？
 
@@ -4262,6 +4262,107 @@ class Solution {
     /     /       \                 \
    2     1         2                 3
 ```
+
+
+
+需要先搞清楚二叉搜索树的概念：
+
+二叉查找树(Binary Search Tree)，又被称为二叉搜索树。设x为二叉查找树中的一个结点，x节点包含关键字key，节点x的key值记为key[x]。如果y是x的左子树中的一个结点，则key[y] <= key[x]；如果y是x的右子树的一个结点，则key[y] >= key[x]。
+
+1. 若任意节点的左子树不空，则左子树上所有结点的值均小于它的根结点的值；
+2. 任意节点的右子树不空，则右子树上所有结点的值均大于它的根结点的值；
+3. 任意节点的左、右子树也分别为二叉查找树。
+4. 没有键值相等的节点（no duplicate nodes）。
+5. 所有结点存储一个关键字。
+
+
+
+思路
+
+难度较大
+
+想法还是深度优先，由于二叉搜索树的特性，对所有枚举的可能做一个剪枝，同时建立一个visit数组存放已经使用过的数字。
+
+官方给出的思路为dp，题目是真的比较阴间，自己从零开始想思路会比较难。
+
+由于二叉搜索树的特性，可以保证同样的数字顺序，只能构建一棵二叉搜索树。
+
+构建dp函数，$F(i,n)$，以i节点为根，n为长度，构建出来的二叉搜索树的个数。那么就等于i的左子树的所有可能个数*i的右子树的可能个数。
+
+
+
+**方法一：动态规划**
+
+**思路**
+
+给定一个有序序列 $1⋯n1$，为了构建出一棵二叉搜索树，我们可以遍历每个数字 i，将该数字作为树根，将 $1⋯(i−1)$ 序列作为左子树，将 $(i+1) \cdots n$ 序列作为右子树。接着我们可以按照同样的方式递归构建左子树和右子树。
+
+在上述构建的过程中，由于根的值不同，因此我们能保证每棵二叉搜索树是唯一的。
+
+由此可见，原问题可以分解成规模较小的两个子问题，且子问题的解可以复用。因此，我们可以想到使用动态规划来求解本题。
+
+**算法**
+
+题目要求是计算不同二叉搜索树的个数。为此，我们可以定义两个函数：
+
+1. $G(n)$: 长度为 n 的序列能构成的不同二叉搜索树的个数。
+2. $F(i, n)$: 以 i 为根、序列长度为 n 的不同二叉搜索树个数 $(1 \leq i \leq n)$。
+
+可见，$G(n)$ 是我们求解需要的函数。
+
+稍后我们将看到，$G(n)$ 可以从 $F(i, n)$ 得到，而 $F(i, n)$ 又会递归地依赖于 $G(n)$。
+
+首先，根据上一节中的思路，不同的二叉搜索树的总数 $G(n)$，是对遍历所有 $i (1 \le i \le n)$ 的 $F(i, n)$ 之和。换言之：
+
+$$
+G(n)=\sum_{i=1}^{n}F(i,n)
+$$
+对于边界情况，当序列长度为 1（只有根）或为 0（空树）时，只有一种情况，即：
+$$
+G(0)=1,G(1)=1
+$$
+给定序列 $1 \cdots n$，我们选择数字 i 作为根，则根为 i 的所有二叉搜索树的集合是左子树集合和右子树集合的笛卡尔积，对于笛卡尔积中的每个元素，加上根节点之后形成完整的二叉搜索树，如下图所示：
+
+<img src="截图/leetCode/96_fig1.png" alt="fig1" style="zoom: 33%;" />
+
+举例而言，创建以 3 为根、长度为 7 的不同二叉搜索树，整个序列是 $[1, 2, 3, 4, 5, 6, 7]$，我们需要从左子序列 $[1, 2]$构建左子树，从右子序列 $[4, 5, 6, 7]$构建右子树，然后将它们组合（即笛卡尔积）。
+
+对于这个例子，不同二叉搜索树的个数为 $F(3, 7)$。我们将 $[1,2]$ 构建不同左子树的数量表示为 $G(2)$, 从 $[4, 5, 6, 7]$ 构建不同右子树的数量表示为 $G(4)$，注意到 $G(n)$ 和序列的内容无关，只和序列的长度有关。于是，$F(3,7) = G(2) \cdot G(4)$。 因此，我们可以得到以下公式：
+
+$$
+F(i,n)=G(i−1)⋅G(n−i)
+$$
+将公式结合，可以得到 $G(n)$ 的递归表达式：
+$$
+G(n)=\sum_{i=1}^{n}G(i−1)⋅G(n−i)
+$$
+至此，我们从小到大计算 G 函数即可，因为 $G(n)$ 的值依赖于 $G(0) \cdots G(n-1)$。
+
+```java
+class Solution {
+    public int numTrees(int n) {
+        int[] G = new int[n + 1];
+        G[0] = 1;
+        G[1] = 1;
+
+        for (int i = 2; i <= n; ++i) {
+            for (int j = 1; j <= i; ++j) {
+                G[i] += G[j - 1] * G[i - j];
+            }
+        }	
+        return G[n];
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/unique-binary-search-trees/solution/bu-tong-de-er-cha-sou-suo-shu-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
 
 
 
@@ -4344,7 +4445,139 @@ class Solution {
 
 
 
+思考
 
+这个没什么好想的了，直接枚举吧。
+
+递归
+
+```java
+    public boolean isSymmetric(TreeNode root) {
+        if (root == null) return true;
+        return check(root.left, root.right);
+    }
+
+
+    public boolean check(TreeNode left, TreeNode right){
+        if (left == null && right == null) {
+            return true;
+        }
+        if (left == null || right == null) return false;
+        if (right.val != left.val) return false;
+        if (check(left.left, right.right)) {
+             return check(left.right, right.left);
+        }
+        return false;
+    }
+```
+
+
+
+迭代
+
+```java
+    public static boolean isSymmetric2(TreeNode root) {
+        if (root == null) return true;
+
+        Stack<TreeNode> stack = new Stack<>();
+
+        TreeNode left = root.left;
+        TreeNode right = root.right;
+        while (!stack.empty() || left != null || right != null){
+            if (left == null && right == null) {
+                right = stack.pop();
+                left = stack.pop();
+
+                left = left.right;
+                right = right.left;
+                continue;
+            }
+
+            if (left == null || right == null) return false;
+            if (right.val != left.val) return false;
+
+            stack.push(left);
+            stack.push(right);
+
+            left = left.left;
+            right = right.right;
+        }
+
+        return true;
+    }
+```
+
+
+
+官方的写法非常漂亮
+
+递归
+
+```java
+class Solution {
+    public boolean isSymmetric(TreeNode root) {
+        return check(root, root);
+    }
+
+    public boolean check(TreeNode p, TreeNode q) {
+        if (p == null && q == null) {
+            return true;
+        }
+        if (p == null || q == null) {
+            return false;
+        }
+      	// 这里利用了&&的特性，少些了很多if else
+        return p.val == q.val && check(p.left, q.right) && check(p.right, q.left);
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/symmetric-tree/solution/dui-cheng-er-cha-shu-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+迭代
+
+```java
+class Solution {
+    public boolean isSymmetric(TreeNode root) {
+        return check(root, root);
+    }
+
+    public boolean check(TreeNode u, TreeNode v) {
+        Queue<TreeNode> q = new LinkedList<TreeNode>();
+        q.offer(u);
+        q.offer(v);
+        while (!q.isEmpty()) {
+            u = q.poll();
+            v = q.poll();
+            if (u == null && v == null) {
+                continue;
+            }
+            if ((u == null || v == null) || (u.val != v.val)) {
+                return false;
+            }
+
+            q.offer(u.left);
+            q.offer(v.right);
+
+            q.offer(u.right);
+            q.offer(v.left);
+        }
+        return true;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/symmetric-tree/solution/dui-cheng-er-cha-shu-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+利用队列，进行广度优先遍历，这种写法更加的明了。
 
 
 
@@ -4595,6 +4828,32 @@ class Solution {
 
 
 
+思考：
+
+顺序遍历数组，用一个Set存储已经重复的。
+
+不适用额外空间的话
+
+- 先排序，再遍历，时间复杂度为$O（logn + n）$
+
+
+
+```java
+    public int singleNumber(int[] nums) {
+        Set<Integer> set = new HashSet<>();
+
+        for (int num : nums) {
+            if (set.contains(num)) {
+                set.remove(num);
+            }else {
+                set.add(num);
+            }
+        }
+
+        return set.iterator().next();
+    }
+```
+
 
 
 官方
@@ -4646,40 +4905,6 @@ class Solution {
 来源：力扣（LeetCode）
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 ```
-
-
-
-
-
-
-
-思考：
-
-顺序遍历数组，用一个Set存储已经重复的。
-
-不适用额外空间的话
-
-- 先排序，再遍历，时间复杂度为$O（logn + n）$
-
-
-
-```java
-    public int singleNumber(int[] nums) {
-        Set<Integer> set = new HashSet<>();
-
-        for (int num : nums) {
-            if (set.contains(num)) {
-                set.remove(num);
-            }else {
-                set.add(num);
-            }
-        }
-
-        return set.iterator().next();
-    }
-```
-
-
 
 
 
