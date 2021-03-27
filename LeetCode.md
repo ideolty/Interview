@@ -1,12 +1,9 @@
 # 综述
 
 - 按照热榜排序，目的是记录一下常问的LeetCode题目。
-
 - cn与com都会涉及。
-
 - 先把简单与中等的处理了，最后再处理困难
-
-- :star: — 金典题|:fearful: — hard题
+- :star: — 金典题|:fearful: — hard题|:new_moon_with_face:  —​ 脑筋急转弯、数学降维、其他思想降维、各种降维打击
 
 所有题目来源：力扣（LeetCode）
 著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
@@ -4095,8 +4092,133 @@ class Solution {
 
  
 
-
 进阶: 递归算法很简单，你可以通过迭代算法完成吗？
+
+
+
+**遍历** - 遍历分为3种，**中序遍历**，**前序遍历**，**后序遍历**。
+
+1. **前序遍历**
+
+   若二叉树非空，则执行以下操作：
+   ① 访问根结点；
+   ② 先序遍历左子树；
+   ③ 先序遍历右子树。
+
+2. **中序遍历**
+
+   ① 中序遍历左子树；
+   ② 访问根结点；
+   ③ 中序遍历右子树。
+
+3. **后序遍历**
+
+   ① 后序遍历左子树；
+   ② 后序遍历右子树；
+   ③ 访问根结点。
+
+
+
+这个序就是指的，访问根节点的顺序。
+
+递归标准写法
+
+```java
+    public List<Integer> inorderTraversal(TreeNode root) {
+        List<Integer> result = new ArrayList<>();
+        visit(root, result);
+        return result;
+    }
+
+    public void visit(TreeNode root, List<Integer> result) {
+        if (root == null) {
+            return;
+        }
+
+        visit(root.left, result);
+        result.add(root.val);
+        visit(root.right, result);
+    }
+```
+
+迭代，就是要自己模拟递归时候的栈。需要把握好，入栈的实际与指针节点的移动。
+
+```java
+public static List<Integer> inorderTraversal(TreeNode root) {
+    List<Integer> result = new ArrayList<>();
+    Stack<TreeNode> stack = new Stack<>();
+    TreeNode node = root;
+
+    while (!stack.empty() || node != null){
+        if (node != null){
+            stack.push(node);
+            node = node.left;
+            continue;
+        }
+
+        node = stack.pop();
+        result.add(node.val);
+        node = node.right;
+    }
+
+    return result;
+}
+```
+
+
+
+官方
+
+**方法三：Morris 中序遍历**
+
+比较绕
+
+
+
+```java
+class Solution {
+    public List<Integer> inorderTraversal(TreeNode root) {
+        List<Integer> res = new ArrayList<Integer>();
+        TreeNode predecessor = null;
+
+        while (root != null) {
+            if (root.left != null) {
+                // predecessor 节点就是当前 root 节点向左走一步，然后一直向右走至无法走为止
+                predecessor = root.left;
+                while (predecessor.right != null && predecessor.right != root) {
+                    predecessor = predecessor.right;
+                }
+                
+                // 让 predecessor 的右指针指向 root，继续遍历左子树
+                if (predecessor.right == null) {
+                    predecessor.right = root;
+                    root = root.left;
+                }
+                // 说明左子树已经访问完了，我们需要断开链接
+                else {
+                    res.add(root.val);
+                    predecessor.right = null;
+                    root = root.right;
+                }
+            }
+            // 如果没有左孩子，则直接访问右孩子
+            else {
+                res.add(root.val);
+                root = root.right;
+            }
+        }
+        return res;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/binary-tree-inorder-traversal/solution/er-cha-shu-de-zhong-xu-bian-li-by-leetcode-solutio/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
 
 
 
@@ -4429,7 +4551,7 @@ class Solution {
 
 
 
-# [136. 只出现一次的数字](https://leetcode-cn.com/problems/single-number/)
+# [136. 只出现一次的数字](https://leetcode-cn.com/problems/single-number/) :new_moon_with_face:
 
 给定一个非空整数数组，除了某个元素只出现一次以外，其余每个元素均出现两次。找出那个只出现了一次的元素。
 
@@ -4448,6 +4570,96 @@ class Solution {
 输入: [4,1,2,1,2]
 输出: 4
 ```
+
+
+
+
+
+官方
+
+**方法一：位运算**
+
+如果不考虑时间复杂度和空间复杂度的限制，这道题有很多种解法，可能的解法有如下几种。
+
+1. 使用集合存储数字。遍历数组中的每个数字，如果集合中没有该数字，则将该数字加入集合，如果集合中已经有该数字，则将该数字从集合中删除，最后剩下的数字就是只出现一次的数字。
+
+2. 使用哈希表存储每个数字和该数字出现的次数。遍历数组即可得到每个数字出现的次数，并更新哈希表，最后遍历哈希表，得到只出现一次的数字。
+
+3. 使用集合存储数组中出现的所有数字，并计算数组中的元素之和。由于集合保证元素无重复，因此计算集合中的所有元素之和的两倍，即为每个元素出现两次的情况下的元素之和。由于数组中只有一个元素出现一次，其余元素都出现两次，因此用集合中的元素之和的两倍减去数组中的元素之和，剩下的数就是数组中只出现一次的数字。
+
+上述三种解法都需要额外使用 O(n) 的空间，其中 n 是数组长度。
+
+如何才能做到线性时间复杂度和常数空间复杂度呢？
+
+答案是使用位运算。对于这道题，可使用异或运算 $\oplus$。异或运算有以下三个性质。
+
+1. 任何数和 0 做异或运算，结果仍然是原来的数，即 $a⊕0=a$。
+2. 任何数和其自身做异或运算，结果是 0，即 $a⊕a=0$。
+3. 异或运算满足交换律和结合律，即 $a⊕b⊕a=b⊕a⊕a=b⊕(a⊕a)=b⊕0=ba$
+
+假设数组中有 $2m+1$ 个数，其中有 m 个数各出现两次，一个数出现一次。令 $a1$、$a2$、$\ldots$、$a_{m}$ 为出现两次的 m 个数，$a_{m+1}$ 为出现一次的数。根据性质 3，数组中的全部元素的异或运算结果总是可以写成如下形式：
+
+$(a_{1} \oplus a_{1}) \oplus (a_{2} \oplus a_{2}) \oplus \cdots \oplus (a_{m} \oplus a_{m}) \oplus a_{m+1} $
+
+根据性质 2 和性质 1，上式可化简和计算得到如下结果：
+
+$0 \oplus 0 \oplus \cdots \oplus 0 \oplus a_{m+1}=a_{m+1} $
+
+因此，数组中的全部元素的异或运算结果即为数组中只出现一次的数字。
+
+```java
+class Solution {
+    public int singleNumber(int[] nums) {
+        int single = 0;
+        for (int num : nums) {
+            single ^= num;
+        }
+        return single;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/single-number/solution/zhi-chu-xian-yi-ci-de-shu-zi-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
+思考：
+
+顺序遍历数组，用一个Set存储已经重复的。
+
+不适用额外空间的话
+
+- 先排序，再遍历，时间复杂度为$O（logn + n）$
+
+
+
+```java
+    public int singleNumber(int[] nums) {
+        Set<Integer> set = new HashSet<>();
+
+        for (int num : nums) {
+            if (set.contains(num)) {
+                set.remove(num);
+            }else {
+                set.add(num);
+            }
+        }
+
+        return set.iterator().next();
+    }
+```
+
+
+
+
 
 
 
