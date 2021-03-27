@@ -4611,6 +4611,88 @@ class Solution {
 
 
 
+没什么好想的，基础题bfs的实现
+
+```java
+public List<List<Integer>> levelOrder(TreeNode root) {
+        Queue<TreeNode> arrayDeque = new LinkedList<>();
+        arrayDeque.offer(root);
+        int next = 1;
+        List<List<Integer>> result = new ArrayList<>();
+        if (root == null) return result;
+
+        while (!arrayDeque.isEmpty()){
+            List<Integer> list = new ArrayList<>();
+
+            int cur = next;
+            next = 0;
+            while (cur-- > 0) {
+                TreeNode node = arrayDeque.poll();
+                if (node.left != null){
+                    next++;
+                    arrayDeque.offer(node.left);
+                }
+                if (node.right != null){
+                    next++;
+                    arrayDeque.offer(node.right);
+                }
+                list.add(node.val);
+            }
+            result.add(list);
+        }
+        return result;
+    }
+```
+
+
+
+官方
+
+```java
+class Solution {
+    public List<List<Integer>> levelOrder(TreeNode root) {
+        List<List<Integer>> ret = new ArrayList<List<Integer>>();
+        if (root == null) {
+            return ret;
+        }
+
+        Queue<TreeNode> queue = new LinkedList<TreeNode>();
+        queue.offer(root);
+        while (!queue.isEmpty()) {
+            List<Integer> level = new ArrayList<Integer>();
+            int currentLevelSize = queue.size();
+            for (int i = 1; i <= currentLevelSize; ++i) {
+                TreeNode node = queue.poll();
+                level.add(node.val);
+                if (node.left != null) {
+                    queue.offer(node.left);
+                }
+                if (node.right != null) {
+                    queue.offer(node.right);
+                }
+            }
+            ret.add(level);
+        }
+        
+        return ret;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/binary-tree-level-order-traversal/solution/er-cha-shu-de-ceng-xu-bian-li-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
+
+
 # [104. 二叉树的最大深度](https://leetcode-cn.com/problems/maximum-depth-of-binary-tree/)
 
 
