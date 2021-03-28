@@ -4830,7 +4830,7 @@ class Solution {
 
 
 
-# [114. 二叉树展开为链表](https://leetcode-cn.com/problems/flatten-binary-tree-to-linked-list/)
+# [114. 二叉树展开为链表 ](https://leetcode-cn.com/problems/flatten-binary-tree-to-linked-list/) :star:
 
 给你二叉树的根结点 root ，请你将它展开为一个单链表：
 
@@ -4864,6 +4864,121 @@ class Solution {
 提示：
 - 树中结点数在范围 [0, 2000] 内
 - -100 <= Node.val <= 100
+
+**进阶：**你可以使用原地算法（`O(1)` 额外空间）展开这棵树吗？
+
+
+
+思考
+
+既然题目要求是需要先序的顺序排，那么就先序遍历，把每个节点存在list里面，最后遍历list的节点，维护树形关系。
+
+```java
+    public void flatten(TreeNode root) {
+        List<TreeNode> list = new ArrayList<>();
+                
+        visit(root, list);
+        for (int i = 1; i < list.size(); i++) {
+            TreeNode pre = list.get(i - 1);
+            TreeNode cur = list.get(i);
+            pre.left = null;
+            pre.right = cur;
+        }
+    }
+
+    public static void visit(TreeNode root, List<TreeNode> list){
+        if (root == null) return;
+
+        list.add(root);
+        visit(root.left, list);
+        visit(root.right, list);
+    }
+```
+
+常数级额外空间的没想到。
+
+
+
+官方
+
+方法一：前序遍历
+
+方法二：前序遍历和展开同步进行
+
+```java
+class Solution {
+    public void flatten(TreeNode root) {
+        if (root == null) {
+            return;
+        }
+        Deque<TreeNode> stack = new LinkedList<TreeNode>();
+        stack.push(root);
+        TreeNode prev = null;
+        while (!stack.isEmpty()) {
+            TreeNode curr = stack.pop();
+            if (prev != null) {
+                prev.left = null;
+                prev.right = curr;
+            }
+            TreeNode left = curr.left, right = curr.right;
+            if (right != null) {
+                stack.push(right);
+            }
+            if (left != null) {
+                stack.push(left);
+            }
+            prev = curr;
+        }
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/flatten-binary-tree-to-linked-list/solution/er-cha-shu-zhan-kai-wei-lian-biao-by-leetcode-solu/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+方法三：寻找前驱节点
+
+前两种方法都借助前序遍历，前序遍历过程中需要使用栈存储节点。有没有空间复杂度是 O(1)O(1)O(1) 的做法呢？
+
+注意到前序遍历访问各节点的顺序是根节点、左子树、右子树。如果一个节点的左子节点为空，则该节点不需要进行展开操作。如果一个节点的左子节点不为空，则该节点的左子树中的最后一个节点被访问之后，该节点的右子节点被访问。该节点的左子树中最后一个被访问的节点是左子树中的最右边的节点，也是该节点的前驱节点。因此，问题转化成寻找当前节点的前驱节点。
+
+具体做法是，对于当前节点，如果其左子节点不为空，则在其左子树中找到最右边的节点，作为前驱节点，将当前节点的右子节点赋给前驱节点的右子节点，然后将当前节点的左子节点赋给当前节点的右子节点，并将当前节点的左子节点设为空。对当前节点处理结束后，继续处理链表中的下一个节点，直到所有节点都处理结束。
+
+```java
+class Solution {
+    public void flatten(TreeNode root) {
+        TreeNode curr = root;
+        while (curr != null) {
+            if (curr.left != null) {
+                TreeNode next = curr.left;
+                TreeNode predecessor = next;
+                while (predecessor.right != null) {
+                    predecessor = predecessor.right;
+                }
+                predecessor.right = curr.right;
+                curr.left = null;
+                curr.right = next;
+            }
+            curr = curr.right;
+        }
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/flatten-binary-tree-to-linked-list/solution/er-cha-shu-zhan-kai-wei-lian-biao-by-leetcode-solu/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+其实第二种与第三种有异曲同工之处，第二种右子树使用栈来存储，第三种更加直接，使用左子树的最后一个叶子节点来存。
 
 
 
