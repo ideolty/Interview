@@ -3163,6 +3163,35 @@ class Solution {
 - 如果结果小于0，则抛弃之前的数组，从0开始重新计数。
 - 如果大于0，则与最大值进行比较，之后继续往后遍历
 
+```java
+    public int maxSubArray(int[] nums) {
+        if (nums.length == 1) return nums[0];
+
+        int max = nums[0];
+        int sum = 0;
+
+        for (int i = 0; i < nums.length; i++) {
+            int cur = nums[i];
+            if (cur < 0) {
+                if ((sum + cur) < 0) {
+                    sum = 0;
+                    max = Math.max(max, cur);
+                }else {
+                    sum = sum + cur;
+                }
+            }else {
+                if ((sum + cur) > 0) {
+                    sum = sum + cur;
+                }else {
+                    sum = cur;
+                }
+                max = Math.max(max, sum);
+            }
+        }
+        return max;
+    }
+```
+
 
 
 
@@ -3184,7 +3213,7 @@ $$
 $$
 \max \{ f(i-1) + \textit{nums}[i], \textit{nums}[i] \}
 $$
-不难给出一个时间复杂度 $O(n)$、空间复杂度 $O(n)$ 的实现，即用一个 fff 数组来保存 $f(i)$ 的值，用一个循环求出所有 $f(i)$。考虑到 $f(i)$ 只和 $f(i−1)$ 相关，于是我们可以只用一个变量 $\textit{pre}$ 来维护对于当前 $f(i)$ 的 $f(i−1)$ 的值是多少，从而让空间复杂度降低到 $O(1)$，这有点类似「滚动数组」的思想。
+不难给出一个时间复杂度 $O(n)$、空间复杂度 $O(n)$ 的实现，即用一个 f 数组来保存 $f(i)$ 的值，用一个循环求出所有 $f(i)$。考虑到 $f(i)$ 只和 $f(i−1)$ 相关，于是我们可以只用一个变量 $\textit{pre}$ 来维护对于当前 $f(i)$ 的 $f(i−1)$ 的值是多少，从而让空间复杂度降低到 $O(1)$，这有点类似「滚动数组」的思想。
 
 ```java
 class Solution {
@@ -3204,6 +3233,8 @@ class Solution {
 来源：力扣（LeetCode）
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 ```
+
+想法好，上面的代码有多种解释，很简洁，需要背一下
 
 
 
