@@ -2427,6 +2427,109 @@ class Solution {
 
 
 
+# [35. 搜索插入位置](https://leetcode-cn.com/problems/search-insert-position/)
+
+给定一个排序数组和一个目标值，在数组中找到目标值，并返回其索引。如果目标值不存在于数组中，返回它将会被按顺序插入的位置。
+
+你可以假设数组中无重复元素。
+
+示例 1:
+```
+输入: [1,3,5,6], 5
+输出: 2
+```
+
+示例 2:
+```
+输入: [1,3,5,6], 2
+输出: 1
+```
+
+示例 3:
+```
+输入: [1,3,5,6], 7
+输出: 4
+```
+
+示例 4:
+```
+输入: [1,3,5,6], 0
+输出: 0
+```
+
+
+
+顺序查是最好写的，有序二分效率是最高的
+
+```java
+    public static int searchInsert(int[] nums, int target) {
+        int left = 0;
+        int right = nums.length - 1;
+        if (target < nums[0]) {
+            return 0;
+        }
+
+        if (target > nums[right]) {
+            return nums.length;
+        }
+
+        while (left <= right) {
+            if (left + 1 == right) {
+                if (nums[left] == target) {
+                    return left;
+                } else if (nums[right] == target) {
+                    return right;
+                } else {
+                    return left + 1;
+                }
+            }
+
+            int mid = (left + right) / 2;
+            if (nums[mid] == target) {
+                return mid;
+            }
+
+            if (target > nums[mid]) {
+                left = mid;
+                continue;
+            }
+
+            if (target < nums[mid]) {
+                right = mid;
+            }
+        }
+
+        return -1;
+    }
+```
+
+写的太复杂了，需要优化写法。
+
+
+
+评论区的简单写法
+
+他不去判断`nums[mid]`是否与target相等了，只判断相对大小。
+
+```java
+    public static int searchInsert(int[] nums, int target) {
+        int n = nums.length;
+        int l = 0, r = n - 1;
+        while (l <= r) {
+            int mid = l + (r - l) / 2;
+            if (nums[mid] < target)
+                l = mid + 1;
+            else r = mid - 1;
+        }
+        return l;
+    }
+```
+
+
+
+
+
+
 # [39. 组合总和](https://leetcode-cn.com/problems/combination-sum/)
 
 给定一个无重复元素的数组 `candidates` 和一个目标数 `target` ，找出 `candidates` 中所有可以使数字和为 `target` 的组合。
@@ -4802,7 +4905,7 @@ class Solution {
 
 
 
-# [105. 从前序与中序遍历序列构造二叉树](https://leetcode-cn.com/problems/construct-binary-tree-from-preorder-and-inorder-traversal/)
+# [105. 从前序与中序遍历序列构造二叉树](https://leetcode-cn.com/problems/construct-binary-tree-from-preorder-and-inorder-traversal/) :star:
 
 根据一棵树的前序遍历与中序遍历构造二叉树。
 
@@ -4813,7 +4916,7 @@ class Solution {
 
 ```
 前序遍历 preorder = [3,9,20,15,7]
-中序遍历 inorder = [9,3,15,20,7]`
+中序遍历 inorder = [9,3,15,20,7]
 ```
 
 
@@ -4825,6 +4928,130 @@ class Solution {
       9  20
         /  \
        15   7
+
+
+
+这个是真的基础能力了，比较重要，需要掌握思路。
+
+从例子看，根据前序，可以判断出根节点为3，拿到3去中序中，可以划分出左右子树为[9]，[15,20,7]两部分，然后依次类推。
+
+没自己写，请默写官方例子。
+
+
+
+官方
+
+**方法一：递归**
+
+思路
+
+对于任意一颗树而言，前序遍历的形式总是
+
+**`[ 根节点, [左子树的前序遍历结果], [右子树的前序遍历结果] ]`**
+
+即根节点总是前序遍历中的第一个节点。而中序遍历的形式总是
+
+**`[ [左子树的中序遍历结果], 根节点, [右子树的中序遍历结果] ]`**
+
+只要我们在中序遍历中定位到根节点，那么我们就可以分别知道左子树和右子树中的节点数目。由于同一颗子树的前序遍历和中序遍历的长度显然是相同的，因此我们就可以对应到前序遍历的结果中，对上述形式中的所有左右括号进行定位。
+
+这样以来，我们就知道了左子树的前序遍历和中序遍历结果，以及右子树的前序遍历和中序遍历结果，我们就可以递归地对构造出左子树和右子树，再将这两颗子树接到根节点的左右位置。
+
+**细节**
+
+在中序遍历中对根节点进行定位时，一种简单的方法是直接扫描整个中序遍历的结果并找出根节点，但这样做的时间复杂度较高。我们可以考虑使用哈希表来帮助我们快速地定位根节点。对于哈希映射中的每个键值对，键表示一个元素（节点的值），值表示其在中序遍历中的出现位置。在构造二叉树的过程之前，我们可以对中序遍历的列表进行一遍扫描，就可以构造出这个哈希映射。在此后构造二叉树的过程中，我们就只需要 $O(1)$ 的时间对根节点进行定位了。
+
+下面的代码给出了详细的注释。
+
+```java
+class Solution {
+    private Map<Integer, Integer> indexMap;
+
+    public TreeNode myBuildTree(int[] preorder, int[] inorder, int preorder_left, int preorder_right, int inorder_left, int inorder_right) {
+        if (preorder_left > preorder_right) {
+            return null;
+        }
+
+        // 前序遍历中的第一个节点就是根节点
+        int preorder_root = preorder_left;
+        // 在中序遍历中定位根节点
+        int inorder_root = indexMap.get(preorder[preorder_root]);
+        
+        // 先把根节点建立出来
+        TreeNode root = new TreeNode(preorder[preorder_root]);
+        // 得到左子树中的节点数目
+        int size_left_subtree = inorder_root - inorder_left;
+        // 递归地构造左子树，并连接到根节点
+        // 先序遍历中「从 左边界+1 开始的 size_left_subtree」个元素就对应了中序遍历中「从 左边界 开始到 根节点定位-1」的元素
+        root.left = myBuildTree(preorder, inorder, preorder_left + 1, preorder_left + size_left_subtree, inorder_left, inorder_root - 1);
+        // 递归地构造右子树，并连接到根节点
+        // 先序遍历中「从 左边界+1+左子树节点数目 开始到 右边界」的元素就对应了中序遍历中「从 根节点定位+1 到 右边界」的元素
+        root.right = myBuildTree(preorder, inorder, preorder_left + size_left_subtree + 1, preorder_right, inorder_root + 1, inorder_right);
+        return root;
+    }
+
+    public TreeNode buildTree(int[] preorder, int[] inorder) {
+        int n = preorder.length;
+        // 构造哈希映射，帮助我们快速定位根节点
+        indexMap = new HashMap<Integer, Integer>();
+        for (int i = 0; i < n; i++) {
+            indexMap.put(inorder[i], i);
+        }
+        return myBuildTree(preorder, inorder, 0, n - 1, 0, n - 1);
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/construct-binary-tree-from-preorder-and-inorder-traversal/solution/cong-qian-xu-yu-zhong-xu-bian-li-xu-lie-gou-zao-9/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+**方法二：迭代**
+
+比较复杂，暂时不看
+
+
+
+
+
+评论区一个很简洁的写法
+
+```java
+class Solution {
+    int pre = 0, in = 0;
+    public TreeNode buildTree(int[] preorder, int[] inorder) {
+        return recursive(preorder, inorder, Integer.MAX_VALUE);
+    }
+    
+    public TreeNode recursive(int[] preorder, int[] inorder, int stop) {
+        if (pre >= preorder.length) return null;
+        if (inorder[in] == stop) {
+            in++;
+            return null;
+        }
+        int curVal = preorder[pre++];
+        TreeNode cur = new TreeNode(curVal);
+        cur.left = recursive(preorder, inorder, curVal);
+        cur.right = recursive(preorder, inorder, stop);
+        return cur;
+    }
+}
+https://leetcode-cn.com/problems/construct-binary-tree-from-preorder-and-inorder-traversal/solution/cong-qian-xu-yu-zhong-xu-bian-li-xu-lie-gou-zao-9/423117
+```
+
+
+
+> ####  为什么前序与后序不能构建出唯一的二叉树？
+
+直觉上看，前序与后序记录了层级关系，中序记录了左右关系。严格的证明还没找到。
+
+
+
+一些参考
+
+[关于二叉树先序遍历和后序遍历为什么不能唯一确定一个二叉树分析](https://blog.csdn.net/suliangkuanjiayou/article/details/102960971)
 
 
 
