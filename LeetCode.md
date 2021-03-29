@@ -1419,7 +1419,7 @@ class Solution {
 
 
 
-# [22. 括号生成](https://leetcode-cn.com/problems/generate-parentheses/)
+# [22. 括号生成](https://leetcode-cn.com/problems/generate-parentheses/) :star:
 
 数字 `n` 代表生成括号的对数，请你设计一个函数，用于能够生成所有可能的并且 **有效的** 括号组合。
 
@@ -1444,6 +1444,40 @@ class Solution {
 
 
 第一直觉就是动态规划。
+
+评论区高赞的思路
+
+```java
+class Solution {
+    private List<String> res = new ArrayList<>();
+
+    public List<String> generateParenthesis(int n) {
+        dfs("", n, n);
+        return res;
+    }
+
+    public void dfs(String str, int left, int right){
+        if (left == 0 && right == 0){
+            res.add(str);
+            return;
+        }
+
+        if (left == right){
+            dfs(str + "(", left - 1, right);
+        // 这里当本次dfs弹出后(())会有个类似的结构，此时要弹出了，不能给有括号了
+        }else {// <- 就右边这个if，可以没有
+          	// 按照当前的递归，当左右括号相等时都是先给个左括号了
+          	// 剩余的左括号数永远都是少于右括号数的
+            if (left > 0){
+                dfs(str + "(", left - 1, right);
+            }
+            dfs(str + ")", left, right - 1);
+        }
+    }
+}
+```
+
+
 
 
 
@@ -1536,6 +1570,8 @@ public class Solution {
             if (curNode.left > 0) {
                 queue.offer(new Node(curNode.res + "(", curNode.left - 1, curNode.right));
             }
+          	// 由于是先dfs的左边括号，按理来说 curNode.left < curNode.right 一直都是成立的
+          	// 写 curNode.left != curNode.right 保证相等的时候左边先放就行了
             if (curNode.right > 0 && curNode.left < curNode.right) {
                 queue.offer(new Node(curNode.res + ")", curNode.left, curNode.right - 1));
             }
