@@ -5341,7 +5341,7 @@ class Solution {
 
 给定一个数组 prices ，它的第 i 个元素 prices[i] 表示一支给定股票第 i 天的价格。
 
-你只能选择 某一天 买入这只股票，并选择在 未来的某一个不同的日子 卖出该股票。设计一个算法来计算你所能获取的最大利润。
+你只能选择 **某一天** 买入这只股票，并选择在 **未来的某一个不同的日子** 卖出该股票。设计一个算法来计算你所能获取的最大利润。
 
 返回你可以从这笔交易中获取的最大利润。如果你不能获取任何利润，返回 0 。
 
@@ -5372,6 +5372,85 @@ class Solution {
 
 - 1 <= prices.length <= 105
 - 0 <= prices[i] <= 104
+
+
+
+思考
+
+注意到例子一，输出为5，说明只允许操作一手，不允许多次买卖。
+
+第一个想法是dfs，遍历数组记录，记录目前遍历的最小值，记录 `当前最大利润 = Math.max(历史最大利润, 今天卖出价 - 买进的最低价)​`
+
+```java
+    public int maxProfit(int[] prices) {
+        int min = prices[0];
+        int max = 0;
+
+        for (int price : prices) {
+            max = Math.max(price - min, max);
+            min = Math.min(min, price);
+        }
+
+        return max;
+    }
+```
+
+
+
+
+
+
+
+评论区
+
+思路还是挺清晰的，还是DP思想：
+
+1. 记录【今天之前买入的最小值】
+2. 计算【今天之前最小值买入，今天卖出的获利】，也即【今天卖出的最大获利】
+3. 比较【每天的最大获利】，取最大值即可
+
+```java
+class Solution {
+    public int maxProfit(int[] prices) {
+        if(prices.length <= 1)
+            return 0;
+        int min = prices[0], max = 0;
+        for(int i = 1; i < prices.length; i++) {
+            max = Math.max(max, prices[i] - min);
+            min = Math.min(min, prices[i]);
+        }
+        return max;
+    }
+}
+https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock/comments/73905
+```
+
+
+
+评论区2
+
+推荐阅读  [@stormsunshine](https://leetcode-cn.com/u/stormsunshine/)  编写的文章《[股票问题系列通解（转载翻译）](https://leetcode-cn.com/circle/article/qiAgHn/)》；
+
+| 题号                                                         | 题解                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [121. 买卖股票的最佳时机](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock) | [暴力解法、动态规划（Java）](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock/solution/bao-li-mei-ju-dong-tai-gui-hua-chai-fen-si-xiang-b/) |
+| [122. 买卖股票的最佳时机 II](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-ii) | [暴力搜索、贪心算法、动态规划（Java）](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-ii/solution/tan-xin-suan-fa-by-liweiwei1419-2/) |
+| [123. 买卖股票的最佳时机 III](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-iii) | [动态规划（Java）](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-iii/solution/dong-tai-gui-hua-by-liweiwei1419-7/) |
+| [188. 买卖股票的最佳时机 IV](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-iv) | [动态规划（「力扣」更新过用例，只有优化空间的版本可以 AC）](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-iv/solution/dong-tai-gui-hua-by-liweiwei1419-4/) |
+| [309. 最佳买卖股票时机含冷冻期](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-with-cooldown) | [动态规划（Java）](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-with-cooldown/solution/dong-tai-gui-hua-by-liweiwei1419-5/) |
+| [714. 买卖股票的最佳时机含手续费](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-with-transaction-fee) | [动态规划（Java）](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock-with-transaction-fee/solution/dong-tai-gui-hua-by-liweiwei1419-6/) |
+
+
+
+作者：liweiwei1419
+链接：https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock/solution/bao-li-mei-ju-dong-tai-gui-hua-chai-fen-si-xiang-b/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+
+
+
+
 
 
 
