@@ -2419,10 +2419,80 @@ class Solution {
 
 数组都已经有序了，数字有重复，直接二分啊。
 
-- 取mid位置的值与target进行比较，看一下target落在了哪边。
-- 找到target落在了哪个位置，然后双指针向两边走直到nums[i]值与target不同位置，双指针的位置即为下标。
+- 取mid位置的值与target进行比较，看一下target落在了哪边。二分找到  `nums[mid] = target `的mid下标。
+- 从mid位置双指针向两边走直到nums[i]值与target不同位置，双指针的位置即为下标。
 
 也许，思路很简单，细节很魔鬼。
+
+
+
+```java
+    public int[] searchRange(int[] nums, int target) {
+        int left = 0;
+        int right = nums.length - 1;
+
+        int mid = -1;
+        while (left <= right) {
+            mid = (left + right) / 2;
+            if (nums[mid] == target) {
+                break;
+            }
+            if (nums[mid] < target) {
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+
+        if (left > right) {
+            return new int[]{-1, -1};
+        }
+
+        left = mid;
+        right = mid;
+        boolean lStop = false;
+        boolean rStop = false;
+
+        while (true) {
+            if (left < 0 && right > nums.length - 1){
+                left++;
+                right--;
+                break;
+            }
+
+            if (lStop && rStop) {
+                break;
+            }
+
+            if (left - 1 >= 0 && !lStop) {
+                if (nums[left - 1] == target) {
+                    left--;
+                } else {
+                    lStop = true;
+                }
+            }else {
+                lStop = true;
+            }
+
+            if (right + 1 < nums.length && !rStop) {
+                if (nums[right + 1] == target) {
+                    right++;
+                } else {
+                    rStop = true;
+                }
+            }else {
+                rStop = true;
+            }
+        }
+
+        int[] result = new int[2];
+        result[0] = left;
+        result[1] = right;
+        return result;
+    }
+```
+
+
 
 
 
@@ -2460,6 +2530,8 @@ class Solution {
 来源：力扣（LeetCode）
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 ```
+
+采用从两边逼近的方法，循环两次，分别求出起始与结束位置，再校验位置是否合法。
 
 
 
