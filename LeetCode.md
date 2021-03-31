@@ -6002,3 +6002,25 @@ class Solution {
 - -105 <= Node.val <= 105
 - pos 为 -1 或者链表中的一个 有效索引 。
 
+
+
+这个快慢指针，如果能碰上就说明有环。
+
+```java
+    public boolean hasCycle(ListNode head) {
+        if(head == null) return false;
+
+        ListNode slow = head;
+        ListNode fast = head.next;
+        while (fast != null && fast.next != null) {
+            if (slow == fast){
+                return true;
+            }
+
+            fast = fast.next.next;
+            slow = slow.next;
+        }
+        return false;
+    }
+```
+
