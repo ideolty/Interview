@@ -2691,6 +2691,69 @@ class Solution {
 
 然后开始枚举，重复取第一个数字，直到总和大于target，则回溯。
 
+```java
+public class CombinationSum {
+    public static void main(String[] args) {
+        CombinationSum combinationSum = new CombinationSum();
+//        int[] candidates = {2,3,5};
+        int[] candidates = {2,3,6,7};
+        List<List<Integer>> lists = combinationSum.combinationSum(candidates, 7);
+        for (List<Integer> list : lists) {
+            for (Integer integer : list) {
+                System.out.println(integer + ",");
+            }
+            System.out.println("——————");
+        }
+    }
+
+    List<List<Integer>> result = new ArrayList<>();
+    public List<List<Integer>> combinationSum(int[] candidates, int target) {
+        Arrays.sort(candidates);
+        for (int i = 0; i < candidates.length; i++){
+            dfs(candidates, target, new ArrayList<>(), i);
+        }
+        return result;
+    }
+
+    /**
+     *
+     * @param candidates 原数组
+     * @param target 还剩下的目标值 = 原始target - list中的数字和
+     * @param list 当前已经存的数字
+     * @param cur 当前叠加的数字的下标
+     */
+    public void dfs(int[] candidates, int target, List<Integer> list, int cur){
+        if (0 == target){
+            List<Integer> tmp = new ArrayList<>(list);
+            result.add(tmp);
+            return;
+        }
+
+        if (target < 0){
+            return;
+        }
+
+        if (cur == candidates.length){
+            return;
+        }
+
+        list.add(candidates[cur]);
+        dfs(candidates, target - candidates[cur], list, cur);
+        list.remove(list.size() - 1);
+
+      	// 剪枝，如果target已经不够了，后面的数字更大，更没有必要去试
+      	// list.size()是为了去重复 这里是使用了外层循环 所以需要去重复
+        if (target - candidates[cur] > 0 && list.size() > 0){
+            for (int i = cur + 1; i < candidates.length; i++){
+                list.add(candidates[i]);
+                dfs(candidates, target  - candidates[i], list, i);
+                list.remove(list.size() - 1);
+            }
+        }
+    }
+
+```
+
 
 
 官方
