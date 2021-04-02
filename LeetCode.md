@@ -4818,6 +4818,149 @@ exection -> execution (插入 'u')
 
 
 
+# [77. 组合](https://leetcode-cn.com/problems/combinations/)
+
+给定两个整数 n 和 k，返回 1 ... n 中所有可能的 k 个数的组合。
+
+**示例:**
+
+```
+输入: n = 4, k = 2
+输出:
+[
+  [2,4],
+  [3,4],
+  [2,3],
+  [1,2],
+  [1,3],
+  [1,4],
+]
+```
+
+
+
+思考
+
+先简化问题，返回1……n中所有可能的3个数，dfs，枚举每一种可能。可能的k个数，也是dfs。
+
+```java
+class Solution {
+    private List<List<Integer>> result = new ArrayList<>();
+
+    public List<List<Integer>> combine(int n, int k) {
+        if (k <= 0 || n < k) {
+            return result;
+        }
+        dfs(n, k, new ArrayList<>(), 0);
+        return result;
+    }
+
+    public void dfs(int n, int k, List<Integer> list, int cur){
+        if (list.size() == k){
+            result.add(new ArrayList<>(list));
+            return;
+        }
+
+        for (int i = cur + 1; i <= n; i++){
+            list.add(i);
+            dfs(n, k, list, i);
+            list.remove(list.size() - 1);
+        }
+    }
+}
+
+执行用时：25 ms, 在所有 Java 提交中击败了22.43% 的用户
+内存消耗：39.7 MB, 在所有 Java 提交中击败了80.36% 的用户
+```
+
+这里最大的问题是没有做合适的剪枝，所以用时比较长。
+
+
+
+评论区高赞：
+
+**优化：分析搜索起点的上界进行剪枝**
+
+事实上，如果 n = 7, k = 4，从 5 开始搜索就已经没有意义了，这是因为：即使把 5 选上，后面的数只有 6 和 7，一共就 3 个候选数，凑不出 4 个数的组合。因此，搜索起点有上界，这个上界是多少，可以举几个例子分析。
+
+分析搜索起点的上界，其实是在深度优先遍历的过程中剪枝，剪枝可以避免不必要的遍历，剪枝剪得好，可以大幅度节约算法的执行时间。下面的图片绿色部分是剪掉的枝叶，当 n 很大的时候，能少遍历很多结点，节约了时间。
+
+![image.png](截图/leetCode/77.png)
+
+容易知道：搜索起点和当前还需要选几个数有关，而当前还需要选几个数与已经选了几个数有关，即与 path 的长度相关。我们举几个例子分析：
+
+例如：n = 6 ，k = 4。
+
+```
+path.size() == 1 的时候，接下来要选择 3 个数，搜索起点最大是 4，最后一个被选的组合是 [4, 5, 6]；
+path.size() == 2 的时候，接下来要选择 2 个数，搜索起点最大是 5，最后一个被选的组合是 [5, 6]；
+path.size() == 3 的时候，接下来要选择 1 个数，搜索起点最大是 6，最后一个被选的组合是 [6]；
+```
+
+再如：n = 15 ，k = 4。
+
+```
+path.size() == 1 的时候，接下来要选择 3 个数，搜索起点最大是 13，最后一个被选的是 [13, 14, 15]；
+path.size() == 2 的时候，接下来要选择 2 个数，搜索起点最大是 14，最后一个被选的是 [14, 15]；
+path.size() == 3 的时候，接下来要选择 1 个数，搜索起点最大是 15，最后一个被选的是 [15]；
+```
+
+可以归纳出：
+
+`搜索起点的上界 + 接下来要选择的元素个数 - 1 = n`
+
+其中，接下来要选择的元素个数 `= k - path.size()`，整理得到：
+
+`搜索起点的上界 = n - (k - path.size()) + 1​`
+
+所以，我们的剪枝过程就是：把 `i <= n` 改成  `i <= n - (k - path.size()) + 1` ：
+
+```java
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+
+public class Solution {
+
+    public List<List<Integer>> combine(int n, int k) {
+        List<List<Integer>> res = new ArrayList<>();
+        if (k <= 0 || n < k) {
+            return res;
+        }
+        Deque<Integer> path = new ArrayDeque<>();
+        dfs(n, k, 1, path, res);
+        return res;
+    }
+
+    private void dfs(int n, int k, int index, Deque<Integer> path, List<List<Integer>> res) {
+        if (path.size() == k) {
+            res.add(new ArrayList<>(path));
+            return;
+        }
+
+        // 只有这里 i <= n - (k - path.size()) + 1 与参考代码 1 不同
+        for (int i = index; i <= n - (k - path.size()) + 1; i++) {
+            path.addLast(i);
+            dfs(n, k, i + 1, path, res);
+            path.removeLast();
+        }
+    }
+}
+
+
+作者：liweiwei1419
+链接：https://leetcode-cn.com/problems/combinations/solution/hui-su-suan-fa-jian-zhi-python-dai-ma-java-dai-ma-/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
 # [78. 子集](https://leetcode-cn.com/problems/subsets/)
 
 给你一个整数数组 nums ，数组中的元素 互不相同 。返回该数组所有可能的子集（幂集）。
