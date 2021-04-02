@@ -2920,6 +2920,109 @@ class Solution {
 
 
 
+这题是验证数独而不是解数独。先遍历每一行，再遍历每一列，再去遍历9个小方块，时间复杂度$O(3n)$，每个数字会访问3遍。
+
+```java
+/**
+* 遍历一遍 但是存在3个容器里面
+*/
+public boolean isValidSudoku(char[][] board) {
+        // 先遍历行
+        Set<Character> set = new HashSet<>();
+        Map<Integer, Set<Character>> map = new HashMap<>();
+        Map<String, Set<Character>> nineMap = new HashMap<>();
+        for (int j = 0; j < board.length; j++) {
+            char[] row = board[j];
+            for (int i = 0; i < row.length; i++) {
+                char col = row[i];
+                if (col == '.') continue;
+                // 判断行
+                if (set.contains(col)){
+                    return false;
+                }
+                set.add(col);
+
+                // 判断列
+                Set<Character> characters = map.computeIfAbsent(i, k -> new HashSet<>());
+                if (characters.contains(col)){
+                    return false;
+                }
+                characters.add(col);
+
+                // 确定9个九宫格
+                // 从左 -> 右排序
+                String key = j / 3 + "-" + i / 3;
+                Set<Character> nine = nineMap.computeIfAbsent(key, k -> new HashSet<>());
+                if (nine.contains(col)){
+                    return false;
+                }
+                nine.add(col);
+            }
+            set.clear();
+        }
+        return true;
+    }
+
+执行用时：20 ms, 在所有 Java 提交中击败了5.03% 的用户
+内存消耗：39 MB, 在所有 Java 提交中击败了6.03% 的用户
+```
+
+
+
+官方
+
+ **方法：一次迭代**
+
+首先，让我们来讨论下面两个问题：
+
+- 如何枚举子数独？
+
+>  可以使用 `box_index = (row / 3) * 3 + columns / 3`，其中 / 是整数除法。
+
+<img src="截图/leetCode/2b141392e2a1811d0e8dfdf6279b1352e59fad0b3961908c6ff9412b6a7e7ccf-image.png" alt="https://pic.leetcode-cn.com/2b141392e2a1811d0e8dfdf6279b1352e59fad0b3961908c6ff9412b6a7e7ccf-image.png" style="zoom:33%;" />
+
+- 如何确保行 / 列 / 子数独中没有重复项？
+
+  可以利用 value -> count 哈希映射来跟踪所有已经遇到的值。（二维数组就够了）
+
+
+
+评论区
+
+```java
+class Solution {
+    public boolean isValidSudoku(char[][] board) {
+        int [][]row  =new int[9][10];
+        int [][]col  =new int[9][10];
+        int [][]box  =new int[9][10];
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+                if (board[i][j]=='.'){
+                    continue;
+                }
+                int curNum = board[i][j]-'0';
+                if (row[i][curNum]==1){
+                    return false;
+                }if (col[j][curNum]==1){
+                    return false;
+                }
+                if (box[j/3 + (i/3) * 3][curNum]==1){
+                    return false;
+                }
+                row[i][curNum]=1;
+                col[j][curNum]=1;
+                box[j/3 + (i/3) * 3][curNum]=1;
+            }
+        }
+        return true;
+    }
+}
+
+https://leetcode-cn.com/problems/valid-sudoku/solution/36-jiu-an-zhao-cong-zuo-wang-you-cong-shang-wang-x/
+```
+
+
+
 # [38. 外观数列](https://leetcode-cn.com/problems/count-and-say/)
 
 给定一个正整数 n ，输出外观数列的第 n 项。
