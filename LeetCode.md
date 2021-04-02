@@ -4995,7 +4995,40 @@ public class Solution {
 
 
 
-dfs，走一个全排列，把所有的可能都枚举出来。
+参考77题的写法，dfs，把所有的可能都枚举出来。
+
+```java
+class Solution {
+    private List<List<Integer>> result = new ArrayList<>();
+
+    public List<List<Integer>> subsets(int[] nums) {
+        for (int i = 0; i <= nums.length; i++){
+            dfs(nums, new ArrayList<>(), 0, i);
+        }
+        return result;
+    }
+
+    public void dfs(int[] nums, List<Integer> list, int cur, int round){
+        if (list.size() == round){
+            result.add(new ArrayList<>(list));
+            return;
+        }
+
+        for (int i = cur; i < nums.length; i++) {
+            list.add(nums[i]);
+            dfs(nums, list, i + 1, round);
+            list.remove(list.size() - 1);
+        }
+    }
+}
+
+执行用时：1 ms, 在所有 Java 提交中击败了82.37% 的用户
+内存消耗：38.9 MB, 在所有 Java 提交中击败了14.85% 的用户
+```
+
+这里就没有什么地方可以剪枝了。
+
+
 
 
 
@@ -5005,18 +5038,18 @@ dfs，走一个全排列，把所有的可能都枚举出来。
 
 思路与算法
 
-记原序列中元素的总数为 nnn。原序列中的每个数字 aia_iai 的状态可能有两种，即「在子集中」和「不在子集中」。我们用 111 表示「在子集中」，000 表示不在子集中，那么每一个子集可以对应一个长度为 nnn 的 0/10/10/1 序列，第 iii 位表示 aia_iai 是否在子集中。例如，n=3n = 3n=3 ，a={5,2,9}a = \{ 5, 2, 9 \}a={5,2,9} 时：
+记原序列中元素的总数为 n。原序列中的每个数字 $a_i$ 的状态可能有两种，即「在子集中」和「不在子集中」。我们用 1 表示「在子集中」，0 表示不在子集中，那么每一个子集可以对应一个长度为 n 的 $0/1$ 序列，第 i 位表示 $a_i$ 是否在子集中。例如，$n = 3$ ，$a = \{ 5, 2, 9 \}$ 时：
 
-| 0/1 序列 | 子集    | 0/10/10/1 序列对应的二进制数 |
-| -------- | ------- | ---------------------------- |
-| 000      | { }     | 0                            |
-| 001      | { 9 }   | 1                            |
-| 010      | {2}     | 2                            |
-| 011      | {2,9}   | 3                            |
-| 100      | {5}     | 4                            |
-| 101      | {5,9}   | 5                            |
-| 110      | {5,2}   | 6                            |
-| 111      | {5,2,9} | 7                            |
+| 0/1 序列 | 子集    | 0/1 序列对应的二进制数 |
+| -------- | ------- | ---------------------- |
+| 000      | { }     | 0                      |
+| 001      | { 9 }   | 1                      |
+| 010      | {2}     | 2                      |
+| 011      | {2,9}   | 3                      |
+| 100      | {5}     | 4                      |
+| 101      | {5,9}   | 5                      |
+| 110      | {5,2}   | 6                      |
+| 111      | {5,2,9} | 7                      |
 
 可以发现 0/1序列对应的二进制数正好从 0 到 $2^n - 1$。我们可以枚举 $\textit{mask} \in [0, 2^n - 1]$，$\textit{mask}$ 的二进制表示是一个 0/1 序列，我们可以按照这个 0/1 序列在原集合当中取数。当我们枚举完所有 $2^n$ 个 $\textit{mask}$，我们也就能构造出所有的子集。
 
@@ -5097,6 +5130,8 @@ class Solution {
             ans.add(new ArrayList<Integer>(t));
             return;
         }
+      	// 注意这里的写法往list中添加后，认为已经选中，然后继续dfs
+      	// 之后弹出，可以认为没有选中，然后dfs
         t.add(nums[cur]);
         dfs(cur + 1, nums);
         t.remove(t.size() - 1);
@@ -6912,5 +6947,158 @@ class Solution {
         }
         return false;
     }
+```
+
+
+
+
+
+
+
+# [160. 相交链表](https://leetcode-cn.com/problems/intersection-of-two-linked-lists/)
+
+编写一个程序，找到两个单链表相交的起始节点。
+
+如下面的两个链表：
+
+<img src="截图/leetCode/160_statement.png" alt="img" style="zoom: 67%;" />
+
+在节点 c1 开始相交。
+
+ 
+
+示例 1：
+
+<img src="截图/leetCode/160_example_1.png" alt="img" style="zoom:67%;" />
+
+```
+输入：intersectVal = 8, listA = [4,1,8,4,5], listB = [5,0,1,8,4,5], skipA = 2, skipB = 3
+输出：Reference of the node with value = 8
+输入解释：相交节点的值为 8 （注意，如果两个链表相交则不能为 0）。从各自的表头开始算起，链表 A 为 [4,1,8,4,5]，链表 B 为 [5,0,1,8,4,5]。在 A 中，相交节点前有 2 个节点；在 B 中，相交节点前有 3 个节点。
+```
+
+示例 2：
+
+```
+输入：intersectVal = 2, listA = [0,9,1,2,4], listB = [3,2,4], skipA = 3, skipB = 1
+输出：Reference of the node with value = 2
+输入解释：相交节点的值为 2 （注意，如果两个链表相交则不能为 0）。从各自的表头开始算起，链表 A 为 [0,9,1,2,4]，链表 B 为 [3,2,4]。在 A 中，相交节点前有 3 个节点；在 B 中，相交节点前有 1 个节点。
+```
+
+示例 3：
+
+```
+输入：intersectVal = 0, listA = [2,6,4], listB = [1,5], skipA = 3, skipB = 2
+输出：null
+输入解释：从各自的表头开始算起，链表 A 为 [2,6,4]，链表 B 为 [1,5]。由于这两个链表不相交，所以 intersectVal 必须为 0，而 skipA 和 skipB 可以是任意值。
+解释：这两个链表不相交，因此返回 null。
+```
+
+注意：
+
+- 如果两个链表没有交点，返回 null.
+- 在返回结果后，两个链表仍须保持原有的结构。
+- 可假定整个链表结构中没有循环。
+- 程序尽量满足 O(n) 时间复杂度，且仅用 O(1) 内存。
+
+
+
+想法一
+
+第一次遍历两条链表，找到长的链表比短的那条长多少。
+
+第二次遍历，让长的那条先走完多出来的距离，然后两条链表同步向后，再判断节点是否相等。
+
+
+
+想法二
+
+两条链表拼起来，开始遍历，相等的那个点就是相交点。
+
+```java
+public class Solution {
+    public ListNode getIntersectionNode(ListNode headA, ListNode headB) {
+        int j = 0;
+        ListNode nodeA = headA;
+        ListNode nodeB = headB;
+        while (nodeA != null && nodeB != null){
+            nodeA = nodeA.next;
+            nodeB = nodeB.next;
+        }
+
+        boolean aLonger = true;
+        if (nodeA != null){
+            while (nodeA != null){
+                nodeA = nodeA.next;
+                j++;
+            }
+        }
+
+        if (nodeB != null){
+            aLonger = false;
+            while (nodeB != null){
+                nodeB = nodeB.next;
+                j++;
+            }
+        }
+
+        nodeA = headA;
+        nodeB = headB;
+
+        if (aLonger){
+            while (j > 0){
+                nodeA = nodeA.next;
+                j--;
+            }
+        }else {
+            while (j > 0){
+                nodeB = nodeB.next;
+                j--;
+            }
+        }
+
+        while (nodeA != null && nodeB != null){
+            if (nodeA == nodeB){
+                return nodeA;
+            }
+            nodeA = nodeA.next;
+            nodeB = nodeB.next;
+        }
+        return null;
+    }
+}
+```
+
+
+
+官方
+
+方法三：双指针法
+
+创建两个指针 pA 和 pB，分别初始化为链表 A 和 B 的头结点。然后让它们向后逐结点遍历。
+当 pA 到达链表的尾部时，将它重定位到链表 B 的头结点 (你没看错，就是链表 B); 类似的，当 pB 到达链表的尾部时，将它重定位到链表 A 的头结点。
+若在某一时刻 pA 和 pB 相遇，则 pA/pB 为相交结点。
+想弄清楚为什么这样可行, 可以考虑以下两个链表: `A={1,3,5,7,9,11} 和 B={2,4,9,11}`，相交于结点 9。 由于 `B.length (=4) < A.length (=6)`，pB 比 pA 少经过 222 个结点，会先到达尾部。将 pB 重定向到 A 的头结点，pA 重定向到 B 的头结点后，pB 要比 pA 多走 2 个结点。因此，它们会同时到达交点。
+如果两个链表存在相交，它们末尾的结点必然相同。因此当 pA/pB 到达链表结尾时，记录下链表 A/B 对应的元素。若最后元素不相同，则两个链表不相交。
+
+评论区答案
+
+```java
+public class Solution {
+    public ListNode getIntersectionNode(ListNode headA, ListNode headB) {
+        /**
+        定义两个指针, 第一轮让两个到达末尾的节点指向另一个链表的头部, 最后如果相遇则为交点(在第一轮移动中恰好抹除了长度差)
+        两个指针等于移动了相同的距离, 有交点就返回, 无交点就是各走了两条指针的长度
+        **/
+        if(headA == null || headB == null) return null;
+        ListNode pA = headA, pB = headB;
+        // 在这里第一轮体现在pA和pB第一次到达尾部会移向另一链表的表头, 而第二轮体现在如果pA或pB相交就返回交点, 不相交最后就是null==null
+        while(pA != pB) {
+            pA = pA == null ? headB : pA.next;
+            pB = pB == null ? headA : pB.next;
+        }
+        return pA;
+    }
+}
 ```
 
