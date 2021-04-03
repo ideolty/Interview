@@ -7242,3 +7242,82 @@ public class Solution {
 }
 ```
 
+
+
+# [237. 删除链表中的节点](https://leetcode-cn.com/problems/delete-node-in-a-linked-list/)
+
+请编写一个函数，使其可以删除某个链表中给定的（非末尾）节点。传入函数的唯一参数为 要被删除的节点 。
+
+现有一个链表 -- head = [4,5,1,9]，它可以表示为:
+
+ ![img](截图/leetCode/237_example.png)
+
+
+
+示例 1：
+
+```
+输入：head = [4,5,1,9], node = 5
+输出：[4,1,9]
+解释：给定你链表中值为 5 的第二个节点，那么在调用了你的函数之后，该链表应变为 4 -> 1 -> 9.
+
+来源：力扣（LeetCode）
+链接：https://leetcode-cn.com/problems/delete-node-in-a-linked-list
+著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
+```
+
+示例 2：
+
+```
+输入：head = [4,5,1,9], node = 1
+输出：[4,5,9]
+解释：给定你链表中值为 1 的第三个节点，那么在调用了你的函数之后，该链表应变为 4 -> 5 -> 9.
+```
+
+ 
+
+提示：
+
+- 链表至少包含两个节点。
+- 链表中所有节点的值都是唯一的。
+- 给定的节点为非末尾节点并且一定是链表中的一个有效节点。
+- 不要从你的函数中返回任何结果。
+
+
+
+思考
+
+这里不会给你头结点，而是给的被删除的节点，拿不到前置节点，所以不能直接改指针。
+
+但是，仔细审题后，发现没有禁止对链表本身进行修改，那么就可以换值了。把当前要被删的节点的值与后序节点的值进行替换即可。
+
+```java
+class Solution {
+    public void deleteNode(ListNode node) {
+        ListNode pre = null;
+        while (node.next != null){
+            node.val = node.next.val;
+            pre = node;
+            node = node.next;
+        }
+        pre.next = null;
+    }
+}
+```
+
+
+
+官方
+
+既然不能干掉自己，那就变成别人然后把他干掉就好了
+
+```ruby
+class Solution {
+    public void deleteNode(ListNode node) {
+        node.val = node.next.val;    //变成下个倒霉蛋
+        node.next = node.next.next;  //把倒霉蛋干掉。
+    }
+}
+```
+
+看了答案之后发现我还是想差了，只要交换一次，然后就可以操作next指向之后的那个节点了，不需要变后序所有的。
