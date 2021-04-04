@@ -7136,6 +7136,8 @@ public class Solution {
 
 如果要在 O(nlogn) 时间复杂度和常数级空间复杂度下，首先从logn中可以想到树的查询，nlogn可以联想到归并排序，归并整体上是一棵树，每一层都要遍历所有的节点，时间复杂度是满足的。由于需要常数的空间，所以不能递归，需要使用迭代的方式，人为的控制左右指针，手动的分割出归并的范围。
 
+好题，不仅锻炼了对链表的操作能力，也练习了迭代式的二路归并的写法。
+
 ```java
 class Solution {
     public ListNode sortList(ListNode head) {
@@ -7373,6 +7375,8 @@ https://leetcode-cn.com/problems/sort-list/solution/sort-list-gui-bing-pai-xu-li
 
 
 
+
+
 # [160. 相交链表](https://leetcode-cn.com/problems/intersection-of-two-linked-lists/)
 
 编写一个程序，找到两个单链表相交的起始节点。
@@ -7522,6 +7526,156 @@ public class Solution {
 
 
 
+
+
+# [217. 存在重复元素](https://leetcode-cn.com/problems/contains-duplicate/)
+
+给定一个整数数组，判断是否存在重复元素。
+
+如果存在一值在数组中出现至少两次，函数返回 true 。如果数组中每个元素都不相同，则返回 false 。
+
+示例 1:
+
+```
+输入: [1,2,3,1]
+输出: true
+```
+
+示例 2:
+
+```
+输入: [1,2,3,4]
+输出: false
+```
+
+示例 3:
+
+```
+输入: [1,1,1,3,3,4,3,2,4,2]
+输出: true
+```
+
+
+
+朴素的想法
+
+```java
+class Solution {
+    public boolean containsDuplicate(int[] nums) {
+        if (nums.length == 0 || nums.length == 1){
+            return false;
+        }
+
+        Set<Integer> set = new HashSet<>();
+        for (int num : nums) {
+            if (set.contains(num)){
+                return true;
+            }
+            
+            set.add(num);
+        }
+        return false;
+    }
+}
+执行用时：9 ms, 在所有 Java 提交中击败了26.61% 的用户
+内存消耗：44.5 MB, 在所有 Java 提交中击败了29.39% 的用户
+```
+
+很低的成绩啊，别人位图？
+
+
+
+
+
+评论区
+
+```java
+ public boolean containsDuplicate(int[] nums) {
+   return Arrays.stream(nums).distinct().count() < nums.length;
+ }
+```
+
+
+
+# [231. 2的幂](https://leetcode-cn.com/problems/power-of-two/)
+
+给定一个整数，编写一个函数来判断它是否是 2 的幂次方。
+
+**示例 1:**
+
+```
+输入: 1
+输出: true
+解释: 2^0= 1
+```
+
+**示例 2:**
+
+```
+输入: 16
+输出: true
+解释: 2^4 = 16
+```
+
+**示例 3:**
+
+```
+输入: 218
+输出: false
+```
+
+
+
+朴素的想法就是不断的除2看是否能整除。
+
+```java
+class Solution {
+    public boolean isPowerOfTwo(int n) {
+        int i = 1;
+        while (i <= n){
+            if (n == i){
+                return true;
+            }
+            i = i * 2;
+        }
+        return false;
+    }
+}
+```
+
+超出时间限制了。
+
+
+
+评论区
+
+位运算，以32位二进制来考虑，要是2的幂，32就只能有一位为1，其余位为0。所以：
+
+```java
+class Solution {
+    public boolean isPowerOfTwo(int n) {
+        if(n <= 0)
+            return false;
+        return (n & (n-1)) == 0;
+    }
+}
+```
+
+```
+例子：
+5 -> 0101
+4 -> 0100
+5&4 = 0101
+
+8 -> 1000
+7 -> 0111
+8&7
+```
+
+
+
+
+
 # [237. 删除链表中的节点](https://leetcode-cn.com/problems/delete-node-in-a-linked-list/)
 
 请编写一个函数，使其可以删除某个链表中给定的（非末尾）节点。传入函数的唯一参数为 要被删除的节点 。
@@ -7603,75 +7757,6 @@ class Solution {
 
 
 
-
-
-
-# [217. 存在重复元素](https://leetcode-cn.com/problems/contains-duplicate/)
-
-给定一个整数数组，判断是否存在重复元素。
-
-如果存在一值在数组中出现至少两次，函数返回 true 。如果数组中每个元素都不相同，则返回 false 。
-
-示例 1:
-
-```
-输入: [1,2,3,1]
-输出: true
-```
-
-示例 2:
-
-```
-输入: [1,2,3,4]
-输出: false
-```
-
-示例 3:
-
-```
-输入: [1,1,1,3,3,4,3,2,4,2]
-输出: true
-```
-
-
-
-朴素的想法
-
-```java
-class Solution {
-    public boolean containsDuplicate(int[] nums) {
-        if (nums.length == 0 || nums.length == 1){
-            return false;
-        }
-
-        Set<Integer> set = new HashSet<>();
-        for (int num : nums) {
-            if (set.contains(num)){
-                return true;
-            }
-            
-            set.add(num);
-        }
-        return false;
-    }
-}
-执行用时：9 ms, 在所有 Java 提交中击败了26.61% 的用户
-内存消耗：44.5 MB, 在所有 Java 提交中击败了29.39% 的用户
-```
-
-很低的成绩啊，别人位图？
-
-
-
-
-
-评论区
-
-```java
- public boolean containsDuplicate(int[] nums) {
-   return Arrays.stream(nums).distinct().count() < nums.length;
- }
-```
 
 
 
