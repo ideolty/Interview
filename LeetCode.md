@@ -7723,7 +7723,104 @@ reverseList: head=1
 
 
 
+# [215. 数组中的第K个最大元素](https://leetcode-cn.com/problems/kth-largest-element-in-an-array/) :star:
 
+在未排序的数组中找到第 k 个最大的元素。请注意，你需要找的是数组排序后的第 k 个最大的元素，而不是第 k 个不同的元素。
+
+示例 1:
+
+```
+输入: [3,2,1,5,6,4] 和 k = 2
+输出: 5
+```
+
+**示例 2:**
+
+```
+输入: [3,2,3,1,2,4,5,5,6] 和 k = 4
+输出: 4
+```
+
+
+
+思考
+
+还想个p，直接排序后去取指定下标的值就行了。
+
+```java
+class Solution {
+    public int findKthLargest(int[] nums, int k) {
+        Arrays.sort(nums);
+        return nums[nums.length - k];
+    }
+}
+执行用时：2 ms, 在所有 Java 提交中击败了90.92% 的用户
+内存消耗：38.5 MB, 在所有 Java 提交中击败了92.19% 的用户
+```
+
+这里想考察的应该是堆的实现与快速选择排序
+
+
+
+官方
+
+**快速选择**
+
+由此可以发现每次经过「划分」操作后，我们一定可以确定一个元素的最终位置，即 x 的最终位置为 q，并且保证 $a[l \cdots q - 1]$ 中的每个元素小于等于 $a[q]$，且 $a[q]$ 小于等于 $a[q + 1 \cdots r]$ 中的每个元素。所以只要某次划分的 q 为倒数第 k 个下标的时候，我们就已经找到了答案。 我们只关心这一点，至于 $a[l \cdots q - 1]$ 和 $a[q+1 \cdots r]$ 是否是有序的，我们不关心。
+
+因此我们可以改进快速排序算法来解决这个问题：在分解的过程当中，我们会对子数组进行划分，如果划分得到的 qqq 正好就是我们需要的下标，就直接返回 $a[q]$；否则，如果 q 比目标下标小，就递归右子区间，否则递归左子区间。这样就可以把原来递归两个区间变成只递归一个区间，提高了时间效率。这就是「快速选择」算法。
+
+```java
+class Solution {
+    Random random = new Random();
+
+    public int findKthLargest(int[] nums, int k) {
+        return quickSelect(nums, 0, nums.length - 1, nums.length - k);
+    }
+
+    public int quickSelect(int[] a, int l, int r, int index) {
+        int q = randomPartition(a, l, r);
+        if (q == index) {
+            return a[q];
+        } else {
+            return q < index ? quickSelect(a, q + 1, r, index) : quickSelect(a, l, q - 1, index);
+        }
+    }
+
+    public int randomPartition(int[] a, int l, int r) {
+        int i = random.nextInt(r - l + 1) + l;
+        swap(a, i, r);
+        return partition(a, l, r);
+    }
+
+    public int partition(int[] a, int l, int r) {
+        int x = a[r], i = l - 1;
+        for (int j = l; j < r; ++j) {
+            if (a[j] <= x) {
+                swap(a, ++i, j);
+            }
+        }
+        swap(a, i + 1, r);
+        return i + 1;
+    }
+
+    public void swap(int[] a, int i, int j) {
+        int temp = a[i];
+        a[i] = a[j];
+        a[j] = temp;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/kth-largest-element-in-an-array/solution/shu-zu-zhong-de-di-kge-zui-da-yuan-su-by-leetcode-/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+**方法二：基于堆排序的选择方法**
 
 
 
@@ -7955,11 +8052,88 @@ class Solution {
 
 
 
+# [292. Nim 游戏](https://leetcode-cn.com/problems/nim-game/)
+
+你和你的朋友，两个人一起玩 Nim 游戏：
+
+- 桌子上有一堆石头。
+- 你们轮流进行自己的回合，你作为先手。
+- 每一回合，轮到的人拿掉 1 - 3 块石头。
+- 拿掉最后一块石头的人就是获胜者。
+
+假设你们每一步都是最优解。请编写一个函数，来判断你是否可以在给定石头数量为 n 的情况下赢得游戏。如果可以赢，返回 true；否则，返回 false 。
+
+示例 1：
+
+```
+输入：n = 4
+输出：false 
+解释：如果堆中有 4 块石头，那么你永远不会赢得比赛；
+     因为无论你拿走 1 块、2 块 还是 3 块石头，最后一块石头总是会被你的朋友拿走。
+```
+
+**示例 2：**
+
+```
+输入：n = 1
+输出：true
+```
+
+**示例 3：**
+
+```
+输入：n = 2
+输出：true
+```
 
 
 
+说着的我一直想这dp怎么做，没做出来……
 
 
+
+评论区高赞
+
+前面作者的心路历程写的很好，思路演变很自然，推荐一看。
+
+这里摘抄一下图解部分
+
+> 因为如果是 4 个石子，谁先手就谁输。因为你一次性最多拿 3 个，最后一个石子一定被对方拿走。
+>
+> 然后我们可以把石子，4 个，4 个分成一个个小堆。然后有 4 种情况。
+>
+> 全是 4 个一小堆。
+>
+> X X     X X     X X     X X
+> X X     X X     X X     X X 
+>
+> 余下 1 个。
+>
+> X X     X X     X X     X X     X 
+> X X     X X     X X     X X     
+>
+> 余下 2 个。
+>
+> X X     X X     X X     X X     X X         
+> X X     X X     X X     X X      
+>
+> 余下 3 个。
+>
+> X X     X X     X X     X X     X X         
+> X X     X X     X X     X X     X 
+>
+> 只要有余下的，因为是你先手，你只需要把余下的全拿走。然后对方从每个小堆里拿石子，你只需要把每个小堆里剩下的拿走即可。最后一定是你拿走最后一个石子。
+>
+> 如果非要说，如果对方从多个小堆里拿石子呢？他拿完以后我们就把每个小堆再还原成 4 个，4 个的，然后把不是 4 个的那堆拿走。
+>
+> 其实上边只是一个抽象出的模型，实际上，当第一步我们把余下的拿走以后。之后如果对方拿 x 个，我们只需要拿 4 - x 个即可。
+>
+> 而如果没有余下的，那如果对方知道这个技巧的话，一定是对方赢了。
+>
+> 作者：windliang
+> 链接：https://leetcode-cn.com/problems/nim-game/solution/xiang-xi-tong-su-de-si-lu-fen-xi-duo-jie-fa-by-54/
+> 来源：力扣（LeetCode）
+> 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 
 
 
