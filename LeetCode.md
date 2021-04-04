@@ -7666,3 +7666,80 @@ class Solution {
 ```
 
 可以干掉一个指针。
+
+
+
+# [557. 反转字符串中的单词 III](https://leetcode-cn.com/problems/reverse-words-in-a-string-iii/)
+
+给定一个字符串，你需要反转字符串中每个单词的字符顺序，同时仍保留空格和单词的初始顺序。
+
+示例：
+
+```
+输入："Let's take LeetCode contest"
+输出："s'teL ekat edoCteeL tsetnoc"
+```
+
+ 
+
+提示：
+
+- 在字符串中，每个单词由单个空格分隔，并且字符串中不会有任何额外的空格。
+
+
+
+```java
+class Solution {
+    public String reverseWords(String s) {
+        StringBuilder result = new StringBuilder();
+        String[] split = s.split(" ");
+        for (String s1 : split) {
+            for (int i = s1.length() - 1; i >= 0; i--){
+                result.append(s1.charAt(i));
+            }
+            result.append(" ");
+        }
+        result.deleteCharAt(result.length() - 1);
+        return result.toString();
+    }
+}
+执行用时：9 ms, 在所有 Java 提交中击败了47.19% 的用户
+内存消耗：39 MB, 在所有 Java 提交中击败了63.31% 的用户
+```
+
+这里偷懒了，使用了 `split` 方法，导致整体的效率降低了。
+
+
+
+官方
+
+```java
+class Solution {
+    public String reverseWords(String s) {
+        StringBuffer ret = new StringBuffer();
+        int length = s.length();
+        int i = 0;
+        while (i < length) {
+            int start = i;
+            while (i < length && s.charAt(i) != ' ') {
+                i++;
+            }
+            for (int p = start; p < i; p++) {
+                ret.append(s.charAt(start + i - 1 - p));
+            }
+            while (i < length && s.charAt(i) == ' ') {
+                i++;
+                ret.append(' ');
+            }
+        }
+        return ret.toString();
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/reverse-words-in-a-string-iii/solution/fan-zhuan-zi-fu-chuan-zhong-de-dan-ci-iii-by-lee-2/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
