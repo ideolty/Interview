@@ -3442,7 +3442,7 @@ https://leetcode-cn.com/problems/trapping-rain-water/solution/jie-yu-shui-by-lee
 
 
 
-# [46. 全排列](https://leetcode-cn.com/problems/permutations/)
+# [46. 全排列](https://leetcode-cn.com/problems/permutations/) :star:
 
 给定一个 **没有重复** 数字的序列，返回其所有可能的全排列。
 
@@ -3467,7 +3467,36 @@ https://leetcode-cn.com/problems/trapping-rain-water/solution/jie-yu-shui-by-lee
 
 或者说，dfs，3个位置，每个位置遍历所有的可能。
 
+```java
+ 		public List<List<Integer>> result = new ArrayList<>();
+    public List<List<Integer>> permute(int[] nums) {
+        boolean[] userd = new boolean[nums.length];
+        dfs(nums, new ArrayList<>(), userd);
+        return result;
+    }
 
+    public void dfs(int[] nums, List<Integer> list, boolean[] userd){
+        if (list.size() == nums.length){
+            result.add(new ArrayList<>(list));
+            return;
+        }
+
+        for (int i = 0; i < nums.length; i ++){
+            if (!userd[i]){
+                Integer integer = nums[i];
+                userd[i] = true;
+                list.add(integer);
+                dfs(nums, list, userd);
+                list.remove(integer);
+                userd[i] = false;
+            }
+        }
+    }
+执行用时：1 ms, 在所有 Java 提交中击败了96.75% 的用户
+内存消耗：38.8 MB, 在所有 Java 提交中击败了46.19% 的用户
+```
+
+多使用一个 `userd[i]` 数组，让代码更加好理解。 
 
 
 
