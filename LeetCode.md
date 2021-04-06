@@ -3674,6 +3674,40 @@ class Solution {
 
 多使用一个 `userd[i]` 数组，让代码更加好理解。 
 
+```java
+class Solution {
+    public List<List<Integer>> result = new ArrayList<>();
+    public List<List<Integer>> permute(int[] nums) {
+        dfs(nums, new ArrayList<>());
+        return result;
+    }
+
+    public void dfs(int[] nums, List<Integer> list){
+        if (list.size() == nums.length){
+            result.add(new ArrayList<>(list));
+            return;
+        }
+
+        for (int i = 0; i < nums.length; i ++){
+            // 更加的简洁	使用更少的内存
+            if (!list.contains(nums[i])){
+                list.add(nums[i]);
+                dfs(nums, list);
+                list.remove(list.size() - 1);
+            }
+        }
+    }
+}
+执行用时：2 ms, 在所有 Java 提交中击败了53.09% 的用户
+内存消耗：38.7 MB, 在所有 Java 提交中击败了61.86% 的用户
+```
+
+
+
+
+
+
+
 
 
 官方
