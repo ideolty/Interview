@@ -8283,6 +8283,98 @@ class Solution {
 
 
 
+# [235. 二叉搜索树的最近公共祖先](https://leetcode-cn.com/problems/lowest-common-ancestor-of-a-binary-search-tree/)
+
+给定一个二叉搜索树, 找到该树中两个指定节点的最近公共祖先。
+
+百度百科中最近公共祖先的定义为：“对于有根树 T 的两个结点 p、q，最近公共祖先表示为一个结点 x，满足 x 是 p、q 的祖先且 x 的深度尽可能大（一个节点也可以是它自己的祖先）。”
+
+例如，给定如下二叉搜索树:  root = [6,2,8,0,4,7,9,null,null,3,5]
+
+![img](截图/leetCode/binarysearchtree_improved.png)
+
+示例 1:
+
+```
+输入: root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 8
+输出: 6 
+解释: 节点 2 和节点 8 的最近公共祖先是 6。
+```
+示例 2:
+```
+输入: root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 4
+输出: 2
+解释: 节点 2 和节点 4 的最近公共祖先是 2, 因为根据定义最近公共祖先节点可以为节点本身。
+```
+说明:
+- 所有节点的值都是唯一的。
+- p、q 为不同节点且均存在于给定的二叉搜索树中。
+
+
+
+利用二叉搜索树的性质，总结规律
+
+```java
+class Solution {
+    public TreeNode lowestCommonAncestor(TreeNode root, TreeNode p, TreeNode q) {
+        TreeNode min;
+        TreeNode max;
+        if (p.val < q.val){
+            min = p;
+            max = q;
+        }else {
+            min = q;
+            max = p;
+        }
+
+        while (root != null){
+            if (root.val > min.val && root.val < max.val) {
+                return root;
+            }
+
+            if (root.val > min.val && root.val > max.val){
+                root = root.left;
+                continue;
+            }
+
+            if (root.val < min.val && root.val < max.val){
+                root = root.right;
+                continue;
+            }
+
+            if (root.val == min.val){
+                return root;
+            }
+
+            if (root.val == max.val){
+                return max;
+            }
+        }
+        return null;
+    }
+}
+执行用时：6 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：39.3 MB, 在所有 Java 提交中击败了57.11% 的用户
+```
+
+
+
+评论区
+
+Java递归，三行解决
+
+```java
+class Solution {
+    public TreeNode lowestCommonAncestor(TreeNode root, TreeNode p, TreeNode q) {
+        if(root.val < p.val && root.val < q.val) return lowestCommonAncestor(root.right, p, q);
+        if(root.val > p.val && root.val > q.val) return lowestCommonAncestor(root.left, p, q);
+        return root;
+    }
+}
+https://leetcode-cn.com/problems/lowest-common-ancestor-of-a-binary-search-tree/solution/er-cha-sou-suo-shu-de-zui-jin-gong-gong-zu-xian-26/607624
+```
+
+
 
 
 # [237. 删除链表中的节点](https://leetcode-cn.com/problems/delete-node-in-a-linked-list/)
