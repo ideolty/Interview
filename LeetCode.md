@@ -2068,6 +2068,135 @@ class Solution {
 
 
 
+# [29. 两数相除](https://leetcode-cn.com/problems/divide-two-integers/)
+
+给定两个整数，被除数 dividend 和除数 divisor。将两数相除，要求不使用乘法、除法和 mod 运算符。
+
+返回被除数 dividend 除以除数 divisor 得到的商。
+
+整数除法的结果应当截去（truncate）其小数部分，例如：`truncate(8.345) = 8` 以及 `truncate(-2.7335) = -2`
+
+示例 1:
+
+```
+输入: dividend = 10, divisor = 3
+输出: 3
+解释: 10/3 = truncate(3.33333..) = truncate(3) = 3
+```
+
+示例 2:
+
+```
+输入: dividend = 7, divisor = -3
+输出: -2
+解释: 7/-3 = truncate(-2.33333..) = -2
+```
+
+**提示**：
+
+- 被除数和除数均为 32 位有符号整数。
+- 除数不为 0。
+- 假设我们的环境只能存储 32 位有符号整数，其数值范围是 [−231,  231 − 1]。本题中，如果除法结果溢出，则返回 231 − 1。
+
+
+
+```java
+class Solution {
+    public int divide(int dividend, int divisor) {
+        if (divisor == 1){
+            return dividend;
+        }
+
+        if (divisor == -1 && dividend == Integer.MIN_VALUE){
+            return Integer.MAX_VALUE;
+        }
+
+        int sign = 1;
+        if ((divisor < 0 && dividend > 0) || (divisor > 0 && dividend < 0)){
+            sign = -1;
+        }
+        long divid = Math.abs((long) dividend);
+        long divis = Math.abs((long) divisor);
+
+        // 有多少个除数
+        int ans = 0;
+        // 当11 - (6 << 1) < 0 了，所以6就是当前轮最大的除数
+        // 就知道了商在 2 - 4 之间
+        while (divid >= divis){
+            // 最终的目的是要知道有多少个除数
+            // 所以每一轮都都要从最小倍数，也就是除数本身开始
+            long div = divis;
+            // 相当于3的个数
+            int m = 1;
+            while (divid >= div << 1){
+                // 每次除数翻倍，那么相当于3的个数也翻倍了
+                div = div << 1;
+                m = m << 1;
+            }
+            // 由于是指数长的，减出来的数也许还能被3除
+            divid = divid - div;
+            ans = ans + m;
+        }
+
+        // 剩下已经不能再被除了
+        // 由于都是截取 不再需要进行余数的矫正了
+        return sign * ans;
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：35.7 MB, 在所有 Java 提交中击败了24.43% 的用户
+```
+
+参考了评论区的各种代码，自己写了一个版本。最繁琐的地方在于边界，由于是使用int，`int i = Integer.MIN_VALUE;` 无论他如何取反，这里都还是 `Integer.MIN_VALUE`，因为已经越界了。所以在允许的情况下还是使用long吧。
+
+
+
+评论区
+
+思路
+
+> 越界问题只要对除数是1和-1单独讨论就完事了啊
+> 关于如何提高效率快速逼近结果
+>
+> 举个例子：11 除以 3 。
+> 首先11比3大，结果至少是1， 然后我让3翻倍，就是6，发现11比3翻倍后还要大，那么结果就至少是2了，那我让这个6再翻倍，得12，11不比12大，吓死我了，差点让就让刚才的最小解2也翻倍得到4了。但是我知道最终结果肯定在2和4之间。也就是说2再加上某个数，这个数是多少呢？我让11减去刚才最后一次的结果6，剩下5，我们计算5是3的几倍，也就是除法，看，递归出现了。说得很乱，不严谨，大家看个大概，然后自己在纸上画一画，或者直接看我代码就好啦！
+>
+> 作者：liujin-4
+> 链接：https://leetcode-cn.com/problems/divide-two-integers/solution/po-su-de-xiang-fa-mei-you-wei-yun-suan-mei-you-yi-/
+> 来源：力扣（LeetCode）
+> 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+```java
+class Solution {
+public:
+    int divide(int dividend, int divisor) {
+        if (dividend == INT_MIN && divisor == -1) {
+            return INT_MAX;
+        }
+        long dvd = labs(dividend), dvs = labs(divisor), ans = 0;
+        int sign = dividend > 0 ^ divisor > 0 ? -1 : 1;
+        while (dvd >= dvs) {
+            long temp = dvs, m = 1;
+            while (temp << 1 <= dvd) {
+                temp <<= 1;
+                m <<= 1;
+            }
+            dvd -= temp;
+            ans += m;
+        }
+        return sign * ans;
+    }
+};
+
+https://leetcode.com/problems/divide-two-integers/discuss/13407/C++-bit-manipulations
+```
+
+
+
+
+
+
+
 
 
 # [31. 下一个排列](https://leetcode-cn.com/problems/next-permutation/)
