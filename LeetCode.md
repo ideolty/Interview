@@ -4469,7 +4469,29 @@ public class Solution {
    - 大于就可以合并，并且更新 `endi`
    - 小于就跳到后一个区间
 
+```java
+class Solution {
+    public int[][] merge(int[][] intervals) {
+        Arrays.sort(intervals, Comparator.comparingInt(a -> a[0]));
+        List<int[]> list = new ArrayList<>();
+        int[] cur = intervals[0];
+        for (int i = 1; i < intervals.length; i++) {
+            if (cur[1] >= intervals[i][0]) {
+                // 前一个数组的结尾大于后一个数组的开头 合并
+                cur[1] = Math.max(cur[1], intervals[i][1]);
+                continue;
+            }
 
+            list.add(cur);
+            cur = intervals[i];
+        }
+        list.add(cur);
+        return list.toArray(new int[list.size()][2]);
+    }
+}
+执行用时：8 ms, 在所有 Java 提交中击败了49.26% 的用户
+内存消耗：41.3 MB, 在所有 Java 提交中击败了18.93% 的用户
+```
 
 
 
