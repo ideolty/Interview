@@ -4157,6 +4157,185 @@ class Solution {
 
 
 
+# [51. N 皇后](https://leetcode-cn.com/problems/n-queens/) :star:
+
+n 皇后问题 研究的是如何将 n 个皇后放置在 n×n 的棋盘上，并且使皇后彼此之间不能相互攻击。
+
+给你一个整数 n ，返回所有不同的 n 皇后问题 的解决方案。
+
+每一种解法包含一个不同的 n 皇后问题 的棋子放置方案，该方案中 'Q' 和 '.' 分别代表了皇后和空位。
+
+示例 1：
+
+<img src="截图/leetCode/queens.jpg" alt="img" style="zoom:67%;" />
+
+```
+输入：n = 4
+输出：[[".Q..","...Q","Q...","..Q."],["..Q.","Q...","...Q",".Q.."]]
+解释：如上图所示，4 皇后问题存在两个不同的解法。
+```
+
+
+
+思考
+
+经典题目N皇后，思路也很明显，dfs + 回溯 + 剪枝，看来又是考察写代码的能力了。
+
+```java
+class Solution {
+    List<List<String>> result = new ArrayList<>();
+
+    public List<List<String>> solveNQueens(int n) {
+        boolean[] rowFlag = new boolean[n];
+        boolean[] colFlag = new boolean[n];
+        // 撇 /
+        boolean[] right = new boolean[n + n];
+        // 捺 \
+        boolean[] left = new boolean[n + n];
+        dfs(n, rowFlag, colFlag, right, left, new ArrayList<>(), 0);
+        return result;
+    }
+
+    public void dfs(int n, boolean[] rowFlag, boolean[] colFlag, boolean[] right, boolean[] left, List<String> queens,
+                    int curRow){
+        if (queens.size() == n){
+            print(n, queens);
+            return;
+        }
+
+        // 权重 给所有斜方向的值统一加上权重
+        // 保证斜的方向的数组下标不会小于0
+        int weights = n - 1;
+        for (int row = curRow; row < n; row++){
+            for (int col = 0; col < n; col++){
+                // 只要有一个为true 就不能放棋子
+                if (!(rowFlag[row] || colFlag[col] || right[row - col + weights] || left[row + col])){
+                    rowFlag[row] = true;
+                    colFlag[col] = true;
+                    right[row - col + weights] = true;
+                    left[row + col] = true;
+                    queens.add(row + "-" + col);
+
+                    dfs(n, rowFlag, colFlag, right, left, queens, curRow + 1);
+
+                    queens.remove(queens.size() - 1);
+                    rowFlag[row] = false;
+                    colFlag[col] = false;
+                    right[row - col + weights] = false;
+                    left[row + col] = false;
+                }
+            }
+        }
+    }
+
+    public void print(int n, List<String> queens){
+        List<String> tmp = new ArrayList<>();
+
+        for (int row = 0; row < n; row++){
+            StringBuilder stringBuilder = new StringBuilder();
+            for (int col = 0; col < n; col++){
+                if (queens.contains(row + "-" + col)){
+                    stringBuilder.append("Q");
+                }else {
+                    stringBuilder.append(".");
+                }
+            }
+            tmp.add(stringBuilder.toString());
+        }
+        result.add(tmp);
+    }
+}
+执行结果：超出时间限制
+最后执行的输入：9
+```
+
+很遗憾，超时，这种时候考虑剪枝，由于每一次递归，都是会向下走一层，所以没有必要再去循环行了。
+
+改进后的核心dfs代码
+
+```java
+    public void dfs(int n, boolean[] colFlag, boolean[] right, boolean[] left, List<String> queens,
+                    int row){
+        if (queens.size() == n){
+            print(n, queens);
+            return;
+        }
+
+        // 权重 给所有斜方向的值统一加上权重
+        // 保证斜的方向的数组下标不会小于0
+        int weights = n - 1;
+        for (int col = 0; col < n; col++){
+            // 只要有一个为true 就不能放棋子
+            if (!(colFlag[col] || right[row - col + weights] || left[row + col])){
+                colFlag[col] = true;
+                right[row - col + weights] = true;
+                left[row + col] = true;
+                queens.add(row + "-" + col);
+
+                dfs(n, colFlag, right, left, queens, row + 1);
+
+                queens.remove(queens.size() - 1);
+                colFlag[col] = false;
+                right[row - col + weights] = false;
+                left[row + col] = false;
+            }
+        }
+    }
+
+执行用时：16 ms, 在所有 Java 提交中击败了5.52% 的用户
+内存消耗：39.5 MB, 在所有 Java 提交中击败了5.01% 的用户
+```
+
+
+
+提交数据集中，执行用时为 1 ms 的范例
+
+```java
+class Solution {
+    private List<List<String>> res = new ArrayList<>();
+
+    public List<List<String>> solveNQueens(int n) {
+        char[][] gird = new char[n][n];
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                gird[i][j] = '.';
+            }
+        }
+        boolean[] col = new boolean[n];
+        boolean[] dg1 = new boolean[n * 2 - 1];
+        boolean[] dg2 = new boolean[n * 2 - 1];
+        dfs(0, n, gird, col, dg1, dg2);
+        return res;
+    }
+
+    private void dfs(int index, int n, char[][] gird, boolean[] col, boolean[] dg1, boolean[] dg2) {
+        if (index == n) {
+            List<String> list = new ArrayList<>();
+            for (int i = 0; i < gird.length; i++) {
+                list.add(new String(gird[i]));
+            }
+            res.add(list);
+            return;
+        }
+        for (int j = 0; j < n; j++) {
+            if ((!col[j] && !dg1[n - index + j - 1]) && !dg2[index + j]) {
+                gird[index][j] = 'Q';
+                col[j] = dg1[n - index + j - 1] = dg2[index + j] = true;
+                dfs(index + 1, n, gird, col, dg1, dg2);
+                gird[index][j] = '.';
+                col[j] = dg1[n - index + j - 1] = dg2[index + j] = false;
+            }
+        }
+    }
+}
+```
+
+思路是一样的，但是代码写的是真的漂亮，思路清晰，也不需要二次画图。
+
+
+
+
+
 # [53. 最大子序和](https://leetcode-cn.com/problems/maximum-subarray/)
 
 给定一个整数数组 `nums` ，找到一个具有最大和的连续子数组（子数组最少包含一个元素），返回其最大和。
