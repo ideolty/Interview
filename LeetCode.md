@@ -5839,6 +5839,84 @@ class Solution {
 
 
 
+# [83. 删除排序链表中的重复元素](https://leetcode-cn.com/problems/remove-duplicates-from-sorted-list/)
+
+存在一个按升序排列的链表，给你这个链表的头节点 head ，请你删除所有重复的元素，使每个元素 **只出现一次** 。
+
+返回同样按升序排列的结果链表。
+示例 1：
+
+<img src="截图/leetCode/list1.jpg" alt="img" style="zoom:67%;" />
+
+```
+输入：head = [1,1,2]
+输出：[1,2]
+```
+示例 2：
+```
+输入：head = [1,1,2,3,3]
+输出：[1,2,3]
+```
+
+
+
+和82题几乎没有区别
+
+```java
+lass Solution {
+    public ListNode deleteDuplicates(ListNode head) {
+        if (head == null) return null;
+        ListNode first = new ListNode();
+        first.next = head;
+        ListNode pre = head;
+        while (head != null){
+            if (head.val != pre.val){
+                pre.next = head;
+                pre = head;
+            }
+            head = head.next;
+        }
+      	// 在最终的结果中pre与cur应当是前后节点关系 所以直接赋值null就行
+        pre.next = null;
+        return first.next;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：37.9 MB, 在所有 Java 提交中击败了65.28% 的用户
+```
+
+
+
+官方
+
+```java
+class Solution {
+    public ListNode deleteDuplicates(ListNode head) {
+        if (head == null) {
+            return head;
+        }
+
+        ListNode cur = head;
+        while (cur.next != null) {
+            if (cur.val == cur.next.val) {
+                cur.next = cur.next.next;
+            } else {
+                cur = cur.next;
+            }
+        }
+
+        return head;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/remove-duplicates-from-sorted-list/solution/shan-chu-pai-xu-lian-biao-zhong-de-zhong-49v5/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+更加的简洁一些
 
 
 
