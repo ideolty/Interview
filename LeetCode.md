@@ -3,7 +3,7 @@
 - 按照热榜排序，目的是记录一下常问的LeetCode题目。
 - cn与com都会涉及。
 - 先把简单与中等的处理了，最后再处理困难
-- :star: — 金典题|:fearful: — hard题|:new_moon_with_face:  —​ 脑筋急转弯、数学降维、其他思想降维、各种降维打击
+- :star: — 经典题|:fearful: — hard题|:new_moon_with_face:  —​ 脑筋急转弯、数学降维、其他思想降维、各种降维打击
 
 所有题目来源：力扣（LeetCode）
 著作权归领扣网络所有。商业转载请联系官方授权，非商业转载请注明出处。
@@ -5189,6 +5189,112 @@ public String addBinary(String a, String b) {
 ```
 
 没有考虑到极端长度不一致的情况下，所以成绩较差。但是由于存在进位的情况，不能直接把更长的那一节拼接过去。
+
+
+
+# [69. x 的平方根](https://leetcode-cn.com/problems/sqrtx/)
+
+实现 int sqrt(int x) 函数。
+
+计算并返回 x 的平方根，其中 x 是非负整数。
+
+由于返回类型是整数，结果只保留整数的部分，小数部分将被舍去。
+
+示例 1:
+```
+输入: 4
+输出: 2
+```
+示例 2:
+```
+输入: 8
+输出: 2
+说明: 8 的平方根是 2.82842..., 
+     由于返回类型是整数，小数部分将被舍去。
+```
+
+
+
+看到这题就想到了《左耳听风-陈皓 —— 魔数 0x5f3759df》的那一节，只不过人家的函数是平方根倒数。简单题就是考思路，我觉得本题使用二分，能够加速遍历。
+
+```java
+class Solution {
+    public int mySqrt(int x) {
+        if(x == 0) return 0;
+        int m = 1;
+        while (true) {
+            while (x > (m << 2) * (m << 2)) {
+                m = m << 2;
+            }
+
+            if ((m + 1) * (m + 1) > x) {
+                return m;
+            }
+
+            m = m + 1;
+        }
+    }
+}
+
+class Solution {
+    public int mySqrt(int x) {
+        int l = 0;
+        int r = x;
+        int ans = -1;
+
+        while (l <= r){
+            int mid = (l + r) / 2;
+            if (x >= mid * mid){
+                ans = mid;
+                l = mid + 1;
+            }else {
+                r = mid - 1;
+            }
+        }
+        return ans;
+    }
+}
+
+执行结果：超出时间限制
+最后执行的输入：2147395599
+```
+
+两种都超了，看来思路不对。
+
+
+
+官方：
+
+**方法一：袖珍计算器算法**
+
+**方法二：二分查找**
+
+```java
+class Solution {
+    public int mySqrt(int x) {
+        int l = 0, r = x, ans = -1;
+        while (l <= r) {
+            int mid = l + (r - l) / 2;
+            if ((long) mid * mid <= x) {
+                ans = mid;
+                l = mid + 1;
+            } else {
+                r = mid - 1;
+            }
+        }
+        return ans;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/sqrtx/solution/x-de-ping-fang-gen-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+**方法三：牛顿迭代**
+
 
 
 
