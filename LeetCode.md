@@ -4341,11 +4341,29 @@ class Solution {
 
 题目写的是可以跳远的**最大**长度，只是最大长度，并不是说只能跳跃那么长。
 
-那么，还是贪心，每次跳最长的，然后判断最后能否跳到最后一个位置，不能的话就回溯。
+那么，还是贪心，~~每次跳最长的，然后判断最后能否跳到最后一个位置，不能的话就回溯。~~ 由于这个跳跃是有连续性的，所以可以遍历每个元素，判断是否可以到达，如果可以到达就取出当前元素的可以跳跃距离，与最大跳跃距离进行比较，直到最后。一定是需要遍历每一个元素的，因为你不知道哪个元素里面就藏有大礼包。
 
+主要考察思路，需要记一下思路。
 
-
-
+```java
+class Solution {
+    public boolean canJump(int[] nums) {
+        int cur = 0;
+        int maxLength = 0;
+        while (cur <= maxLength){
+            // 判断当前的点是否能到达
+            maxLength = Math.max(maxLength, cur + nums[cur]);
+            if (maxLength >= nums.length - 1){
+                return true;
+            }
+            cur++;
+        }
+        return false;
+    }
+}
+执行用时：2 ms, 在所有 Java 提交中击败了83.16% 的用户
+内存消耗：40.5 MB, 在所有 Java 提交中击败了28.10% 的用户
+```
 
 
 
