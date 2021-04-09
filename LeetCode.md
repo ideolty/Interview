@@ -4038,12 +4038,6 @@ class Solution {
 
 
 
-
-
-
-
-
-
 官方
 
 **回溯**
@@ -4095,6 +4089,153 @@ class Solution {
 - 最后写以 3 开头的全排列，它们是：`[3, 1, 2]`, `[3, 2, 1]`，即 `3` + `[1, 2]` 的全排列。
 
 <img src="截图/leetCode/46-image.png" alt="image.png" style="zoom: 50%;" />
+
+
+
+# [47. 全排列 II](https://leetcode-cn.com/problems/permutations-ii/)
+
+给定一个可包含重复数字的序列 nums ，按任意顺序 返回所有不重复的全排列。
+
+ 
+
+示例 1：
+```
+输入：nums = [1,1,2]
+输出：
+[[1,1,2],
+ [1,2,1],
+ [2,1,1]]
+```
+示例 2：
+```
+输入：nums = [1,2,3]
+输出：[[1,2,3],[1,3,2],[2,1,3],[2,3,1],[3,1,2],[3,2,1]]
+```
+
+
+提示：
+- 1 <= nums.length <= 8
+- -10 <= nums[i] <= 10
+
+
+
+基本上与上题也没有区别，与第40题组合总数的解法异曲同工。
+
+```java
+class Solution {
+    public List<List<Integer>> result = new ArrayList<>();
+
+    public List<List<Integer>> permuteUnique(int[] nums) {
+        Arrays.sort(nums);
+        dfs(nums, new ArrayList<>(), new boolean[nums.length]);
+        return result;
+    }
+
+    public void dfs(int[] nums, List<Integer> list, boolean[] used){
+        if (list.size() == nums.length){
+            result.add(new ArrayList<>(list));
+            return;
+        }
+
+        int pre = Integer.MIN_VALUE;
+        for (int i = 0; i < nums.length; i++) {
+            if (used[i]){
+                continue;
+            }
+
+            if (pre != Integer.MIN_VALUE && nums[i] == pre){
+                continue;
+            }
+            pre = nums[i];
+
+            list.add(nums[i]);
+            used[i] = true;
+            dfs(nums, list, used);
+            list.remove(list.size() - 1);
+            used[i] = false;
+        }
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：39.3 MB, 在所有 Java 提交中击败了42.96% 的用户
+```
+
+
+
+
+
+评论区高赞
+
+这一题在「力扣」第 46 题： 全排列 的基础上增加了 序列中的元素可重复 这一条件，但要求：返回的结果又不能有重复元素。
+
+思路是：在遍历的过程中，一边遍历一遍检测，在一定会产生重复结果集的地方剪枝。
+
+<img src="截图/leetCode/1600386643-uhkGmW-image.png" alt="image.png" style="zoom:50%;" />
+
+```java
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Deque;
+import java.util.List;
+
+public class Solution {
+
+    public List<List<Integer>> permuteUnique(int[] nums) {
+        int len = nums.length;
+        List<List<Integer>> res = new ArrayList<>();
+        if (len == 0) {
+            return res;
+        }
+
+        // 排序（升序或者降序都可以），排序是剪枝的前提
+        Arrays.sort(nums);
+
+        boolean[] used = new boolean[len];
+        // 使用 Deque 是 Java 官方 Stack 类的建议
+        Deque<Integer> path = new ArrayDeque<>(len);
+        dfs(nums, len, 0, used, path, res);
+        return res;
+    }
+
+    private void dfs(int[] nums, int len, int depth, boolean[] used, Deque<Integer> path, List<List<Integer>> res) {
+        if (depth == len) {
+            res.add(new ArrayList<>(path));
+            return;
+        }
+
+        for (int i = 0; i < len; ++i) {
+            if (used[i]) {
+                continue;
+            }
+
+            // 剪枝条件：i > 0 是为了保证 nums[i - 1] 有意义
+            // 写 !used[i - 1] 是因为 nums[i - 1] 在深度优先遍历的过程中刚刚被撤销选择
+            if (i > 0 && nums[i] == nums[i - 1] && !used[i - 1]) {
+                continue;
+            }
+
+            path.addLast(nums[i]);
+            used[i] = true;
+
+            dfs(nums, len, depth + 1, used, path, res);
+            // 回溯部分的代码，和 dfs 之前的代码是对称的
+            used[i] = false;
+            path.removeLast();
+        }
+    }
+}
+
+
+作者：liweiwei1419
+链接：https://leetcode-cn.com/problems/permutations-ii/solution/hui-su-suan-fa-python-dai-ma-java-dai-ma-by-liwe-2/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
 
 
 
