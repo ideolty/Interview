@@ -6863,8 +6863,6 @@ class Solution {
 
 解集 **不能** 包含重复的子集。返回的解集中，子集可以按 **任意顺序** 排列。
 
- 
-
 示例 1：
 ```
 输入：nums = [1,2,2]
@@ -6882,6 +6880,78 @@ class Solution {
 - -10 <= nums[i] <= 10
 
 
+
+两种思路统计子集
+
+1. 按题目的输出，每个数字可以选择取or不取。
+2. 按照每次取的个数来计算子集。
+
+
+
+按照第一种思路
+
+这样，其实每个数字只有两种可能，但是把数字独立来看了，相互之间是没有联系的，这样去重就不知道如何去做，只能借助于set了
+
+```java
+public static Set<List<Integer>> set = new HashSet<>();
+    public static List<List<Integer>> subsetsWithDup2(int[] nums) {
+        dfs2(nums, new ArrayList<>(), 0);
+        return new ArrayList<>(set);
+    }
+
+    public static void dfs2(int[] nums, List<Integer> list, int term){
+        if (nums.length == term){
+            set.add(new ArrayList<>(list));
+            return;
+        }
+
+        // 取了当前值的情况
+        list.add(nums[term]);
+        dfs2(nums, list, term + 1);
+        list.remove(list.size() - 1);
+
+        // 没取的情况
+        dfs2(nums, list, term + 1);
+    }
+```
+
+
+
+按照第二种思路，使用递归的方式
+
+```java
+class Solution {
+    public List<List<Integer>> result = new ArrayList<>();
+
+    public List<List<Integer>> subsetsWithDup(int[] nums) {
+        Arrays.sort(nums);
+        result.add(new ArrayList<>());
+        for (int gap = 1; gap <= nums.length; gap++){
+            dfs(nums, new ArrayList<>(), gap, 0);
+        }
+        return result;
+    }
+
+    public void dfs(int[] nums, List<Integer> list, int gap, int term){
+        if (list.size() == gap){
+            result.add(new ArrayList<>(list));
+            return;
+        }
+				
+        int pre = Integer.MIN_VALUE;
+        for (int i = term; i < nums.length; i++) {
+            // 当然这个if可以写的更加”标准“一点
+          	// if(i > term && nums[i - 1] != nums[i])
+            if (pre != nums[i]){
+                pre = nums[i];
+                list.add(nums[i]);
+                dfs(nums, list, gap, i + 1);
+                list.remove(list.size() - 1);
+            }
+        }
+    }
+}
+```
 
 
 
