@@ -5073,6 +5073,173 @@ class Solution {
 
 
 
+# [57. 插入区间](https://leetcode-cn.com/problems/insert-interval/)
+
+给你一个 无重叠的 ，按照区间起始端点排序的区间列表。
+
+在列表中插入一个新的区间，你需要确保列表中的区间仍然有序且不重叠（如果有必要的话，可以合并区间）。
+
+ 
+
+示例 1：
+```
+输入：intervals = [[1,3],[6,9]], newInterval = [2,5]
+输出：[[1,5],[6,9]]
+```
+示例 2：
+```
+输入：intervals = [[1,2],[3,5],[6,7],[8,10],[12,16]], newInterval = [4,8]
+输出：[[1,2],[3,10],[12,16]]
+解释：这是因为新的区间 [4,8] 与 [3,5],[6,7],[8,10] 重叠。
+```
+示例 3：
+```
+输入：intervals = [], newInterval = [5,7]
+输出：[[5,7]]
+```
+示例 4：
+```
+输入：intervals = [[1,5]], newInterval = [2,3]
+输出：[[1,5]]
+```
+示例 5：
+```
+输入：intervals = [[1,5]], newInterval = [2,7]
+输出：[[1,7]]
+```
+
+
+提示：
+- 0 <= intervals.length <= 104
+- intervals[i].length == 2
+- 0 <= intervals[i][0] <= intervals[i][1] <= 105
+- intervals 根据 intervals[i][0] 按 升序 排列
+- newInterval.length == 2
+- 0 <= newInterval[0] <= newInterval[1] <= 105
+
+
+
+思考
+
+和上一题感觉差不多，理清思路就行了
+
+1. 单独的一个区间
+2. 可以与前一个合并、后一个合并，前后一起合并
+3. 可以包掉一个或多个
+
+整体使用滑动窗口，左右指针即可。
+
+```java
+class Solution {
+    public int[][] insert(int[][] intervals, int[] newInterval) {
+        List<int[]> result = new ArrayList<>();
+        int l = newInterval[0];
+        int r = newInterval[1];
+
+        int i = 0;
+        for (; i < intervals.length; i++) {
+            int[] interval = intervals[i];
+            int left = interval[0];
+            int right = interval[1];
+
+            // 完全大于当前区间
+            if (right < newInterval[0]){
+                result.add(new int[]{left, right});
+                continue;
+            }
+
+            // 完全小于当前区间
+            if (newInterval[1] < left){
+                break;
+            }
+
+            // 与当前区间接上了或者有重合或者包括了
+            l = Math.min(l, left);
+            r = Math.max(r, right);
+        }
+
+        result.add(new int[]{l, r});
+        while (i < intervals.length){
+            int[] interval = intervals[i];
+            result.add(interval);
+            i++;
+        }
+
+        return result.toArray(new int[result.size()][2]);
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了99.85% 的用户
+内存消耗：40.9 MB, 在所有 Java 提交中击败了21.99% 的用户
+```
+
+官方的思路基本上一致
+
+
+
+官方
+
+**方法一：模拟**
+
+思路与算法
+
+在给定的区间集合 $\mathcal{X}$ 互不重叠的前提下，当我们需要插入一个新的区间 $[\textit{left}, \textit{right}]$时，我们只需要：
+
+- 找出所有与区间 $S$ 重叠的区间集合 $\mathcal{X}'$；
+- 将 $\mathcal{X}'$ 中的所有区间连带上区间 S 合并成一个大区间；
+- 最终的答案即为不与 $\mathcal{X}'$ 重叠的区间以及合并后的大区间。
+
+<img src="截图/leetCode/1.png" alt="fig1" style="zoom:45%;" />
+
+
+
+```java
+class Solution {
+    public int[][] insert(int[][] intervals, int[] newInterval) {
+        int left = newInterval[0];
+        int right = newInterval[1];
+        boolean placed = false;
+        List<int[]> ansList = new ArrayList<int[]>();
+        for (int[] interval : intervals) {
+            if (interval[0] > right) {
+                // 在插入区间的右侧且无交集
+                if (!placed) {
+                    ansList.add(new int[]{left, right});
+                    placed = true;                    
+                }
+                ansList.add(interval);
+            } else if (interval[1] < left) {
+                // 在插入区间的左侧且无交集
+                ansList.add(interval);
+            } else {
+                // 与插入区间有交集，计算它们的并集
+                left = Math.min(left, interval[0]);
+                right = Math.max(right, interval[1]);
+            }
+        }
+        if (!placed) {
+            ansList.add(new int[]{left, right});
+        }
+        int[][] ans = new int[ansList.size()][2];
+        for (int i = 0; i < ansList.size(); ++i) {
+            ans[i] = ansList.get(i);
+        }
+        return ans;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/insert-interval/solution/cha-ru-qu-jian-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
 # [58. 最后一个单词的长度](https://leetcode-cn.com/problems/length-of-last-word/)
 
 给你一个字符串 s，由若干单词组成，单词之间用空格隔开。返回字符串中最后一个单词的长度。如果不存在最后一个单词，请返回 0 。
@@ -6687,6 +6854,37 @@ class Solution {
 执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
 内存消耗：38.3 MB, 在所有 Java 提交中击败了89.06% 的用户
 ```
+
+
+
+# [90. 子集 II](https://leetcode-cn.com/problems/subsets-ii/)
+
+给你一个整数数组 nums ，其中可能包含重复元素，请你返回该数组所有可能的子集（幂集）。
+
+解集 **不能** 包含重复的子集。返回的解集中，子集可以按 **任意顺序** 排列。
+
+ 
+
+示例 1：
+```
+输入：nums = [1,2,2]
+输出：[[],[1],[1,2],[1,2,2],[2],[2,2]]
+```
+示例 2：
+```
+输入：nums = [0]
+输出：[[],[0]]
+```
+
+
+提示：
+- 1 <= nums.length <= 10
+- -10 <= nums[i] <= 10
+
+
+
+
+
 
 
 
