@@ -5333,6 +5333,148 @@ class Solution {
 
 
 
+# [61. 旋转链表](https://leetcode-cn.com/problems/rotate-list/)
+
+给你一个链表的头节点 head ，旋转链表，将链表每个节点向右移动 k 个位置。
+
+ 
+
+示例 1：
+
+<img src="截图/leetCode/rotate1.jpg" alt="img" style="zoom: 67%;" />
+
+```
+输入：head = [1,2,3,4,5], k = 2
+输出：[4,5,1,2,3]
+```
+示例 2：
+
+<img src="截图/leetCode/roate2.jpg" alt="img" style="zoom:67%;" />
+
+```
+输入：head = [0,1,2], k = 4
+输出：[2,0,1]
+```
+
+
+提示：
+- 链表中节点的数目在范围 [0, 500] 内
+- -100 <= Node.val <= 100
+- 0 <= k <= 2 * 109
+
+
+
+第一眼看没看懂题目意思，题目中 ”将链表每个节点向右移动“ 指你需要整体看来链表，而不是先把第一个节点往右移动，第二个节点再往右移动，而是整体往右移动，而且是成环的，最后一个节点再移动会回到第一个节点。
+
+链表题，大多都是考思路，记住答案的思路就ok，评论区看下来，思路是模拟，然后给出了两种方案
+
+- 链表成环
+
+  把尾结点与头结点连起来，然后从头结点往后走 total - k 个位置后断开，后面那个位置就是新的头节点。
+
+- 快慢指针
+
+  快指针先走k步，然后慢指针与快指针一起走，直到走掉链表的尾节点，把尾节点与头节点连起来。此时慢指针的下一个位置，就是原链表倒数第k个节点，也就是新链表的头结点。
+
+
+
+
+
+
+
+评论区高赞
+
+**「快慢指针」解法**
+
+本质还是道模拟题，分步骤处理即可：
+
+- 避免不必要的旋转：与链表长度成整数倍的「旋转」都是没有意义的（旋转前后链表不变）
+- 使用「快慢指针」找到倒数第 k 个节点（新头结点），然后完成基本的链接与断开与断开
+
+```java
+class Solution {
+    public ListNode rotateRight(ListNode head, int k) {
+        if (head == null || k == 0) return head;
+        // 计算有效的 k 值：对于与链表长度成整数倍的「旋转」都是没有意义的（旋转前后链表不变）
+        int tot = 0;
+        ListNode tmp = head;
+        while (tmp != null && ++tot > 0) tmp = tmp.next;
+        k %= tot;
+        if (k == 0) return head;
+
+        // 使用「快慢指针」找到倒数第 k 个节点（新头结点）：slow 会停在「新头结点」的「前一位」，也就是「新尾结点」
+        ListNode slow = head, fast = head;
+        while (k-- > 0) fast = fast.next;
+        while (fast.next != null) {
+            slow = slow.next;
+            fast = fast.next;
+        }
+        // 保存新头结点，并将新尾结点的 next 指针置空
+        ListNode nHead = slow.next;
+        slow.next = null;
+        // 将新链表的前半部分（原链表的后半部分）与原链表的头结点链接上
+        fast.next = head;
+        return nHead;
+    }
+}
+
+
+作者：AC_OIer
+链接：https://leetcode-cn.com/problems/rotate-list/solution/kuai-man-zhi-zhen-ru-he-fen-bu-zou-jie-j-ns7u/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+**「闭合成环」解法**
+
+另外一个做法是，先成环，再断开：
+
+- 找到原链表的最后一个节点，将其与原链表的头结点相连（成环），并统计链表长度，更新有效 k 值
+- 从原链表的头节点出发，找到需要断开的点，进行断开
+
+```java
+class Solution {
+    public ListNode rotateRight(ListNode head, int k) {
+        if (head == null || k == 0) return head;
+        // 先将链表成环，并记录链表的长度
+        // tmp 会记录住原链表最后一位节点
+        int tot = 0;
+        ListNode tmp = head;
+        while (tmp.next != null && ++tot > 0) tmp = tmp.next;
+        tot++;
+        k %= tot;
+        if (k == 0) return head;
+
+        // 正式成环
+        tmp.next = head;
+
+        // 从原链表 head 出发，走 tot - k - 1 步，找到「新尾结点」进行断开，并将其下一个节点作为新节点返回
+        k = tot - k - 1;
+        while (k-- > 0) head = head.next;
+        ListNode nHead = head.next;
+        head.next = null;
+        return nHead;
+    }
+}
+
+
+作者：AC_OIer
+链接：https://leetcode-cn.com/problems/rotate-list/solution/kuai-man-zhi-zhen-ru-he-fen-bu-zou-jie-j-ns7u/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
+
+
+
 
 
 # [62. 不同路径](https://leetcode-cn.com/problems/unique-paths/) :star:
