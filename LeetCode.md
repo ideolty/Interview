@@ -5530,6 +5530,88 @@ class Solution {
 
 
 
+# [59. 螺旋矩阵 II](https://leetcode-cn.com/problems/spiral-matrix-ii/)
+
+给你一个正整数 n ，生成一个包含 1 到 $n^2$ 所有元素，且元素按顺时针顺序螺旋排列的 n x n 正方形矩阵 matrix 。 
+
+示例 1：
+
+![img](截图/leetCode/spiraln.jpg)
+
+```
+输入：n = 3
+输出：[[1,2,3],[8,9,4],[7,6,5]]
+```
+
+示例 2：
+
+```
+输入：n = 1
+输出：[[1]]
+```
+
+提示：
+
+- 1 <= n <= 20
+
+
+
+思考
+
+与54题的差别不大，受评论区代码影响
+
+```java
+class Solution {
+    public int[][] generateMatrix(int n) {
+        int[][] result = new int[n][n];
+
+        int total = n * n;
+        int count = 1;
+        int left = 0;
+        int top = 0;
+        int right = n - 1;
+        int bottom = n - 1;
+        
+        while (count <= total){
+            // 向右
+            for (int i = left; i <= right && count <= total; i++){
+                result[top][i] = count;
+                count++;
+            }
+            top++;
+
+            for (int i = top; i <= bottom && count <= total; i++){
+                result[i][right] = count;
+                count++;
+            }
+            right--;
+
+            for (int i = right; i >= left && count <= total; i--){
+                result[bottom][i] = count;
+                count++;
+            }
+            bottom--;
+
+            for (int i = bottom; i >= top && count <= total; i--){
+                result[i][left] = count;
+                count++;
+            }
+            left++;
+        }
+
+        return result;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：36.5 MB, 在所有 Java 提交中击败了54.71% 的用户
+```
+
+
+
+评论区与官方的思路与54题的完全没有区别。
+
+
+
 
 
 # [61. 旋转链表](https://leetcode-cn.com/problems/rotate-list/)
