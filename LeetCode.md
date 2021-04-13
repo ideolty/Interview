@@ -4825,6 +4825,205 @@ class Solution {
 
 
 
+# [54. 螺旋矩阵](https://leetcode-cn.com/problems/spiral-matrix/)
+
+给你一个 m 行 n 列的矩阵 matrix ，请按照 顺时针螺旋顺序 ，返回矩阵中的所有元素。
+
+示例 1：
+
+<img src="截图/leetCode/spiral1.jpg" alt="img" style="zoom: 67%;" />
+
+```
+输入：matrix = [[1,2,3],[4,5,6],[7,8,9]]
+输出：[1,2,3,6,9,8,7,4,5]
+```
+示例 2：
+
+<img src="截图/leetCode/spiral.jpg" alt="img" style="zoom:67%;" />
+
+```
+输入：matrix = [[1,2,3,4],[5,6,7,8],[9,10,11,12]]
+输出：[1,2,3,4,8,12,11,10,9,5,6,7]
+```
+
+
+提示：
+- m == matrix.length
+- n == matrix[i].length
+- 1 <= m, n <= 10
+- -100 <= matrix[i][j] <= 100
+
+
+
+思考
+
+自己再定义一个`bolean used[][]` 数组，方向是固定的顺时针，一个方向上到头了，转的方向也是固定的。最后所有的数字都被访问了，就终止。
+
+```java
+class Solution {
+    public List<Integer> spiralOrder(int[][] matrix) {
+        boolean[][] visited = new boolean[matrix.length][matrix[0].length];
+        int count = 0;
+        int total = matrix.length * matrix[0].length;
+        List<Integer> result = new ArrayList<>();
+
+        int col = 0;
+        int row = 0;
+
+        // 4个方向 左-1 右1 上-2 下2
+        int direct = 1;
+        while (count < total) {
+            result.add(matrix[row][col]);
+            visited[row][col] = true;
+            count++;
+
+            switch (direct) {
+                case 1:
+                    if (col == matrix[0].length - 1 || visited[row][col + 1]) {
+                        // 往右走到头了 改为向下
+                        direct = 2;
+                        row++;
+                    } else {
+                        col++;
+                    }
+                    break;
+                case 2:
+                    if (row == matrix.length - 1 || visited[row + 1][col]) {
+                        // 往下走到头了 改为向左
+                        direct = -1;
+                        col--;
+                    } else {
+                        row++;
+                    }
+                    break;
+                case -1:
+                    if (col == 0 || visited[row][col - 1]) {
+                        // 往左走到头了 改为向上
+                        direct = -2;
+                        row--;
+                    } else {
+                        col--;
+                    }
+                    break;
+                case -2:
+                    if (row == 0 || visited[row - 1][col]) {
+                        // 往上走到头了 改为向右
+                        direct = 1;
+                        col++;
+                    } else {
+                        row--;
+                    }
+                    break;
+
+            }
+        }
+
+        return result;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：36.8 MB, 在所有 Java 提交中击败了18.82% 的用户
+```
+
+
+
+官方
+
+模拟或者递归
+
+**方法一：模拟**
+
+可以模拟螺旋矩阵的路径。初始位置是矩阵的左上角，初始方向是向右，当路径超出界限或者进入之前访问过的位置时，顺时针旋转，进入下一个方向。
+
+判断路径是否进入之前访问过的位置需要使用一个与输入矩阵大小相同的辅助矩阵 visited\textit{visited}visited，其中的每个元素表示该位置是否被访问过。当一个元素被访问时，将 visited\textit{visited}visited 中的对应位置的元素设为已访问。
+
+如何判断路径是否结束？由于矩阵中的每个元素都被访问一次，因此路径的长度即为矩阵中的元素数量，当路径的长度达到矩阵中的元素数量时即为完整路径，将该路径返回。
+
+```java
+class Solution {
+    public List<Integer> spiralOrder(int[][] matrix) {
+        List<Integer> order = new ArrayList<Integer>();
+        if (matrix == null || matrix.length == 0 || matrix[0].length == 0) {
+            return order;
+        }
+        int rows = matrix.length, columns = matrix[0].length;
+        boolean[][] visited = new boolean[rows][columns];
+        int total = rows * columns;
+        int row = 0, column = 0;
+        int[][] directions = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+        int directionIndex = 0;
+        for (int i = 0; i < total; i++) {
+            order.add(matrix[row][column]);
+            visited[row][column] = true;
+            int nextRow = row + directions[directionIndex][0], nextColumn = column + directions[directionIndex][1];
+            if (nextRow < 0 || nextRow >= rows || nextColumn < 0 || nextColumn >= columns || visited[nextRow][nextColumn]) {
+                directionIndex = (directionIndex + 1) % 4;
+            }
+            row += directions[directionIndex][0];
+            column += directions[directionIndex][1];
+        }
+        return order;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/spiral-matrix/solution/luo-xuan-ju-zhen-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+**方法二：按层模拟**
+
+可以将矩阵看成若干层，首先输出最外层的元素，其次输出次外层的元素，直到输出最内层的元素。
+
+也就是递归，这里使用评论区的代码
+
+```java
+private static List<Integer> spiralOrder(int[][] matrix) {
+        LinkedList<Integer> result = new LinkedList<>();
+        if(matrix==null||matrix.length==0) return result;
+        int left = 0;
+        int right = matrix[0].length - 1;
+        int top = 0;
+        int bottom = matrix.length - 1;
+        int numEle = matrix.length * matrix[0].length;
+        while (numEle >= 1) {
+            for (int i = left; i <= right && numEle >= 1; i++) {
+                result.add(matrix[top][i]);
+                numEle--;
+            }
+            top++;
+            for (int i = top; i <= bottom && numEle >= 1; i++) {
+                result.add(matrix[i][right]);
+                numEle--;
+            }
+            right--;
+            for (int i = right; i >= left && numEle >= 1; i--) {
+                result.add(matrix[bottom][i]);
+                numEle--;
+            }
+            bottom--;
+            for (int i = bottom; i >= top && numEle >= 1; i--) {
+                result.add(matrix[i][left]);
+                numEle--;
+            }
+            left++;
+        }
+        return result;
+    }
+https://leetcode-cn.com/problems/spiral-matrix/solution/luo-xuan-ju-zhen-by-leetcode-solution/441395
+```
+
+这个遍历的dfs写的很漂亮
+
+
+
+
+
+
 # [55. 跳跃游戏](https://leetcode-cn.com/problems/jump-game/)
 
 给定一个非负整数数组 `nums` ，你最初位于数组的 **第一个下标** 。
