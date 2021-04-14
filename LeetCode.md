@@ -6736,6 +6736,190 @@ exection -> execution (插入 'u')
 
 
 
+# [74. 搜索二维矩阵](https://leetcode-cn.com/problems/search-a-2d-matrix/)
+
+编写一个高效的算法来判断 m x n 矩阵中，是否存在一个目标值。该矩阵具有如下特性：
+- 每行中的整数从左到右按升序排列。
+- 每行的第一个整数大于前一行的最后一个整数。
+
+ 
+
+示例 1：
+
+<img src="截图/leetCode/mat.jpg" alt="img" style="zoom:67%;" />
+
+```
+输入：matrix = [[1,3,5,7],[10,11,16,20],[23,30,34,60]], target = 3
+输出：true
+```
+示例 2：
+
+<img src="截图/leetCode/74mat2.jpg" alt="img" style="zoom:67%;" />
+
+```
+输入：matrix = [[1,3,5,7],[10,11,16,20],[23,30,34,60]], target = 13
+输出：false
+```
+
+
+提示：
+- m == matrix.length
+- n == matrix[i].length
+- 1 <= m, n <= 100
+- -104 <= matrix[i][j], target <= 104
+
+
+
+思考
+
+由于是按大小排好了顺序的，所以考虑二分，首先在第一列上使用二分法，可以定位到一行，然后在行上再进行二分。
+
+```java
+class Solution {
+    public boolean searchMatrix(int[][] matrix, int target) {
+        int m = matrix.length;
+        int n = matrix[0].length;
+        if (target < matrix[0][0]){
+            return false;
+        }
+
+        if (target > matrix[m - 1][n - 1]){
+            return false;
+        }
+
+        // 在第一列上进行二分，定位到具体的某一行
+        int top = 0;
+        int bottom = m - 1;
+        int cur;
+        while (Math.abs(top - bottom) > 1){
+            cur = top + (bottom - top) / 2;
+            if (matrix[cur][0] == target){
+                return true;
+            }
+
+            if (matrix[cur][0] > target){
+                bottom = cur - 1;
+            }else {
+                top = cur;
+            }
+        }
+
+        if (matrix[bottom][0] <= target){
+            top = bottom;
+        }
+
+        // 在行上进行二分，定位到具体的某一列
+        int l = 0;
+        int r = n - 1;
+        while (l <= r){
+            cur = (l + r) / 2;
+            if (matrix[top][cur] == target){
+                return true;
+            }
+
+            if (matrix[top][cur] > target){
+                r = cur - 1;
+            }else {
+                l = cur + 1;
+            }
+        }
+
+        return false;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38 MB, 在所有 Java 提交中击败了49.30% 的用户
+```
+
+
+
+官方
+
+**方法一：两次二分查找**
+
+```java
+class Solution {
+    public boolean searchMatrix(int[][] matrix, int target) {
+        int rowIndex = binarySearchFirstColumn(matrix, target);
+        if (rowIndex < 0) {
+            return false;
+        }
+        return binarySearchRow(matrix[rowIndex], target);
+    }
+
+    public int binarySearchFirstColumn(int[][] matrix, int target) {
+        int low = -1, high = matrix.length - 1;
+        while (low < high) {
+            int mid = (high - low + 1) / 2 + low;
+            if (matrix[mid][0] <= target) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return low;
+    }
+
+    public boolean binarySearchRow(int[] row, int target) {
+        int low = 0, high = row.length - 1;
+        while (low <= high) {
+            int mid = (high - low) / 2 + low;
+            if (row[mid] == target) {
+                return true;
+            } else if (row[mid] > target) {
+                high = mid - 1;
+            } else {
+                low = mid + 1;
+            }
+        }
+        return false;
+    }
+}
+```
+
+
+
+**方法二：一次二分查找**
+
+思路
+
+若将矩阵每一行拼接在上一行的末尾，则会得到一个升序数组，我们可以在该数组上二分找到目标元素。
+
+代码实现时，可以二分升序数组的下标，将其映射到原矩阵的行和列上。
+
+```java
+class Solution {
+    public boolean searchMatrix(int[][] matrix, int target) {
+        int m = matrix.length, n = matrix[0].length;
+        int low = 0, high = m * n - 1;
+        while (low <= high) {
+            int mid = (high - low) / 2 + low;
+            int x = matrix[mid / n][mid % n];
+            if (x < target) {
+                low = mid + 1;
+            } else if (x > target) {
+                high = mid - 1;
+            } else {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/search-a-2d-matrix/solution/sou-suo-er-wei-ju-zhen-by-leetcode-solut-vxui/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
 # [75. 颜色分类](https://leetcode-cn.com/problems/sort-colors/)
 
 给定一个包含红色、白色和蓝色，一共 n 个元素的数组，原地对它们进行排序，使得相同颜色的元素相邻，并按照红色、白色、蓝色顺序排列。
