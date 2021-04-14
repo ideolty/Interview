@@ -5916,6 +5916,141 @@ class Solution {
 
 
 
+# [63. 不同路径 II](https://leetcode-cn.com/problems/unique-paths-ii/)
+
+一个机器人位于一个 m x n 网格的左上角 （起始点在下图中标记为“Start” ）。
+
+机器人每次只能向下或者向右移动一步。机器人试图达到网格的右下角（在下图中标记为“Finish”）。
+
+现在考虑网格中有障碍物。那么从左上角到右下角将会有多少条不同的路径？
+
+示例 1：
+
+<img src="截图/leetCode/robot1.jpg" alt="img" style="zoom:67%;" />
+
+```
+输入：obstacleGrid = [[0,0,0],[0,1,0],[0,0,0]]
+输出：2
+解释：
+3x3 网格的正中间有一个障碍物。
+从左上角到右下角一共有 2 条不同的路径：
+1. 向右 -> 向右 -> 向下 -> 向下
+2. 向下 -> 向下 -> 向右 -> 向右
+```
+示例 2：
+
+<img src="截图/leetCode/robot2.jpg" alt="img"  />
+
+```
+输入：obstacleGrid = [[0,1],[0,0]]
+输出：1
+```
+
+
+提示：
+- m == obstacleGrid.length
+- n == obstacleGrid[i].length
+- 1 <= m, n <= 100
+- $obstacleGrid[i][j]$ 为 0 或 1
+
+
+
+思考
+
+还是dp，没有区别啊。
+
+
+
+```java
+class Solution {
+    public int uniquePathsWithObstacles(int[][] obstacleGrid) {
+        int[][] dp = new int[obstacleGrid.length][obstacleGrid[0].length];
+        // 左上角可能有石头
+        if (obstacleGrid[0][0] == 1){
+            return 0;
+        }
+        dp[0][0] = 1;
+
+        int i = 1;
+        // 初始化 第一行
+        for (; i < obstacleGrid[0].length && obstacleGrid[0][i] == 0; i++){
+            dp[0][i] = 1;
+        }
+        // 第一行有石头 石头后面的格子压根就到不了了
+        for (; i < obstacleGrid[0].length; i++){
+            dp[0][i] = 0;
+        }
+
+        for (i = 1; i < obstacleGrid.length && obstacleGrid[i][0] == 0; i++){
+            dp[i][0] = 1;
+        }
+        // 第一列有石头 石头后面的格子压根就到不了了
+        for (; i < obstacleGrid.length; i++){
+            dp[i][0] = 0;
+        }
+
+        for (int row = 1; row < obstacleGrid.length; row++){
+            for (int col = 1; col < obstacleGrid[0].length; col++){
+                if (obstacleGrid[row][col] == 1){
+                    dp[row][col] = 0;
+                    continue;
+                }
+
+                dp[row][col] = (obstacleGrid[row - 1][col] == 1 ? 0 : dp[row - 1][col])
+                        + (obstacleGrid[row][col - 1] == 1 ? 0 : dp[row][col - 1]);
+            }
+        }
+
+        return dp[obstacleGrid.length - 1][obstacleGrid[0].length - 1];
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38 MB, 在所有 Java 提交中击败了9.84% 的用户
+```
+
+
+
+官方
+
+很显然我们可以给出一个时间复杂度 O(nm)并且空间复杂度也是 O(nm) 的实现，由于这里 f(i,j) 只与 f(i−1,j) 和 f(i,j−1) 相关，我们可以运用**「滚动数组思想」**把空间复杂度优化称 O(m)。「滚动数组思想」是一种常见的动态规划优化方法，在我们的题目中已经多次使用到，例如「剑指 Offer 46. 把数字翻译成字符串」、「70. 爬楼梯」等，当我们定义的状态在动态规划的转移方程中只和某几个状态相关的时候，就可以考虑这种优化方法，目的是给空间复杂度「降维」。如果你还不知道什么是「滚动数组思想」，一定要查阅相关资料进行学习哦。
+
+代码中给出了使用「滚动数组思想」优化后的实现。 //todo
+
+```java
+class Solution {
+    public int uniquePathsWithObstacles(int[][] obstacleGrid) {
+        int n = obstacleGrid.length, m = obstacleGrid[0].length;
+        int[] f = new int[m];
+
+        f[0] = obstacleGrid[0][0] == 0 ? 1 : 0;
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < m; ++j) {
+                if (obstacleGrid[i][j] == 1) {
+                    f[j] = 0;
+                    continue;
+                }
+                if (j - 1 >= 0 && obstacleGrid[i][j - 1] == 0) {
+                    f[j] += f[j - 1];
+                }
+            }
+        }
+        
+        return f[m - 1];
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/unique-paths-ii/solution/bu-tong-lu-jing-ii-by-leetcode-solution-2/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
 
 
 # [64. 最小路径和](https://leetcode-cn.com/problems/minimum-path-sum/)
