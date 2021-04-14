@@ -7895,7 +7895,126 @@ class Solution {
 - rows == matrix.length
 - cols == matrix[0].length
 - 0 <= row, cols <= 200
-- matrix[i][j] 为 '0' 或 '1'
+- $matrix[i][j]$ 为 '0' 或 '1'
+
+
+
+# [86. 分隔链表](https://leetcode-cn.com/problems/partition-list/)
+给你一个链表的头节点 head 和一个特定值 x ，请你对链表进行分隔，使得所有 **小于** x 的节点都出现在 **大于或等于** x 的节点之前。
+
+你应当 **保留** 两个分区中每个节点的初始相对位置。
+
+ 
+
+示例 1：
+
+![img](截图/leetCode/partition.jpg)
+
+```
+输入：head = [1,4,3,2,5,2], x = 3
+输出：[1,2,2,4,3,5]
+```
+示例 2：
+```
+输入：head = [2,1], x = 2
+输出：[1,2]
+```
+
+
+提示：
+- 链表中节点的数目在范围 [0, 200] 内
+- -100 <= Node.val <= 100
+- -200 <= x <= 200
+
+
+
+思考
+
+要保留相对位置就需要按顺序遍历。创建左指针，指向最后一个小于目标的节点，依次遍历每个节点，把小于目标的节点移动到左节点之后。
+
+```java
+class Solution {
+    public ListNode partition(ListNode head, int x) {
+        if (head == null) return null;
+      	// 左节点 记录小于x的节点
+        ListNode left = new ListNode();
+      	// 哑结点
+        ListNode first = left;
+        left.next = head;
+      	// 当前遍历的节点
+        ListNode cur = left;
+      	// 当前遍历的节点的前一个节点
+        ListNode pre = left;
+
+      	// 确定left节点的位置 找到第一个大于等于x的前一个节点
+        while (cur.next != null && cur.next.val < x){
+            left = left.next;
+            pre = cur;
+            cur = cur.next;
+        }
+        cur = cur.next;
+
+        while (cur != null){
+            if (cur.val >= x){
+                pre = cur;
+                cur = cur.next;
+                continue;
+            }
+
+            // 断掉小于x的节点 放到left后面去
+            pre.next = cur.next;
+            cur.next = left.next;
+            left.next = cur;
+            left = left.next;
+            cur = pre.next;
+        }
+
+        return first.next;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：37.9 MB, 在所有 Java 提交中击败了23.08% 的用户
+```
+
+
+
+官方
+
+方法一：模拟
+
+直观来说我们只需维护两个链表 $\textit{small}$ 和 $\textit{large}$ 即可，$\textit{small}$ 链表按顺序存储所有小于 x 的节点，$\textit{large}$ 链表按顺序存储所有大于等于 x 的节点。遍历完原链表后，我们只要将 $\textit{small}$ 链表尾节点指向 $\textit{large}$ 链表的头节点即能完成对链表的分隔。
+
+```java
+class Solution {
+    public ListNode partition(ListNode head, int x) {
+        ListNode small = new ListNode(0);
+        ListNode smallHead = small;
+        ListNode large = new ListNode(0);
+        ListNode largeHead = large;
+        while (head != null) {
+            if (head.val < x) {
+                small.next = head;
+                small = small.next;
+            } else {
+                large.next = head;
+                large = large.next;
+            }
+            head = head.next;
+        }
+        large.next = null;
+        small.next = largeHead.next;
+        return smallHead.next;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/partition-list/solution/fen-ge-lian-biao-by-leetcode-solution-7ade/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
 
 
 
