@@ -7642,6 +7642,135 @@ class Solution {
 
 
 
+# [80. 删除有序数组中的重复项 II](https://leetcode-cn.com/problems/remove-duplicates-from-sorted-array-ii/)
+
+给你一个有序数组 nums ，请你 **原地** 删除重复出现的元素，使每个元素 最多出现两次 ，返回删除后数组的新长度。
+
+不要使用额外的数组空间，你必须在 **原地** 修改输入数组 并在使用 O(1) 额外空间的条件下完成。
+
+示例 1：
+```
+输入：nums = [1,1,1,2,2,3]
+输出：5, nums = [1,1,2,2,3]
+解释：函数应返回新长度 length = 5, 并且原数组的前五个元素被修改为 1, 1, 2, 2, 3 。 不需要考虑数组中超出新长度后面的元素。
+```
+示例 2：
+```
+输入：nums = [0,0,1,1,1,1,2,3,3]
+输出：7, nums = [0,0,1,1,2,3,3]
+解释：函数应返回新长度 length = 7, 并且原数组的前五个元素被修改为 0, 0, 1, 1, 2, 3, 3 。 不需要考虑数组中超出新长度后面的元素。
+```
+
+
+提示：
+- 1 <= nums.length <= 3 * 104
+- $-10^4 <= nums[i] <= 10^4$
+- nums 已按升序排列
+
+
+
+思考
+
+有序数组，所以找重复的元素问题不大，但是删除之后留下的空格是需要后续的元素往前补.
+
+```java
+class Solution {
+    public int removeDuplicates(int[] nums) {
+        if (nums.length == 1){
+            return 1;
+        }
+
+        int start = 0;
+        int length = 0;
+        int pre = nums[0];
+        int same = 1;
+
+        for (int i = 1; i < nums.length; i++){
+            int cur = nums[i];
+            if (pre == cur){
+                pre = cur;
+                same ++;
+                if (same >= 3){
+                    // 需要删除的节点
+                    // 由于节点排好了序 每一个节点都会尝试往左移动 所以空的位置都是连续的
+                    if (length == 0){
+                        start = i;
+                    }
+                    
+                    length++;
+                    continue;
+                }
+            }else {
+                same = 1;
+            }
+
+            // 判断是否需要往左移动 需要的话要移到start的位置
+            // 由于是删除了节点 所以length是不会减少的
+            if (length > 0){
+                nums[start] = nums[i];
+                start++;
+            }
+            
+            pre = cur;
+        }
+        
+        return nums.length - length;
+    }
+}
+
+执行用时：1 ms, 在所有 Java 提交中击败了68.14% 的用户
+内存消耗：38.9 MB, 在所有 Java 提交中击败了5.06% 的用户
+```
+
+
+
+官方的代码漂亮的多
+
+方法一：双指针
+
+思路及解法
+
+在阅读本题前，读者们可以先尝试解决「26. 删除有序数组中的重复项」。
+
+因为给定数组是有序的，所以相同元素必然连续。我们可以使用双指针解决本题，遍历数组检查每一个元素是否应该被保留，如果应该被保留，就将其移动到指定位置。具体地，我们定义两个指针 slow 和 fast 分别为慢指针和快指针，其中慢指针表示处理出的数组的长度，快指针表示已经检查过的数组的长度，即 nums[fast] 表示待检查的第一个元素，nums[slow−1] 为上一个应该被保留的元素所移动到的指定位置。
+
+因为本题要求相同元素最多出现两次而非一次，所以我们需要检查上上个应该被保留的元素 nums[slow−2] 是否和当前待检查元素 nums[fast] 相同。当且仅当 nums[slow−2]=nums[fast] 时，当前待检查元素 nums[fast] 不应该被保留（因为此时必然有 nums[slow−2]=nums[slow−1]=nums[fast]）。最后，slow 即为处理好的数组的长度。
+
+特别地，数组的前两个数必然可以被保留，因此对于长度不超过 2 的数组，我们无需进行任何处理，对于长度超过 2 的数组，我们直接将双指针的初始值设为 2 即可。
+
+```java
+class Solution {
+    public int removeDuplicates(int[] nums) {
+        int n = nums.length;
+        if (n <= 2) {
+            return n;
+        }
+        int slow = 2, fast = 2;
+        while (fast < n) {
+            if (nums[slow - 2] != nums[fast]) {
+                nums[slow] = nums[fast];
+                ++slow;
+            }
+            ++fast;
+        }
+        return slow;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/remove-duplicates-from-sorted-array-ii/solution/shan-chu-pai-xu-shu-zu-zhong-de-zhong-fu-yec2/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
+
 
 
 # [82. 删除排序链表中的重复元素 II](https://leetcode-cn.com/problems/remove-duplicates-from-sorted-list-ii/)
