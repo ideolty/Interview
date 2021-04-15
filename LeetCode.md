@@ -3975,9 +3975,25 @@ class Solution {
 
 猜测是个dp，但是想不出转移方程。事实证明我想多了，本题可以用贪心，
 
-// 待自己重写一遍
+```java
+    public static int jump(int[] nums) {
+        int times = 0;
+        int end = 0;
+        // 本轮可以调到的最大位置
+        int maxPosition = 0;
 
+        for (int i = 0; i < nums.length - 1; i++){
+            maxPosition = Math.max(maxPosition, nums[i] + i);
+            if (i == end){
+                end = maxPosition;
+                times++;
+            }
+        }
+        return times;
+    }
+```
 
+使用评论区思路
 
 
 
