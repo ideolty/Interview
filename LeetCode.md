@@ -8558,6 +8558,157 @@ class Solution {
 
 
 
+# [91. 解码方法](https://leetcode-cn.com/problems/decode-ways/) :cry:
+
+一条包含字母 A-Z 的消息通过以下映射进行了 编码 ：
+```
+'A' -> 1
+'B' -> 2
+...
+'Z' -> 26
+```
+要 **解码** 已编码的消息，所有数字必须基于上述映射的方法，反向映射回字母（可能有多种方法）。例如，"111" 可以将 "1" 中的每个 "1" 映射为 "A" ，从而得到 "AAA" ，或者可以将 "11" 和 "1"（分别为 "K" 和 "A" ）映射为 "KA" 。注意，"06" 不能映射为 "F" ，因为 "6" 和 "06" 不同。
+
+给你一个只含数字的 **非空** 字符串 num ，请计算并返回 解码 方法的 总数 。
+
+题目数据保证答案肯定是一个 **32 位** 的整数。
+
+ 
+
+示例 1：
+```
+输入：s = "12"
+输出：2
+解释：它可以解码为 "AB"（1 2）或者 "L"（12）。
+```
+示例 2：
+```
+输入：s = "226"
+输出：3
+解释：它可以解码为 "BZ" (2 26), "VF" (22 6), 或者 "BBF" (2 2 6) 。
+```
+示例 3：
+```
+输入：s = "0"
+输出：0
+解释：没有字符映射到以 0 开头的数字。含有 0 的有效映射是 'J' -> "10" 和 'T'-> "20" 。由于没有字符，因此没有有效的方法对此进行解码，因为所有数字都需要映射。
+```
+示例 4：
+```
+输入：s = "06"
+输出：0
+```
+
+提示：
+- 1 <= s.length <= 100
+- s 只包含数字，并且可能包含前导零。
+
+
+
+思考
+
+感觉还是一个dfs啊，在每次遍历的时候增加判断条件用来剪枝。
+
+```java
+class Solution {
+    private int count = 0;
+    private boolean unDecode = false;
+
+    public int numDecodings(String s) {
+        // 排除先导0
+        if (s.startsWith("0")){
+            return 0;
+        }
+
+        if (unDecode){
+            return 0;
+        }
+
+        dfs(s, 0);
+        return count;
+    }
+
+    public void dfs(String s, int start){
+        // 出现了无法解析的0
+        if (unDecode){
+            return;
+        }
+
+        if (start == s.length()){
+            count++;
+            return;
+        }
+
+        for (int i = 1; i <= 2; i++){
+            int cur = s.charAt(start) - '0';
+            if (cur == 0){
+                // 检查这个0是否可以被解析
+                if (s.charAt(start - 1) - '0' == 1 || s.charAt(start - 1) - '0' == 2){
+                    continue;
+                }
+                // 0打头的东西解析不了 0结尾的已经在上轮统计过了。
+                unDecode = true;
+                return;
+            }
+            if (start + i > s.length()){
+                break;
+            }
+            String str = s.substring(start, start + i);
+            int num = Integer.parseInt(str);
+            if (num > 26) continue;
+
+            dfs(s, start + i);
+        }
+
+    }
+}
+执行结果：
+超出时间限制
+显示详情
+最后执行的输入：
+"111111111111111111111111111111111111111111111"
+```
+
+这个是正向的，一个个去统计，超时了，看起来应该是有方法来一次统计所有的可能，然后再减去不可能的情况。
+
+
+
+评论区高赞
+
+**算法分析**
+
+![image.png](截图/leetCode/91.png)
+源码
+
+```c++
+int numDecodings(string s) {
+    if (s[0] == '0') return 0;
+    int pre = 1, curr = 1;//dp[-1] = dp[0] = 1
+    for (int i = 1; i < s.size(); i++) {
+        int tmp = curr;
+        if (s[i] == '0')
+            if (s[i - 1] == '1' || s[i - 1] == '2') curr = pre;
+            else return 0;
+        else if (s[i - 1] == '1' || (s[i - 1] == '2' && s[i] >= '1' && s[i] <= '6'))
+            curr = curr + pre;
+        pre = tmp;
+    }
+    return curr;
+}
+
+
+作者：pris_bupt
+链接：https://leetcode-cn.com/problems/decode-ways/solution/c-wo-ren-wei-hen-jian-dan-zhi-guan-de-jie-fa-by-pr/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+真的没有考虑dp……
+
+
+
+
+
 # [93. 复原 IP 地址](https://leetcode-cn.com/problems/restore-ip-addresses/)
 
 给定一个只包含数字的字符串，用以表示一个 IP 地址，返回所有可能从 s 获得的 有效 IP 地址 。你可以按任何顺序返回答案。
