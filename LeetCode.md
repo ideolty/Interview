@@ -6606,6 +6606,171 @@ class Solution {
 }
 ```
 
+
+
+
+
+#### [71. 简化路径](https://leetcode-cn.com/problems/simplify-path/)
+
+给你一个字符串 path ，表示指向某一文件或目录的 Unix 风格 绝对路径 （以 '/' 开头），请你将其转化为更加简洁的规范路径。
+
+在 Unix 风格的文件系统中，一个点（.）表示当前目录本身；此外，两个点 （..） 表示将目录切换到上一级（指向父目录）；两者都可以是复杂相对路径的组成部分。任意多个连续的斜杠（即，'//'）都被视为单个斜杠 '/' 。 对于此问题，任何其他格式的点（例如，'...'）均被视为文件/目录名称。
+
+请注意，返回的 规范路径 必须遵循下述格式：
+- 始终以斜杠 '/' 开头。
+- 两个目录名之间必须只有一个斜杠 '/' 。
+- 最后一个目录名（如果存在）不能 以 '/' 结尾。
+- 此外，路径仅包含从根目录到目标文件或目录的路径上的目录（即，不含 '.' 或 '..'）。
+
+返回简化后得到的 规范路径 。
+
+ 
+
+示例 1：
+```
+输入：path = "/home/"
+输出："/home"
+解释：注意，最后一个目录名后面没有斜杠。 
+```
+示例 2：
+```
+输入：path = "/../"
+输出："/"
+解释：从根目录向上一级是不可行的，因为根目录是你可以到达的最高级。
+```
+示例 3：
+```
+输入：path = "/home//foo/"
+输出："/home/foo"
+解释：在规范路径中，多个连续斜杠需要用一个斜杠替换。
+```
+示例 4：
+```
+输入：path = "/a/./b/../../c/"
+输出："/c"
+```
+
+
+提示：
+- 1 <= path.length <= 3000
+- path 由英文字母，数字，'.'，'/' 或 '_' 组成。
+- path 是一个有效的 Unix 风格绝对路径。
+
+
+
+思考
+
+这个看起来是对队列的应用，使用 `/` 区分文件夹的名称，遇到 `/` 就压入队列，遍历完成后逐个弹出。
+
+```java
+class Solution {
+    public String simplifyPath(String path) {
+        LinkedList<String> queue = new LinkedList<>();
+      	// 补一个 / 方便后续循环处理
+        path = path + "/";
+
+        int cur = 0;
+        StringBuilder stringBuilder = new StringBuilder();
+        while (cur < path.length()){
+            char c = path.charAt(cur);
+            cur++;
+
+            if (c == '/'){
+                String s = stringBuilder.toString();
+                stringBuilder = new StringBuilder();
+
+                if (s.length() > 0){
+                    if (s.equals(".")){
+                        continue;
+                    }
+
+                    // 如果是返回上一层 就删掉一个层级
+                    if (s.equals("..")){
+                        if (!queue.isEmpty()){
+                            queue.removeLast();
+                        }
+                        continue;
+                    }
+                    queue.offer(s);
+                }
+                continue;
+            }
+            stringBuilder.append(c);
+        }
+
+        StringBuilder result = new StringBuilder("/");
+        while (!queue.isEmpty()){
+            result.append(queue.pop()).append("/");
+        }
+        if (result.length() > 1){
+            result.deleteCharAt(result.length() - 1);
+        }
+        return result.toString();
+    }
+}
+执行用时：6 ms, 在所有 Java 提交中击败了50.50% 的用户
+内存消耗：38.5 MB, 在所有 Java 提交中击败了63.20% 的用户
+```
+
+
+
+评论区
+
+解题思路
+
+分割字符串之后根据每种情况进行判定
+.和``就不用管，直接跳过
+..就代表着返回上一级，即弹出队尾元素（要注意判空）
+其他情况直接压入队列就行。
+
+如果对linux比较熟悉的话这道题应该是秒杀的，Linux的目录层级就是用栈实现的
+只不过为了拼接方便这里使用了双端队列
+
+```java
+class Solution {
+    public String simplifyPath(String path) {
+        // 双端队列
+        Deque<String> queue = new LinkedList<>();
+        // 分割字符
+        String[] res = path.split("/");
+        for(int i = 0; i < res.length; i++){
+            String s = res[i];
+            if(s.equals(".") || s.equals("")) continue;
+            else if (s.equals("..")){
+                if(!queue.isEmpty()){
+                    queue.pollLast();
+                }
+            }else{
+                queue.offer(s);
+            }
+        }
+        // 拼接
+        StringBuilder sb = new StringBuilder("/");
+        while(!queue.isEmpty()){
+            sb.append(queue.poll());
+            if(!queue.isEmpty()){
+                sb.append("/");
+            }
+        }
+        // 判空
+        return sb.toString().equals("") ? "/" : sb.toString();
+    }
+}
+
+
+作者：spark-
+链接：https://leetcode-cn.com/problems/simplify-path/solution/shuang-duan-dui-lie-linuxde-si-lu-by-sik-lt4h/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
+
 # [72. 编辑距离](https://leetcode-cn.com/problems/edit-distance/) :fearful:
 
 给你两个单词 word1 和 word2，请你计算出将 word1 转换成 word2 所使用的最少操作数 。
