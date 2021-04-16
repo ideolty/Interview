@@ -4547,9 +4547,30 @@ class Solution {
 
   位运算，a的ASCII码为97，那么字符串 $abc = 97+98+99$ 然后把数字存到map中，这样字符相同的单词算出来的总数值是一样的。
 
+```java
+class Solution {
+    public List<List<String>> groupAnagrams(String[] strs) {
+        Map<String, List<String>> map = new HashMap<>();
 
+        for (String str : strs) {
+            char[] arrayCh = str.toCharArray();
+            Arrays.sort(arrayCh);
+            String key = new String(arrayCh);
+            List<String> list = map.get(key);
+            if (list == null){
+                list = new ArrayList<>();
+            }
+            list.add(str);
+            map.put(key, list);
 
+        }
 
+        return new ArrayList<>(map.values());
+    }
+}
+执行用时：10 ms, 在所有 Java 提交中击败了38.60% 的用户
+内存消耗：41.7 MB, 在所有 Java 提交中击败了40.21% 的用户
+```
 
 
 
@@ -4592,7 +4613,7 @@ class Solution {
 
 
 
-方法二：计数
+**方法二：计数**
 
 由于互为字母异位词的两个字符串包含的字母相同，因此两个字符串中的相同字母出现的次数一定是相同的，故可以将每个字母出现的次数使用字符串表示，作为哈希表的键。
 
