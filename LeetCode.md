@@ -10636,6 +10636,221 @@ class Solution {
 
 
 
+# [109. 有序链表转换二叉搜索树](https://leetcode-cn.com/problems/convert-sorted-list-to-binary-search-tree/) :star:
+
+给定一个单链表，其中的元素按升序排序，将其转换为高度平衡的二叉搜索树。
+
+本题中，一个高度平衡二叉树是指一个二叉树每个节点 的左右两个子树的高度差的绝对值不超过 1。
+
+**示例:**
+
+```
+给定的有序链表： [-10, -3, 0, 5, 9],
+
+一个可能的答案是：[0, -3, 9, -10, null, 5], 它可以表示下面这个高度平衡二叉搜索树：
+
+      0
+     / \
+   -3   9
+   /   /
+ -10  5
+```
+
+
+
+熟悉树的好题目，解法比较多，在使用了最基本的方法之后，还是看一下官方的比较好。
+
+```java
+    public TreeNode sortedListToBST(ListNode head) {
+        if (head == null) return null;
+        if (head.next == null) return new TreeNode(head.val);
+
+        ListNode fast = head;
+        ListNode slow = head;
+        ListNode slowPre = head;
+        while (fast != null && fast.next != null){
+            fast = fast.next.next;
+            slowPre = slow;
+            slow = slow.next;
+        }
+
+        TreeNode root = new TreeNode(slow.val);
+        slowPre.next = null;
+
+        root.left = sortedListToBST(head);
+        root.right = sortedListToBST(slow.next);
+        return root;
+    }
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：39 MB, 在所有 Java 提交中击败了97.93% 的用户
+```
+
+
+
+评论区思路完全一样的
+
+> 其实蛮简单的，就是找链表中间节点作为根节点，然后再找中点两边的子链表的中点，一直递归下去直到子链表为空
+>
+> 1. 特例处理：如果head为空返回空，如果head.next为空返回值为head.val的树节点
+> 2. 利用快慢指针找链表中间节点（slow每次走一步，fast每次走两步，循环停止时slow指向中间节点）
+>    同时记录一下slow的前一个节点pre，这是为后面的断开操作做准备
+> 3. 创建树的根节点，把slow的值赋给它，并断开链表中间节点和左边子链表的连接
+> 4. 递归链表中间节点左右两边的子链表，找子链表的中间节点，再找子链表的子链表的中间节点，如此循环往复，直到符合特例处理的条件递归返回
+>
+> 作者：edelweisskoko
+> 链接：https://leetcode-cn.com/problems/convert-sorted-list-to-binary-search-tree/solution/109-you-xu-lian-biao-zhuan-huan-er-cha-s-x583/
+> 来源：力扣（LeetCode）
+> 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+
+
+再来一个思路非常流畅的
+
+> 作者：xiao_ben_zhu
+> 链接：https://leetcode-cn.com/problems/convert-sorted-list-to-binary-search-tree/solution/shou-hua-tu-jie-san-chong-jie-fa-jie-zhu-shu-zu-ku/
+> 来源：力扣（LeetCode）
+> 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出
+
+
+
+官方
+
+**前言**
+
+将给定的有序链表转换为二叉搜索树的第一步是确定根节点。由于我们需要构造出平衡的二叉树，因此比较直观的想法是让根节点左子树中的节点个数与右子树中的节点个数尽可能接近。这样一来，左右子树的高度也会非常接近，可以达到高度差绝对值不超过 1 的题目要求。
+
+如何找出这样的一个根节点呢？我们可以找出链表元素的中位数作为根节点的值。
+
+根据中位数的性质，链表中小于中位数的元素个数与大于中位数的元素个数要么相等，要么相差 111。此时，小于中位数的元素组成了左子树，大于中位数的元素组成了右子树，它们分别对应着有序链表中连续的一段。在这之后，我们使用分治的思想，继续递归地对左右子树进行构造，找出对应的中位数作为根节点，以此类推。
+
+**方法一：分治**
+具体地，设当前链表的左端点为 $left$，右端点 $right$，包含关系为「左闭右开」，即 $left$ 包含在链表中而 $right$ 不包含在链表中。我们希望快速地找出链表的中位数节点 $mid$。
+
+> 为什么要设定「左闭右开」的关系？由于题目中给定的链表为单向链表，访问后继元素十分容易，但无法直接访问前驱元素。因此在找出链表的中位数节点 $mid$ 之后，如果设定「左闭右开」的关系，我们就可以直接用 $(\textit{left}, \textit{mid})$ 以及 $(\textit{mid}.\textit{next}, \textit{right})$ 来表示左右子树对应的列表了。并且，初始的列表也可以用 $(\textit{head}, \textit{null})$ 方便地进行表示，其中 $\textit{null}$ 表示空节点。
+
+找出链表中位数节点的方法多种多样，其中较为简单的一种是「快慢指针法」。初始时，快指针 $\textit{fast}$ 和慢指针 $\textit{slow}$ 均指向链表的左端点 $left$。我们将快指针 $\textit{fast}$ 向右移动两次的同时，将慢指针 $\textit{slow}$ 向右移动一次，直到快指针到达边界（即快指针到达右端点或快指针的下一个节点是右端点）。此时，慢指针对应的元素就是中位数。
+
+在找出了中位数节点之后，我们将其作为当前根节点的元素，并递归地构造其左侧部分的链表对应的左子树，以及右侧部分的链表对应的右子树。
+
+```java
+class Solution {
+    public TreeNode sortedListToBST(ListNode head) {
+        return buildTree(head, null);
+    }
+
+    public TreeNode buildTree(ListNode left, ListNode right) {
+        if (left == right) {
+            return null;
+        }
+        ListNode mid = getMedian(left, right);
+        TreeNode root = new TreeNode(mid.val);
+        root.left = buildTree(left, mid);
+        root.right = buildTree(mid.next, right);
+        return root;
+    }
+
+    public ListNode getMedian(ListNode left, ListNode right) {
+        ListNode fast = left;
+        ListNode slow = left;
+        while (fast != right && fast.next != right) {
+            fast = fast.next;
+            fast = fast.next;
+            slow = slow.next;
+        }
+        return slow;
+    }
+}
+```
+
+
+
+**方法二：分治 + 中序遍历优化**
+
+方法一的时间复杂度的瓶颈在于寻找中位数节点。由于构造出的二叉搜索树的中序遍历结果就是链表本身，因此我们可以将分治和中序遍历结合起来，减少时间复杂度。
+
+```java
+class Solution {
+    ListNode globalHead;
+
+    public TreeNode sortedListToBST(ListNode head) {
+        globalHead = head;
+        int length = getLength(head);
+        return buildTree(0, length - 1);
+    }
+
+    public int getLength(ListNode head) {
+        int ret = 0;
+        while (head != null) {
+            ++ret;
+            head = head.next;
+        }
+        return ret;
+    }
+
+    public TreeNode buildTree(int left, int right) {
+        if (left > right) {
+            return null;
+        }
+        int mid = (left + right + 1) / 2;
+        TreeNode root = new TreeNode();
+        root.left = buildTree(left, mid - 1);
+        root.val = globalHead.val;
+        globalHead = globalHead.next;
+        root.right = buildTree(mid + 1, right);
+        return root;
+    }
+}
+```
+
+
+
+官方解答下面的评论区暴躁老哥的，这个思路很好的
+
+用什么分治，bfs建树 + dfs填节点值不香吗
+
+```c++
+private:
+    void dfsBuild(ListNode*& li, TreeNode* root){
+        if (root == NULL)
+            return;
+        dfsBuild(li, root->left);
+        root->val = li->val;
+        li = li->next;
+        dfsBuild(li, root->right);
+    }
+public:
+    TreeNode* sortedListToBST(ListNode* head) {
+        if (head == NULL)
+            return NULL;
+        ListNode* node = head;
+        TreeNode* root = new TreeNode(0);
+        queue<TreeNode*> que;
+        que.push(root);
+        node = node->next;
+        while (node){
+            TreeNode* n = que.front();
+            que.pop();
+            n->left = new TreeNode(0);
+            que.push(n->left);
+            node = node->next;
+            if (node == NULL){
+                break;
+            }
+            n->right = new TreeNode(0);
+            que.push(n->right);
+            node = node->next;
+        }
+        dfsBuild(head, root);
+        return root;
+    }
+https://leetcode-cn.com/problems/convert-sorted-list-to-binary-search-tree/solution/you-xu-lian-biao-zhuan-huan-er-cha-sou-suo-shu-1-3/550589
+```
+
+
+
+
+
+
 
 
 # [114. 二叉树展开为链表 ](https://leetcode-cn.com/problems/flatten-binary-tree-to-linked-list/) :star:
