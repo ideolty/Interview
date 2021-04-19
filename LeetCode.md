@@ -10151,8 +10151,8 @@ class Solution {
 示例：
 二叉树：[3,9,20,null,null,15,7],
 
-    3
-    / \
+    		3
+    	 / \
       9  20
         /  \
        15   7
@@ -10508,6 +10508,131 @@ https://leetcode-cn.com/problems/construct-binary-tree-from-preorder-and-inorder
 一些参考
 
 [关于二叉树先序遍历和后序遍历为什么不能唯一确定一个二叉树分析](https://blog.csdn.net/suliangkuanjiayou/article/details/102960971)
+
+
+
+# [107. 二叉树的层序遍历 II](https://leetcode-cn.com/problems/binary-tree-level-order-traversal-ii/)
+
+给定一个二叉树，返回其节点值自底向上的层序遍历。 （即按从叶子节点所在层到根节点所在的层，逐层从左向右遍历）
+
+例如：
+给定二叉树 [3,9,20,null,null,15,7],
+```
+    3
+   / \
+  9  20
+    /  \
+   15   7
+```
+返回其自底向上的层序遍历为：
+```
+[
+  [15,7],
+  [9,20],
+  [3]
+]
+```
+
+
+
+102题写法换了一种，最后再把结果集逆转。
+
+```java
+class Solution {
+    public List<List<Integer>> levelOrderBottom(TreeNode root) {
+        List<List<Integer>> result = new ArrayList<>();
+        if (root == null) return result;
+
+        Queue<TreeNode> queue = new ArrayDeque<>();
+        queue.offer(root);
+
+        int cur = 1;
+        int next = 0;
+        List<Integer> tmp = new ArrayList<>();
+        while (!queue.isEmpty()){
+            TreeNode node = queue.poll();
+
+            if (node.left != null){
+                queue.offer(node.left);
+                next++;
+            }
+
+            if (node.right != null){
+                queue.offer(node.right);
+                next++;
+            }
+
+
+            tmp.add(node.val);
+            if (cur > 1){
+                cur --;
+            } else {
+                result.add(new ArrayList<>(tmp));
+                tmp.clear();
+                cur = next;
+                next = 0;
+            }
+        }
+        Collections.reverse(result);
+        return result;
+    }
+}
+执行用时：2 ms, 在所有 Java 提交中击败了18.17% 的用户
+内存消耗：38.4 MB, 在所有 Java 提交中击败了91.55% 的用户
+```
+
+
+
+官方
+
+**前言**
+
+这道题和「102. 二叉树的层序遍历」相似，不同之处在于，第 102 题要求从上到下输出每一层的节点值，而这道题要求从下到上输出每一层的节点值。除了输出顺序不同以外，这两道题的思路是相同的，都可以使用广度优先搜索进行层次遍历。
+方法一：广度优先搜索
+
+树的层次遍历可以使用广度优先搜索实现。从根节点开始搜索，每次遍历同一层的全部节点，使用一个列表存储该层的节点值。
+
+如果要求从上到下输出每一层的节点值，做法是很直观的，在遍历完一层节点之后，将存储该层节点值的列表添加到结果列表的尾部。这道题要求从下到上输出每一层的节点值，只要对上述操作稍作修改即可：在遍历完一层节点之后，将存储该层节点值的列表添加到结果列表的头部。
+
+为了降低在结果列表的头部添加一层节点值的列表的时间复杂度，结果列表可以使用链表的结构，在链表头部添加一层节点值的列表的时间复杂度是 O(1)。在 Java 中，由于我们需要返回的 List 是一个接口，这里可以使用链表实现；而 C++ 或 Python 中，我们需要返回一个 vector 或 list，它不方便在头部插入元素（会增加时间开销），所以我们可以先用尾部插入的方法得到从上到下的层次遍历列表，然后再进行反转。
+
+```java
+class Solution {
+    public List<List<Integer>> levelOrderBottom(TreeNode root) {
+        List<List<Integer>> levelOrder = new LinkedList<List<Integer>>();
+        if (root == null) {
+            return levelOrder;
+        }
+        Queue<TreeNode> queue = new LinkedList<TreeNode>();
+        queue.offer(root);
+        while (!queue.isEmpty()) {
+            List<Integer> level = new ArrayList<Integer>();
+            int size = queue.size();
+            for (int i = 0; i < size; i++) {
+                TreeNode node = queue.poll();
+                level.add(node.val);
+                TreeNode left = node.left, right = node.right;
+                if (left != null) {
+                    queue.offer(left);
+                }
+                if (right != null) {
+                    queue.offer(right);
+                }
+            }
+            levelOrder.add(0, level);
+        }
+        return levelOrder;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/binary-tree-level-order-traversal-ii/solution/er-cha-shu-de-ceng-ci-bian-li-ii-by-leetcode-solut/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+这个链表就非常的骚
 
 
 
