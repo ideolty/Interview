@@ -4655,6 +4655,181 @@ class Solution {
 
 
 
+
+
+# [50. Pow(x, n)](https://leetcode-cn.com/problems/powx-n/)
+
+实现 pow(x, n) ，即计算 x 的 n 次幂函数（即，xn）。
+
+示例 1：
+```
+输入：x = 2.00000, n = 10
+输出：1024.00000
+```
+示例 2：
+```
+输入：x = 2.10000, n = 3
+输出：9.26100
+```
+示例 3：
+```
+输入：x = 2.00000, n = -2
+输出：0.25000
+解释：2-2 = 1/22 = 1/4 = 0.25
+```
+
+提示：
+- -100.0 < x < 100.0
+- $-2^{31} <= n <= 2^{31}-1$
+- $-10^4 <= x^n <= 10^4$
+
+这种题目，一看就知道是二分，或者说分治，不然一个个去乘，复杂度实在太高了。
+$$
+3^7 = 3^6 * 3 = (3^3)^2*3 = (3^2*3)^2 * 3
+$$
+这就是一个递归了啊，要求当前的值，就需要求出子的值。
+
+```java
+class Solution {
+    public double myPow(double x, int n) {
+        if (n == 0) return 1;
+        return n > 0 ? dfs(x, (long)n) : 1 / dfs(x, -(long)n);
+    }
+
+    public double dfs(double x, long n){
+        if (n == 1){
+            return x;
+        }
+
+        double y = dfs(x, n / 2);
+        if (n % 2 == 0){
+            return y * y;
+        }else {
+            return x * y * y;
+        }
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了98.84% 的用户
+内存消耗：37.7 MB, 在所有 Java 提交中击败了51.30% 的用户
+```
+
+
+
+官方
+
+**前言**
+
+本题的方法被称为**「快速幂算法」**，有递归和迭代两个版本。这篇题解会从递归版本的开始讲起，再逐步引出迭代的版本。
+
+当指数 n 为负数时，我们可以计算 $x^{-n}$ 再取倒数得到结果，因此我们只需要考虑 n 为自然数的情况。
+方法一：快速幂 + 递归
+
+「快速幂算法」的本质是分治算法。举个例子，如果我们要计算 $x^{64}$，我们可以按照：
+$$
+x→x^2→x^4→x^8→x^16→x^32→x^64
+$$
+的顺序，从 x 开始，每次直接把上一次的结果进行平方，计算 6 次就可以得到 $x^{64}$ 的值，而不需要对 x 乘 63 次 x。
+
+再举一个例子，如果我们要计算 $x^{77}$，我们可以按照：
+$$
+x→x^2→x^4→x^9→x^19→x^38→x^77
+$$
+的顺序，在 $x \to x^2$，$x^2 \to x^4$，$x^{19} \to x^{38}$ 这些步骤中，我们直接把上一次的结果进行平方，而在 $x^4 \to x^9$，$x^9 \to x^{19}$，$x^{38} \to x^{77}$ 这些步骤中，我们把上一次的结果进行平方后，还要额外乘一个 x。
+
+直接从左到右进行推导看上去很困难，因为在每一步中，我们不知道在将上一次的结果平方之后，还需不需要额外乘 x。但如果我们从右往左看，分治的思想就十分明显了：
+
+- 当我们要计算 $x^n$ 时，我们可以先递归地计算出 $y = x^{\lfloor n/2 \rfloor}$，其中 $\lfloor a \rfloor$ 表示对 a 进行下取整；
+  
+- 根据递归计算的结果，如果 n 为偶数，那么 $x^n = y^2$；如果 n 为奇数，那么 $x^n = y^2 \times x$；
+  
+- 递归的边界为 $n = 0$，任意数的 0 次方均为 1。
+
+```java
+class Solution {
+    public double myPow(double x, int n) {
+        long N = n;
+        return N >= 0 ? quickMul(x, N) : 1.0 / quickMul(x, -N);
+    }
+
+    public double quickMul(double x, long N) {
+        if (N == 0) {
+            return 1.0;
+        }
+        double y = quickMul(x, N / 2);
+        return N % 2 == 0 ? y * y : y * y * x;
+    }
+}
+```
+
+
+
+**方法二：快速幂 + 迭代**
+
+方法非常好，使用二进制的方式来处理。
+
+```java
+class Solution {
+    public double myPow(double x, int n) {
+        long N = n;
+        return N >= 0 ? quickMul(x, N) : 1.0 / quickMul(x, -N);
+    }
+
+    public double quickMul(double x, long N) {
+        double ans = 1.0;
+        // 贡献的初始值为 x
+        double x_contribute = x;
+        // 在对 N 进行二进制拆分的同时计算答案
+        while (N > 0) {
+            if (N % 2 == 1) {
+                // 如果 N 二进制表示的最低位为 1，那么需要计入贡献
+                ans *= x_contribute;
+            }
+            // 将贡献不断地平方
+            x_contribute *= x_contribute;
+            // 舍弃 N 二进制表示的最低位，这样我们每次只要判断最低位即可
+            N /= 2;
+        }
+        return ans;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/powx-n/solution/powx-n-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+关于第二种，看评论区会更加的好理解
+
+解题思路：
+
+求 xnx^nxn 最简单的方法是通过循环将 nnn 个 xxx 乘起来，依次求 x1,x2,...,xn−1,xnx^1, x^2, ..., x^{n-1}, x^nx1,x2,...,xn−1,xn ，时间复杂度为 O(n)O(n)O(n) 。
+快速幂法 可将时间复杂度降低至 O(log⁡n)O(\log n)O(logn) ，以下从 “二分法” 和 “二进制” 两个角度解析快速幂法。
+快速幂解析（二进制角度）：
+
+    利用十进制数字 nnn 的二进制表示，可对快速幂进行数学化解释。
+    
+    对于任何十进制正整数 nnn ，设其二进制为 "bm...b3b2b1b_m...b_3b_2b_1bm...b3b2b1"（ bib_ibi 为二进制某位值，i∈[1,m]i \in [1,m]i∈[1,m] ），则有：
+        二进制转十进制： n=1b1+2b2+4b3+...+2m−1bmn = 1b_1 + 2b_2 + 4b_3 + ... + 2^{m-1}b_mn=1b1+2b2+4b3+...+2m−1bm （即二进制转十进制公式） ；
+        幂的二进制展开： xn=x1b1+2b2+4b3+...+2m−1bm=x1b1x2b2x4b3...x2m−1bmx^n = x^{1b_1 + 2b_2 + 4b_3 + ... + 2^{m-1}b_m} = x^{1b_1}x^{2b_2}x^{4b_3}...x^{2^{m-1}b_m}xn=x1b1+2b2+4b3+...+2m−1bm=x1b1x2b2x4b3...x2m−1bm ；
+    根据以上推导，可把计算 xnx^nxn 转化为解决以下两个问题：
+        计算 x1,x2,x4,...,x2m−1x^1, x^2, x^4, ..., x^{2^{m-1}}x1,x2,x4,...,x2m−1 的值： 循环赋值操作 x=x2x = x^2x=x2 即可；
+        获取二进制各位 b1,b2,b3,...,bmb_1, b_2, b_3, ..., b_mb1,b2,b3,...,bm 的值： 循环执行以下操作即可。
+            n&1n \& 1n&1 （与操作）： 判断 nnn 二进制最右一位是否为 111 ；
+            n>>1n>>1n>>1 （移位操作）： nnn 右移一位（可理解为删除最后一位）。
+    因此，应用以上操作，可在循环中依次计算 x20b1,x21b2,...,x2m−1bmx^{2^{0}b_1}, x^{2^{1}b_2}, ..., x^{2^{m-1}b_m}x20b1,x21b2,...,x2m−1bm 的值，并将所有 x2i−1bix^{2^{i-1}b_i}x2i−1bi 累计相乘即可，其中：
+
+作者：jyd
+链接：https://leetcode-cn.com/problems/powx-n/solution/50-powx-n-kuai-su-mi-qing-xi-tu-jie-by-jyd/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+
+
+
 # [51. N 皇后](https://leetcode-cn.com/problems/n-queens/) :star:
 
 n 皇后问题 研究的是如何将 n 个皇后放置在 n×n 的棋盘上，并且使皇后彼此之间不能相互攻击。
