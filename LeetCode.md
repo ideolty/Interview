@@ -2241,7 +2241,7 @@ https://leetcode.com/problems/divide-two-integers/discuss/13407/C++-bit-manipula
 
 
 
-# [31. 下一个排列](https://leetcode-cn.com/problems/next-permutation/)
+# [31. 下一个排列](https://leetcode-cn.com/problems/next-permutation/) :star:
 
 实现获取 下一个排列 的函数，算法需要将给定数字序列重新排列成字典序中下一个更大的排列。
 
@@ -4412,7 +4412,7 @@ public class Solution {
 
 
 
-# [48. 旋转图像](https://leetcode-cn.com/problems/rotate-image/)
+# [48. 旋转图像](https://leetcode-cn.com/problems/rotate-image/) :new_moon_with_face:
 
 给定一个 n × n 的二维矩阵 matrix 表示一个图像。请你将图像顺时针旋转 90 度。
 
@@ -4431,7 +4431,7 @@ public class Solution {
 
 **示例 2：**
 
-![img](截图/leetCode/mat2.jpg)
+<img src="截图/leetCode/mat2.jpg" alt="img" style="zoom:67%;" />
 
 ```
 输入：matrix = [[5,1,9,11],[2,4,8,10],[13,3,6,7],[15,14,12,16]]
@@ -4461,7 +4461,36 @@ public class Solution {
 
 
 
-没想法，第一个反应应该是找规律。
+没想法，第一个反应应该是找规律。按照先斜对称，再水平对称的做法来。
+
+```java
+class Solution {
+    public void rotate(int[][] matrix) {
+        // 行数 = 列数
+        int n = matrix.length;
+        // 斜(/)对称 根据次对角线做轴对称 把左上的内容放到左下
+        for (int i = 0; i < n; i++) {
+            // 由于是个正方形 所以只需要遍历一半
+            for (int j = 0; j < n - i - 1; j++) {
+                int tmp = matrix[i][j];
+                matrix[i][j] = matrix[n - j - 1][n - i - 1];
+                matrix[n - j - 1][n - i - 1] = tmp;
+            }
+        }
+
+        // 上下翻转
+        for (int i = 0; i < n / 2; i++) {
+            for (int j = 0; j < n; j++) {
+                int tmp = matrix[i][j];
+                matrix[i][j] = matrix[n - i - 1][j];
+                matrix[n - i - 1][j] = tmp;
+            }
+        }
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38.7 MB, 在所有 Java 提交中击败了19.75% 的用户
+```
 
 
 
