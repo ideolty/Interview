@@ -9998,6 +9998,152 @@ class Solution {
 
 
 
+# [97. 交错字符串](https://leetcode-cn.com/problems/interleaving-string/) :cry:
+
+给定三个字符串 s1、s2、s3，请你帮忙验证 s3 是否是由 s1 和 s2 交错 组成的。
+
+两个字符串 s 和 t 交错 的定义与过程如下，其中每个字符串都会被分割成若干 非空 子字符串：
+
+- s = s1 + s2 + ... + sn
+- t = t1 + t2 + ... + tm
+- |n - m| <= 1
+- 交错 是 s1 + t1 + s2 + t2 + s3 + t3 + ... 或者 t1 + s1 + t2 + s2 + t3 + s3 + ...
+
+**提示：**`a + b` 意味着字符串 `a` 和 `b` 连接。
+
+
+
+**示例 1**
+
+![img](截图/leetCode/interleave.jpg)
+
+```
+输入：s1 = "aabcc", s2 = "dbbca", s3 = "aadbbcbcac"
+输出：true
+```
+
+**示例 2：**
+
+```
+输入：s1 = "aabcc", s2 = "dbbca", s3 = "aadbbbaccc"
+输出：false
+```
+
+**示例 3：**
+
+```
+输入：s1 = "", s2 = "", s3 = ""
+输出：true
+```
+
+**提示：**
+
+- `0 <= s1.length, s2.length <= 100`
+- `0 <= s3.length <= 200`
+- `s1`、`s2`、和 `s3` 都由小写英文字母组成
+
+
+
+一开始确实想用双指针，发现并不对，因为会有大量的回溯。没有好的想法，所以猜测为dp，但是没有想到递推公式，在阅读答案后的代码
+
+```java
+class Solution {
+    public boolean isInterleave(String s1, String s2, String s3) {
+       if (s1.length() + s2.length() != s3.length()){
+            return false;
+        }
+        boolean[][] dp = new boolean[s1.length() + 1][s2.length() + 1];
+        dp[0][0] = true;
+
+        for (int i = 0; i <= s1.length(); i++){
+            for (int j = 0; j <= s2.length(); j++){
+                int p = i + j - 1;
+
+                if (i > 0){
+                    dp[i][j] = dp[i - 1][j] && s1.charAt(i - 1) == s3.charAt(p);
+                }
+
+                if (j > 0){
+                    dp[i][j] = dp[i][j] || dp[i][j - 1] && s2.charAt(j - 1) == s3.charAt(p);
+                }
+            }
+        }
+
+        return dp[s1.length()][s2.length()];
+    }
+}
+执行用时：8 ms, 在所有 Java 提交中击败了23.81% 的用户
+内存消耗：36.8 MB, 在所有 Java 提交中击败了33.65% 的用户
+```
+
+
+
+官方
+
+方法一：动态规划
+
+记 ∣s1∣=n|s_1| = n∣s1∣=n，∣s2∣=m|s_2| = m∣s2∣=m。
+
+思路与算法
+
+双指针法错在哪里？ 也许有同学看到这道题目的第一反应是使用双指针法解决这个问题，指针 $p_1$ 一开始指向 $s_1$ 的头部，指针 $p_1$ 一开始指向 $s_3$ 的头部，指针 $p_3$ 指向 $s_3$ 的头部，每次观察 $p_1$ 和 $p_1$ 指向的元素哪一个和 $p_3$ 指向的元素相等，相等则匹配并后移指针。样例就是一个很好的反例，用这种方法判断 $s_1 = {\rm aabcc}$，$s_2 = {\rm dbbca}$，$s_3 = {\rm aadbbcbcac}$ 时，得到的结果是 $\rm False$，实际应该是 $\rm True$。
+
+解决这个问题的正确方法是动态规划。 首先如果 $|s_1| + |s_2| \neq |s_3|$，那 $s_3$ 必然不可能由 $s_1$ 和 $s_3$ 交错组成。在 $|s_1| + |s_2| = |s_3|$时，我们可以用动态规划来求解。**我们定义 $f(i, j)$ 表示 $s_1$ 的前 $i$ 个元素和 $s_2$ 的前 $j$ 个元素是否能交错组成 $s_3$ 的前 $i + j$ 个元素**。如果 $s_1$ 的第 $i$ 个元素和 $s_2$ 的第 $i + j$ 个元素相等，那么 $s_1$ 的前 $i$ 个元素和 $s_2$ 的前 $j$ 个元素是否能交错组成 $s_3$ 的前 $i + j$ 个元素取决于 $s_1$ 的前 $i - 1$ 个元素和 $s_2$ 的前 $j$ 个元素是否能交错组成 $s_3$ 的前 $i + j - 1$ 个元素，即此时 $f(i, j)$ 取决于 $f(i - 1, j)$，在此情况下如果 $f(i - 1, j)$ 为真，则 $f(i, j)$ 也为真。同样的，如果 $s_2$ 的第 $j$ 个元素和 $s_3$ 的第 $i + j$ 个元素相等并且 $f(i, j - 1)$ 为真，则 $f(i, j)$ 也为真。于是我们可以推导出这样的动态规划转移方程：
+$$
+f(i, j) = [f(i - 1, j) \, {\rm and} \, s_1(i - 1) = s_3(p)] \, {\rm or} \, [f(i, j - 1) \, {\rm and} \, s_2(j - 1) = s_3(p)]
+$$
+其中 $p = i + j - 1$。边界条件为 $f(0, 0) = {\rm True}$。至此，我们很容易可以给出这样一个实现：
+
+```java
+class Solution {
+    public boolean isInterleave(String s1, String s2, String s3) {
+        int n = s1.length(), m = s2.length(), t = s3.length();
+
+        if (n + m != t) {
+            return false;
+        }
+
+        boolean[][] f = new boolean[n + 1][m + 1];
+
+        //边界条件：认为s1的前0个字符和s2的前0个字符，可以交替组成s3的前0个字符
+        f[0][0] = true;
+        for (int i = 0; i <= n; ++i) {
+            for (int j = 0; j <= m; ++j) {
+                int p = i + j - 1;
+                if (i > 0) {
+                  	// 官方代码前面这个'f[i][j] ||'是没必要的
+                    f[i][j] = f[i][j] || (f[i - 1][j] && s1.charAt(i - 1) == s3.charAt(p));
+                }
+                if (j > 0) {
+                  	// 如果前一步i>0时已算出f[i][j]为true，则下面的||会短路，f[i][j]直接就是true了
+                    f[i][j] = f[i][j] || (f[i][j - 1] && s2.charAt(j - 1) == s3.charAt(p));
+                }
+            }
+        }
+
+      	// 返回结果：s1的前n个字符和s2的前m个字符，可否交替组成s3的前n+m个字符
+        return f[n][m];
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/interleaving-string/solution/jiao-cuo-zi-fu-chuan-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+不难看出这个实现的时间复杂度和空间复杂度都是 O(nm)。
+
+使用滚动数组优化空间复杂度。 因为这里数组 f 的第 i 行只和第 i - 1 行相关，所以我们可以用滚动数组优化这个动态规划，这样空间复杂度可以变成 O(m)。敲黑板：我们又遇到「滚动数组」优化啦！不会的同学一定要学习哟。如果还没有做过这几个题建议大家做一下，都可以使用这个思想进行优化：
+
+
+
+
+
+
+
+
 
 
 
@@ -10026,7 +10172,6 @@ class Solution {
 **示例 2:**
 
 ```
-
 输入:
     5
    / \
