@@ -2235,12 +2235,6 @@ https://leetcode.com/problems/divide-two-integers/discuss/13407/C++-bit-manipula
 
 
 
-
-
-
-
-
-
 # [31. 下一个排列](https://leetcode-cn.com/problems/next-permutation/) :star:
 
 实现获取 下一个排列 的函数，算法需要将给定数字序列重新排列成字典序中下一个更大的排列。
@@ -2296,7 +2290,46 @@ https://leetcode.com/problems/divide-two-integers/discuss/13407/C++-bit-manipula
 
 [4,5,3,1,2,6]，[1,2,6]的后续为[1,6,2]。
 
-所以相当于，从后往前找，找到第一个逆序的数字a，然后继续从后往前找，找到第一个比a大的数字b，然后交换他们，在a的原位置之后重新排个序。
+**所以相当于，从后往前找，找到第一个逆序的数字a，然后继续从后往前找，找到第一个比a大的数字b，然后交换他们，在a的原位置之后重新排个序。**
+
+```java
+class Solution {
+    public void nextPermutation(int[] nums) {
+        if (nums.length == 1) return;
+
+        for (int i = nums.length - 2; i >= 0; i--) {
+            // 找到逆序的
+            if (nums[i] < nums[i + 1]){
+                // 继续从最右边的开始找起
+                int j = nums.length - 1;
+                while (j >= 0){
+                    // 由于是逆序的 所以一定会找到一个更大的数
+                    if (nums[j] > nums[i]){
+                        // 交换
+                        int tmp = nums[j];
+                        nums[j] = nums[i];
+                        nums[i] = tmp;
+
+                        // 排序
+                        Arrays.sort(nums, i + 1, nums.length);
+                        return;
+                    }
+                    j--;
+                }
+            }
+        }
+
+        // 如果是全逆序了 相当于是最后一个排序了
+        Arrays.sort(nums);
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了98.28% 的用户
+内存消耗：38.7 MB, 在所有 Java 提交中击败了50.87% 的用户
+```
+
+官方代码写的明显更加的漂亮。
+
+
 
 
 
