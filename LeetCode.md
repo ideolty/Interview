@@ -11997,6 +11997,141 @@ class Solution {
 
 
 
+# [137. 只出现一次的数字 II](https://leetcode-cn.com/problems/single-number-ii/) :new_moon_with_face:
+
+给你一个整数数组 nums ，除某个元素仅出现 一次 外，其余每个元素都恰出现 三次 。请你找出并返回那个只出现了一次的元素。
+
+示例 1：
+```
+输入：nums = [2,2,3,2]
+输出：3
+```
+示例 2：
+```
+输入：nums = [0,1,0,1,0,1,99]
+输出：99
+```
+
+
+提示：
+- $1 <= nums.length <= 3 * 10^4$
+- $-2^{31} <= nums[i] <= 2^{31} - 1$
+- nums 中，除某个元素仅出现 一次 外，其余每个元素都恰出现 三次
+
+**进阶：**你的算法应该具有线性时间复杂度。 你可以不使用额外空间来实现吗？
+
+
+
+非进阶的比较简单，不使用额外空间的凉了。
+
+
+
+官方：
+
+**综述**
+
+该问题看起来很简单，使用 Set 或 HashMap 可以在 O(N) 的时间和 O(N) 的空间内解决。
+
+真正的挑战在于 Google 面试官要求使用常数空间解决该问题（最近 6 个月该问题在 Google 上非常流行），测试应聘者是否熟练位操作。
+
+**方法一：HashSet**
+
+将输入数组存储到 HashSet，然后使用 HashSet 中数字和的三倍与数组之和比较。
+
+$$
+3 \times (a + b + c) - (a + a + a + b + b + b + c) = 2 c
+$$
+**方法二：HashMap**
+
+遍历输入数组，统计每个数字出现的次数，最后返回出现次数为 1 的数字。
+
+
+
+**方法三：位运算符：NOT，AND 和 XOR**
+
+使用[位运算符](https://leetcode-cn.com/problems/single-number-ii/solution/zhi-chu-xian-yi-ci-de-shu-zi-ii-by-leetcode/[https://wiki.python.org/moin/BitwiseOperators)可以实现 O(1) 的空间复杂度。
+
+
+
+∼x表示位运算 NOT
+
+x&y表示位运算 AND
+
+x⊕y表示位运算 XOR
+
+
+
+**XOR**
+
+该运算符用于检测出现奇数次的位：1、3、5 等。
+
+0 与任何数 XOR 结果为该数。
+
+$$
+0\oplus x = x
+$$
+两个相同的数 XOR 结果为 0。
+$$
+x \oplus x = 0
+$$
+
+
+以此类推，只有某个位置的数字出现奇数次时，该位的掩码才不为 0。
+
+<img src="截图/leetCode/137xor.png" alt="img" style="zoom: 33%;" />
+
+因此，可以检测出出现一次的位和出现三次的位，但是要注意区分这两种情况。
+
+**AND 和 NOT**
+
+为了区分出现一次的数字和出现三次的数字，使用两个位掩码：`seen_once` 和 `seen_twice`。
+
+思路是：
+
+- 仅当 seen_twice 未变时，改变 seen_once。
+- 仅当 seen_once 未变时，改变 seen_twice。
+
+<img src="截图/leetCode/137three.png" alt="img" style="zoom:33%;" />
+
+位掩码 seen_once 仅保留出现一次的数字，不保留出现三次的数字。
+
+```java
+class Solution {
+  public int singleNumber(int[] nums) {
+    int seenOnce = 0, seenTwice = 0;
+
+    for (int num : nums) {
+      // first appearence: 
+      // add num to seen_once 
+      // don't add to seen_twice because of presence in seen_once
+
+      // second appearance: 
+      // remove num from seen_once 
+      // add num to seen_twice
+
+      // third appearance: 
+      // don't add to seen_once because of presence in seen_twice
+      // remove num from seen_twice
+      seenOnce = ~seenTwice & (seenOnce ^ num);
+      seenTwice = ~seenOnce & (seenTwice ^ num);
+    }
+
+    return seenOnce;
+  }
+}
+
+
+作者：LeetCode
+链接：https://leetcode-cn.com/problems/single-number-ii/solution/zhi-chu-xian-yi-ci-de-shu-zi-ii-by-leetcode/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
 
 
 # [139. 单词拆分](https://leetcode-cn.com/problems/word-break/)
