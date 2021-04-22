@@ -2110,7 +2110,7 @@ class Solution {
 
 
 
-# [29. 两数相除](https://leetcode-cn.com/problems/divide-two-integers/)
+# [29. 两数相除](https://leetcode-cn.com/problems/divide-two-integers/) :star:
 
 给定两个整数，被除数 dividend 和除数 divisor。将两数相除，要求不使用乘法、除法和 mod 运算符。
 
@@ -2232,6 +2232,73 @@ public:
 
 https://leetcode.com/problems/divide-two-integers/discuss/13407/C++-bit-manipulations
 ```
+
+
+
+
+
+# [30. 串联所有单词的子串](https://leetcode-cn.com/problems/substring-with-concatenation-of-all-words/) :fearful:
+
+给定一个字符串 s 和一些长度相同的单词 words。找出 s 中恰好可以由 words 中所有单词串联形成的子串的起始位置。
+
+注意子串要与 words 中的单词完全匹配，中间不能有其他字符，但不需要考虑 words 中单词串联的顺序。
+
+ 
+
+示例 1：
+```
+输入：
+  s = "barfoothefoobarman",
+  words = ["foo","bar"]
+输出：[0,9]
+解释：
+从索引 0 和 9 开始的子串分别是 "barfoo" 和 "foobar" 。
+输出的顺序不重要, [9,0] 也是有效答案。
+```
+示例 2：
+```
+输入：
+  s = "wordgoodgoodgoodbestword",
+  words = ["word","good","best","word"]
+输出：[]
+```
+
+
+
+根据评论区思路，由于单词是定长的所以可以直接按单词移动。由于不限制顺序，只判断存在与否，可以同时使用2个map来缓存数据，降低查找复杂度，一个map用来缓存words里面的单词，另外一个map用来存储当前已经匹配上的内容。
+
+todo
+
+
+
+
+
+
+
+评论区高赞
+
+图太多，记录一下主要的思路。
+
+**详细通俗的思路分析，多解法**
+
+**解法一**
+
+首先，最直接的思路，判断每个子串是否符合，符合就把下标保存起来，最后返回即可。
+
+怎么判断子串是否符合？这也是这个题的难点了，由于子串包含的单词顺序并不需要固定，如果是两个单词 A，B，我们只需要判断子串是否是 AB 或者 BA 即可。如果是三个单词 A，B，C 也还好，只需要判断子串是否是 ABC，或者 ACB，BAC，BCA，CAB，CBA 就可以了，但如果更多单词呢？那就崩溃了。
+
+用两个 HashMap 来解决。首先，我们把所有的单词存到 HashMap 里，key 直接存单词，value 存单词出现的个数（因为给出的单词可能会有重复的，所以可能是 1 或 2 或者其他）。然后扫描子串的单词，如果当前扫描的单词在之前的 HashMap 中，就把该单词存到新的 HashMap 中，并判断新的 HashMap 中该单词的 value 是不是大于之前的 HashMap 该单词的 value ，如果大了，就代表该子串不是我们要找的，接着判断下一个子串就可以了。如果不大于，那么我们接着判断下一个单词的情况。子串扫描结束，如果子串的全部单词都符合，那么该子串就是我们找的其中一个。
+
+**解法二**
+
+我们在解法一中，每次移动一个字符。现在为了方便讨论，我们每次移动一个单词的长度，也就是 3 个字符，这样所有的移动被分成了三类。
+
+
+
+作者：windliang
+链接：https://leetcode-cn.com/problems/substring-with-concatenation-of-all-words/solution/xiang-xi-tong-su-de-si-lu-fen-xi-duo-jie-fa-by-w-6/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 
 
 
