@@ -2512,7 +2512,7 @@ class Solution {
 
 
 
-# [32. 最长有效括号](https://leetcode-cn.com/problems/longest-valid-parentheses/) :fearful:
+# [32. 最长有效括号](https://leetcode-cn.com/problems/longest-valid-parentheses/) :fearful::star:
 
 给你一个只包含 `'('` 和 `')'` 的字符串，找出最长有效（格式正确且连续）括号子串的长度。
 
@@ -2547,6 +2547,10 @@ class Solution {
 
 
 一道hard，深度优先遍历的就不太合适了，联系22.括号生成的思路来看，第一反应还是dp，找$(a)b$模样的结构。
+
+
+
+todo
 
 
 
@@ -2615,7 +2619,7 @@ public class Solution {
 
 思路和算法
 
-撇开方法一提及的动态规划方法，相信大多数人对于这题的第一直觉是找到每个可能的子串后判断它的有效性，但这样的时间复杂度会达到 O(n3)O(n^3)O(n3)，无法通过所有测试用例。但是通过栈，我们可以在遍历给定字符串的过程中去判断到目前为止扫描的子串的有效性，同时能得到最长有效括号的长度。
+撇开方法一提及的动态规划方法，相信大多数人对于这题的第一直觉是找到每个可能的子串后判断它的有效性，但这样的时间复杂度会达到 $O(n^3)$，无法通过所有测试用例。但是通过栈，我们可以在遍历给定字符串的过程中去判断到目前为止扫描的子串的有效性，同时能得到最长有效括号的长度。
 
 具体做法是我们始终保持栈底元素为当前已经遍历过的元素中「最后一个没有被匹配的右括号的下标」，这样的做法主要是考虑了边界条件的处理，栈里其他元素维护左括号的下标：
 
@@ -3238,6 +3242,10 @@ public boolean isValidSudoku(char[][] board) {
 内存消耗：39 MB, 在所有 Java 提交中击败了6.03% 的用户
 ```
 
+不能使用 `Map<Integer, Set<Character>>` 因为实在是太慢了，使用二维数组！！！
+
+
+
 
 
 官方
@@ -3381,7 +3389,10 @@ countAndSay(4) = 读 "21" = 一 个 2 + 一 个 1 = "12" + "11" = "1211"
         }else {
             remainder = n.substring(n.length() - 1);
         }
+      
+      	// 递归从后往前打印每个数字的外观读法
         if (remainder.equals(dupChar)){
+          	// 如果和之前的相同，那么统计数字要 + 1
             result = dfs(n.substring(0, n.length() - 1), remainder, dupNum + 1, result);
         }else {
             result = dfs(n.substring(0, n.length() - 1), remainder, 1L, result);
@@ -3406,6 +3417,7 @@ countAndSay(4) = 读 "21" = 一 个 2 + 一 个 1 = "12" + "11" = "1211"
         int start = 0;
         for(int i=1;i<s.length();i++){
             if(s.charAt(i)!=s.charAt(start)){
+            		// 双指针，就正向的往前走，如果两个指针指向的值不同，就在结果集里面记录一下外观描述 
                 result.append(i-start).append(s.charAt(start));
                 start=i;
             }
@@ -3420,7 +3432,7 @@ countAndSay(4) = 读 "21" = 一 个 2 + 一 个 1 = "12" + "11" = "1211"
 
 
 
-# [39. 组合总和](https://leetcode-cn.com/problems/combination-sum/)
+# [39. 组合总和](https://leetcode-cn.com/problems/combination-sum/) :star:
 
 给定一个无重复元素的数组 `candidates` 和一个目标数 `target` ，找出 `candidates` 中所有可以使数字和为 `target` 的组合。
 
@@ -3797,6 +3809,167 @@ public class Solution {
 https://leetcode-cn.com/problems/combination-sum-ii/solution/hui-su-suan-fa-jian-zhi-python-dai-ma-java-dai-m-3/225211
 ```
 
+
+
+# [41. 缺失的第一个正数](https://leetcode-cn.com/problems/first-missing-positive/)
+
+给你一个未排序的整数数组 nums ，请你找出其中没有出现的最小的正整数。
+
+ 
+
+进阶：你可以实现时间复杂度为 O(n) 并且只使用常数级别额外空间的解决方案吗？
+示例 1：
+```
+输入：nums = [1,2,0]
+输出：3
+```
+示例 2：
+```
+输入：nums = [3,4,-1,1]
+输出：2
+```
+示例 3：
+```
+输入：nums = [7,8,9,11,12]
+输出：1
+```
+
+
+提示：
+- 0 <= nums.length <= 300
+- $-2^{31}$ <= nums[i] <= $2^{31} - 1$
+
+
+
+正常来说可以先排序，然后按顺序遍历即可。但是进阶的条件下，如何实现O(n)的时间复杂度？
+
+~~假设数字不重复。~~ 会有重复数字
+
+参考了答案，之后反应过来O(n)不是指只能遍历一遍数组，这完全可以多遍历几遍。考虑极端情况，数组里面没有缺失任何一个一个数，从0到N-1刚刚好，那么相当于数组中最大的数就是 n -1 了，大于n - 1的数都不可能是缺失的第一个正数，同理负数和0都是无效的。遍历数组，读取数组中的值，把他与 num[i] - 1 下标的位置进行交换。
+
+```java
+class Solution {
+    public int firstMissingPositive(int[] nums) {
+        int i = 0;
+        // 给数组重新整理顺序
+        while (i < nums.length){
+            // 不处理无效数组
+            if (nums[i] <= 0 || nums[i] > nums.length){
+                i++;
+                continue;
+            }
+
+            // 当前元素已处于正确的位置
+            if (i == nums[i] - 1){
+                i++;
+                continue;
+            }
+
+            int tmp = nums[i];
+            if (nums[i] == nums[tmp - 1]){
+                // 出现重复的数字了 无论怎么换都是死循环
+                nums[i] = 0;
+                continue;
+            }
+            nums[i] = nums[tmp - 1];
+            nums[tmp - 1] = tmp;
+        }
+
+        // 第二次遍历数组
+        for (i = 0; i < nums.length; i++){
+            if (nums[i] <= 0 || nums[i] > nums.length){
+                return i + 1;
+            }
+        }
+
+        return nums.length + 1;
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了70.09% 的用户
+内存消耗：36.3 MB, 在所有 Java 提交中击败了28.57% 的用户
+```
+
+
+
+官方
+
+前言
+
+如果本题没有额外的时空复杂度要求，那么就很容易实现：
+
+- 我们可以将数组所有的数放入哈希表，随后从 1 开始依次枚举正整数，并判断其是否在哈希表中；
+
+- 我们可以从 1 开始依次枚举正整数，并遍历数组，判断其是否在数组中。
+
+如果数组的长度为 N，那么第一种做法的时间复杂度为 O(N)，空间复杂度为 O(N)；第二种做法的时间复杂度为 $O(N^2)$，空间复杂度为 O(1)。但它们都不满足时间复杂度为 O(N) 且空间复杂度为 O(1)。
+
+「真正」满足时间复杂度为 O(N) 且空间复杂度为 O(1) 的算法是不存在的，但是我们可以退而求其次：利用给定数组中的空间来存储一些状态。也就是说，如果题目给定的数组是不可修改的，那么就不存在满足时空复杂度要求的算法；但如果我们可以修改给定的数组，那么是存在满足要求的算法的。
+
+**方法一：哈希表**
+
+算法的流程如下：
+
+- 我们将数组中所有小于等于 0 的数修改为 N+1；
+- 我们遍历数组中的每一个数 x，它可能已经被打了标记，因此原本对应的数为 ∣x∣，其中 $|\,|$ 为绝对值符号。如果 $|x| \in [1, N]$，那么我们给数组中的第 ∣x∣−1 个位置的数添加一个负号。注意如果它已经有负号，不需要重复添加；
+- 在遍历完成之后，如果数组中的每一个数都是负数，那么答案是 N+1，否则答案是第一个正数的位置加 1。
+
+<img src="截图/leetCode/41_fig1.png" alt="fig1" style="zoom: 33%;" />
+
+```java
+class Solution {
+    public int firstMissingPositive(int[] nums) {
+        int n = nums.length;
+        for (int i = 0; i < n; ++i) {
+            if (nums[i] <= 0) {
+                nums[i] = n + 1;
+            }
+        }
+        for (int i = 0; i < n; ++i) {
+            int num = Math.abs(nums[i]);
+            if (num <= n) {
+                nums[num - 1] = -Math.abs(nums[num - 1]);
+            }
+        }
+        for (int i = 0; i < n; ++i) {
+            if (nums[i] > 0) {
+                return i + 1;
+            }
+        }
+        return n + 1;
+    }
+}
+```
+
+
+
+**方法二：置换**
+
+```java
+class Solution {
+    public int firstMissingPositive(int[] nums) {
+        int n = nums.length;
+        for (int i = 0; i < n; ++i) {
+            while (nums[i] > 0 && nums[i] <= n && nums[nums[i] - 1] != nums[i]) {
+                int temp = nums[nums[i] - 1];
+                nums[nums[i] - 1] = nums[i];
+                nums[i] = temp;
+            }
+        }
+        for (int i = 0; i < n; ++i) {
+            if (nums[i] != i + 1) {
+                return i + 1;
+            }
+        }
+        return n + 1;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/first-missing-positive/solution/que-shi-de-di-yi-ge-zheng-shu-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
 
 
 
