@@ -10934,8 +10934,156 @@ class Solution {
 
 
 
+# [103. 二叉树的锯齿形层序遍历](https://leetcode-cn.com/problems/binary-tree-zigzag-level-order-traversal/)
+
+给定一个二叉树，返回其节点值的锯齿形层序遍历。（即先从左往右，再从右往左进行下一层遍历，以此类推，层与层之间交替进行）。
+
+例如：
+给定二叉树 [3,9,20,null,null,15,7],
+```
+    3
+   / \
+  9  20
+    /  \
+   15   7
+```
+返回锯齿形层序遍历如下：
+```
+[
+  [3],
+  [20,9],
+  [15,7]
+]
+```
+
+难度适中，主要就是要思路清晰，理清楚关系，再用代码表达出来就ok了。大家都知道要借助于队列，或者说链表，使用一个或者两个队列，对与链表来说区别不大，所以使用2个链表。
+
+从第二层看，需要倒序读先读到20，再读9，读到20之后，只能往集合里面放入15或者7，由于要保持一个顺序，所以只能先放7再放15，那么
+
+- 偶数层从右往左遍历，往队头先插入右节点，再插入左节点。
+- 同理，奇数层，需要从左往右遍历，那么需要先读取链表的尾部，这是一个先进后出的栈结构。然后为了保持顺序，只能先插入左节点，再插入右节点，这也倒数偶数层也必须从链表尾部开始读取，所以这里定义两个栈是比较合适的。
+
+```java
+/**
+ * Definition for a binary tree node.
+ * public class TreeNode {
+ *     int val;
+ *     TreeNode left;
+ *     TreeNode right;
+ *     TreeNode() {}
+ *     TreeNode(int val) { this.val = val; }
+ *     TreeNode(int val, TreeNode left, TreeNode right) {
+ *         this.val = val;
+ *         this.left = left;
+ *         this.right = right;
+ *     }
+ * }
+ */
+class Solution {
+    public List<List<Integer>> zigzagLevelOrder(TreeNode root) {
+        List<List<Integer>> result = new ArrayList<>();
+        if (root == null) return result;
+        LinkedList<TreeNode> odd = new LinkedList<>();
+        LinkedList<TreeNode> even = new LinkedList<>();
+        // 放到尾部
+        odd.offer(root);
+
+        List<Integer> list = new ArrayList<>();
+        while (!odd.isEmpty() || !even.isEmpty()){
+            list = new ArrayList<>();
+            while (!odd.isEmpty()){
+                TreeNode node = odd.pollLast();
+                if (node.left != null){
+                    even.offer(node.left);
+                }
+                if (node.right != null){
+                    even.offer(node.right);
+                }
+                list.add(node.val);
+            }
+            if (list.size() > 0){
+                result.add(list);
+            }
+
+            list = new ArrayList<>();
+            while (!even.isEmpty()){
+                TreeNode node = even.pollLast();
+                if (node.right != null){
+                    odd.offer(node.right);
+                }
+                if (node.left != null){
+                    odd.offer(node.left);
+                }
+                list.add(node.val);
+            }
+            if (list.size() > 0){
+                result.add(list);
+            }
+        }
+
+        return result;
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了98.69% 的用户
+内存消耗：38.5 MB, 在所有 Java 提交中击败了65.35% 的用户
+```
 
 
+
+官方的思路也很好
+
+方法一：广度优先遍历
+
+此题是「102. 二叉树的层序遍历」的变种，最后输出的要求有所变化，要求我们按层数的奇偶来决定每一层的输出顺序。规定二叉树的根节点为第 0 层，如果当前层数是偶数，从左至右输出当前层的节点值，否则，从右至左输出当前层的节点值。
+
+我们依然可以沿用第 102 题的思想，修改广度优先搜索，对树进行逐层遍历，用队列维护当前层的所有元素，当队列不为空的时候，求得当前队列的长度 $\textit{size}$，每次从队列中取出 $\textit{size}$ 个元素进行拓展，然后进行下一次迭代。
+
+为了满足题目要求的返回值为「先从左往右，再从右往左」交替输出的锯齿形，我们可以利用「双端队列」的数据结构来维护当前层节点值输出的顺序。
+
+双端队列是一个可以在队列任意一端插入元素的队列。在广度优先搜索遍历当前层节点拓展下一层节点的时候我们仍然从左往右按顺序拓展，但是对当前层节点的
+
+- 如果从左至右，我们每次将被遍历到的元素插入至双端队列的末尾。
+- 如果从右至左，我们每次将被遍历到的元素插入至双端队列的头部。
+
+```java
+class Solution {
+    public List<List<Integer>> zigzagLevelOrder(TreeNode root) {
+        List<List<Integer>> ans = new LinkedList<List<Integer>>();
+        if (root == null) {
+            return ans;
+        }
+
+        Queue<TreeNode> nodeQueue = new LinkedList<TreeNode>();
+        nodeQueue.offer(root);
+        boolean isOrderLeft = true;
+
+        while (!nodeQueue.isEmpty()) {
+            Deque<Integer> levelList = new LinkedList<Integer>();
+            int size = nodeQueue.size();
+            for (int i = 0; i < size; ++i) {
+                TreeNode curNode = nodeQueue.poll();
+                if (isOrderLeft) {
+                    levelList.offerLast(curNode.val);
+                } else {
+                    levelList.offerFirst(curNode.val);
+                }
+                if (curNode.left != null) {
+                    nodeQueue.offer(curNode.left);
+                }
+                if (curNode.right != null) {
+                    nodeQueue.offer(curNode.right);
+                }
+            }
+            ans.add(new LinkedList<Integer>(levelList));
+            isOrderLeft = !isOrderLeft;
+        }
+
+        return ans;
+    }
+}
+```
+
+他不纠结与从队列的哪端存入/读取数据，只要能够顺序或者逆序读出就可以，也就是使用一个标准的二叉树层序遍历，之后再找一个双端队列转一下结果集。
 
 
 
