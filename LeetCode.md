@@ -5001,9 +5001,9 @@ class Solution {
 
 
 
-# [50. Pow(x, n)](https://leetcode-cn.com/problems/powx-n/)
+# [50. Pow(x, n)](https://leetcode-cn.com/problems/powx-n/) :star:
 
-实现 pow(x, n) ，即计算 x 的 n 次幂函数（即，xn）。
+实现 pow(x, n) ，即计算 x 的 n 次幂函数（即，$x^n$）。
 
 示例 1：
 ```
@@ -5070,13 +5070,13 @@ class Solution {
 
 「快速幂算法」的本质是分治算法。举个例子，如果我们要计算 $x^{64}$，我们可以按照：
 $$
-x→x^2→x^4→x^8→x^16→x^32→x^64
+x→x^2→x^4→x^8→x^{16}→x^{32}→x^{64}
 $$
 的顺序，从 x 开始，每次直接把上一次的结果进行平方，计算 6 次就可以得到 $x^{64}$ 的值，而不需要对 x 乘 63 次 x。
 
 再举一个例子，如果我们要计算 $x^{77}$，我们可以按照：
 $$
-x→x^2→x^4→x^9→x^19→x^38→x^77
+x→x^2→x^4→x^9→x^{19}→x^{38}→x^{77}
 $$
 的顺序，在 $x \to x^2$，$x^2 \to x^4$，$x^{19} \to x^{38}$ 这些步骤中，我们直接把上一次的结果进行平方，而在 $x^4 \to x^9$，$x^9 \to x^{19}$，$x^{38} \to x^{77}$ 这些步骤中，我们把上一次的结果进行平方后，还要额外乘一个 x。
 
@@ -6776,7 +6776,7 @@ dp[j] = dp[j - 1] + dp[j]
 
 # [64. 最小路径和](https://leetcode-cn.com/problems/minimum-path-sum/)
 
-给定一个包含非负整数的 `*m* x *n*` 网格 `grid` ，请找出一条从左上角到右下角的路径，使得路径上的数字总和为最小。
+给定一个包含非负整数的 `m x n` 网格 `grid` ，请找出一条从左上角到右下角的路径，使得路径上的数字总和为最小。
 
 **说明：**每次只能向下或者向右移动一步。
 
@@ -6984,9 +6984,9 @@ public String addBinary(String a, String b) {
 
 
 
-# [69. x 的平方根](https://leetcode-cn.com/problems/sqrtx/)
+# [69. x 的平方根](https://leetcode-cn.com/problems/sqrtx/) :star:
 
-实现 int sqrt(int x) 函数。
+实现 `int sqrt(int x)` 函数。
 
 计算并返回 x 的平方根，其中 x 是非负整数。
 
@@ -7894,9 +7894,9 @@ class Solution {
 
 具体地，我们用指针 $p_0$ 来交换 0，$p_1$ 来交换 1，初始值都为 0。当我们从左向右遍历整个数组时：
 
-- 如果找到了 1，那么将其与 nums[p1]\ 进行交换，并将 p1 向后移动一个位置，这与方法一是相同的；
+- 如果找到了 1，那么将其与 nums[p1] 进行交换，并将 p1 向后移动一个位置，这与方法一是相同的；
 
-- 如果找到了 0，那么将其与 nums[p0] 进行交换，并将 p0 向后移动一个位置。这样做是正确的吗？我们可以注意到，因为连续的 0 之后是连续的 1，因此如果我们将 0 与 nums[p0] 进行交换，那么我们可能会把一个 1 交换出去。当 p0<p1 时，我们已经将一些 1 连续地放在头部，此时一定会把一个 1 交换出去，导致答案错误。因此，如果 p0<p1，那么我们需要再将 nums[i] 与 nums[p1] 进行交换，其中 i 是当前遍历到的位置，在进行了第一次交换后，nums[i] 的值为 111，我们需要将这个 1 放到「头部」的末端。在最后，无论是否有 p0<p1，我们需要将 p0 和 p1 均向后移动一个位置，而不是仅将 p0 向后移动一个位置。
+- 如果找到了 0，那么将其与 nums[p0] 进行交换，并将 p0 向后移动一个位置。这样做是正确的吗？我们可以注意到，因为连续的 0 之后是连续的 1，因此如果我们将 0 与 nums[p0] 进行交换，那么我们可能会把一个 1 交换出去。当 p0<p1 时，我们已经将一些 1 连续地放在头部，此时一定会把一个 1 交换出去，导致答案错误。因此，如果 p0<p1，那么我们需要再将 nums[i] 与 nums[p1] 进行交换，其中 i 是当前遍历到的位置，在进行了第一次交换后，nums[i] 的值为 1，我们需要将这个 1 放到「头部」的末端。在最后，无论是否有 p0<p1，我们需要将 p0 和 p1 均向后移动一个位置，而不是仅将 p0 向后移动一个位置。
 
 ```java
 class Solution {
@@ -8159,7 +8159,7 @@ public class Solution {
 
 
 
-# [78. 子集](https://leetcode-cn.com/problems/subsets/)
+# [78. 子集](https://leetcode-cn.com/problems/subsets/)​ :star:
 
 给你一个整数数组 nums ，数组中的元素 互不相同 。返回该数组所有可能的子集（幂集）。
 
@@ -8430,7 +8430,7 @@ board =
             }
         }
 
-        visited[i][j] = false;
+        visite d[i][j] = false;
         return result;
     }
 ```
@@ -8888,7 +8888,7 @@ class Solution {
 
 由于给定的链表是排好序的，因此重复的元素在链表中出现的位置是连续的，因此我们只需要对链表进行一次遍历，就可以删除重复的元素。由于链表的头节点可能会被删除，因此我们需要额外使用一个哑节点（dummy node）指向链表的头节点。
 
-具体地，我们从指针 $\textit{cur}$ 指向链表的哑节点，随后开始对链表进行遍历。如果当前 c$\textit{cur.next}$ 与 $\textit{cur.next.next}$ 对应的元素相同，那么我们就需要将 $\textit{cur.next}$ 以及所有后面拥有相同元素值的链表节点全部删除。我们记下这个元素值 x，随后不断将 $\textit{cur.next}$ 从链表中移除，直到 $\textit{cur.next}$ 为空节点或者其元素值不等于 x 为止。此时，我们将链表中所有元素值为 x 的节点全部删除。
+具体地，我们从指针 $\textit{cur}$ 指向链表的哑节点，随后开始对链表进行遍历。如果当前 $\textit{cur.next}$ 与 $\textit{cur.next.next}$ 对应的元素相同，那么我们就需要将 $\textit{cur.next}$ 以及所有后面拥有相同元素值的链表节点全部删除。我们记下这个元素值 x，随后不断将 $\textit{cur.next}$ 从链表中移除，直到 $\textit{cur.next}$ 为空节点或者其元素值不等于 x 为止。此时，我们将链表中所有元素值为 x 的节点全部删除。
 
 如果当前 $\textit{cur.next}$ 与 $\textit{cur.next.next}$ 对应的元素不相同，那么说明链表中只有一个元素值为 $\textit{cur.next}$ 的节点，那么我们就可以将 $\textit{cur}$ 指向 $\textit{cur.next}$。
 
@@ -9777,7 +9777,7 @@ class Solution {
 
 由于我们需要找出所有可能复原出的 IP 地址，因此可以考虑使用回溯的方法，对所有可能的字符串分隔方式进行搜索，并筛选出满足要求的作为答案。
 
-设题目中给出的字符串为 s。我们用递归函数 $\textit{dfs}(\textit{segId}, \textit{segStart})$ 表示我们正在从 $s[\textit{segStart}]$ 的位置开始，搜索 IP 地址中的第 $\textit{segId}$ 段，其中 $\textit{segId} \in \{0, 1, 2, 3\}$。由于 IP 地址的每一段必须是 [0,255][0, 255][0,255] 中的整数，因此我们从 $\textit{segStart}$ 开始，从小到大依次枚举当前这一段 IP 地址的结束位置 $\textit{segEnd}$。如果满足要求，就递归地进行下一段搜索，调用递归函数 $\textit{dfs}(\textit{segId} + 1, \textit{segEnd} + 1)$。
+设题目中给出的字符串为 s。我们用递归函数 $\textit{dfs}(\textit{segId}, \textit{segStart})$ 表示我们正在从 $s[\textit{segStart}]$ 的位置开始，搜索 IP 地址中的第 $\textit{segId}$ 段，其中 $\textit{segId} \in \{0, 1, 2, 3\}$。由于 IP 地址的每一段必须是 $[0, 255]$ 中的整数，因此我们从 $\textit{segStart}$ 开始，从小到大依次枚举当前这一段 IP 地址的结束位置 $\textit{segEnd}$。如果满足要求，就递归地进行下一段搜索，调用递归函数 $\textit{dfs}(\textit{segId} + 1, \textit{segEnd} + 1)$。
 
 特别地，由于 IP 地址的每一段不能有前导零，因此如果 $s[\textit{segStart}]$ 等于字符 0，那么 IP 地址的第 $\textit{segId}$ 段只能为 0，需要作为特殊情况进行考虑。
 
@@ -10300,7 +10300,7 @@ class Solution {
 
 
 
-# [97. 交错字符串](https://leetcode-cn.com/problems/interleaving-string/) :cry:
+# [97. 交错字符串](https://leetcode-cn.com/problems/interleaving-string/) :cry::star:
 
 给定三个字符串 s1、s2、s3，请你帮忙验证 s3 是否是由 s1 和 s2 交错 组成的。
 
