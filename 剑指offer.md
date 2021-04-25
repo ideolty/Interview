@@ -241,3 +241,72 @@ class Solution {
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 ```
 
+
+
+# [剑指 Offer 05. 替换空格](https://leetcode-cn.com/problems/ti-huan-kong-ge-lcof/)
+
+请实现一个函数，把字符串 `s` 中的每个空格替换成"%20"。
+
+**示例 1：**
+
+```
+输入：s = "We are happy."
+输出："We%20are%20happy."
+```
+
+**限制：**
+
+`0 <= s 的长度 <= 10000`
+
+
+
+说实话，没太懂，一个个字符遍历过去不就可以了吗？或者直接使用replace的api，或者使用字符串splite，然后在把数组使用 %20 串起来。题目到底想考察什么内容？
+
+```java
+class Solution {
+    public String replaceSpace(String s) {
+        return s.replace(" ", "%20");
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：36.1 MB, 在所有 Java 提交中击败了92.56% 的用户
+```
+
+
+
+看了一下书的内容，本题应该是面对 C 语言来出的题，而且这里应该说明使用数组来存储每一个字符，并且要求原地修改。那么把空格替换的时候，会把一个长度的字符替换为3个。而解法的亮点为，**从后往前遍历**，这样后续的字符串就不需要进行重复的移动。
+
+
+
+评论区
+
+```c++
+class Solution {
+public:
+    string replaceSpace(string s) {
+        int count = 0, len = s.size();
+        for (char c : s) {
+            if (c == ' ') count++;
+        }
+        s.resize(len + 2 * count);
+        for(int i = len - 1, j = s.size() - 1; i < j; i--, j--) {
+            if (s[i] != ' ')
+                s[j] = s[i];
+            else {
+                s[j - 2] = '%';
+                s[j - 1] = '2';
+                s[j] = '0';
+                j -= 2;
+            }
+        }
+        return s;
+    }
+};
+
+
+作者：demigodliu
+链接：https://leetcode-cn.com/problems/ti-huan-kong-ge-lcof/solution/tu-jie-guan-fang-tui-jian-ti-jie-ti-huan-3l74/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
