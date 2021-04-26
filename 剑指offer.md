@@ -310,3 +310,57 @@ public:
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 ```
 
+
+
+
+
+# [剑指 Offer 06. 从尾到头打印链表](https://leetcode-cn.com/problems/cong-wei-dao-tou-da-yin-lian-biao-lcof/)
+
+输入一个链表的头节点，从尾到头反过来返回每个节点的值（用数组返回）。
+
+**示例 1：**
+
+```
+输入：head = [1,3,2]
+输出：[2,3,1]
+```
+
+**限制：**
+
+`0 <= 链表长度 <= 10000`
+
+
+
+就很奇怪的题，因为解法非常多，这里缺少了限制条件。
+
+- 首先可以考虑先做链表倒转，之后再遍历一次，这样只需要遍历两遍即可。
+
+- 第二，由于是java可以使用 list ，算是动态数组，直接遍历链表，最后把数组倒转也是可以的。
+- 当然也可以先遍历链表，得到链表长度，然后再建一个数组，倒着放数字就可以了。
+
+这里我选择了第3种做法，感觉是更满足面试官的要求
+
+```java
+class Solution {
+    public int[] reversePrint(ListNode head) {
+        int count = 0;
+        ListNode node = head;
+        while (node != null){
+            node = node.next;
+            count++;
+        }
+        int[] nums = new int[count];
+        for (int i = count - 1; i >= 0; i--){
+            nums[i] = head.val;
+            head = head.next;
+        }
+        return nums;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：39 MB, 在所有 Java 提交中击败了77.76% 的用户
+```
+
+
+
+官方的是借助 “栈” 来实现的，那么同理递归也是可以的……
