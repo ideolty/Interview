@@ -1,6 +1,8 @@
 # 综述
 
-文档记录了LeetCode上面有的剑指offer的题，后续在把书上的习题搬过来
+文档记录了LeetCode上面有的剑指offer的题，后续在把书上的习题搬过来。
+
+难度比起主站来说，不是简单了一点半点。
 
 
 
@@ -364,3 +366,103 @@ class Solution {
 
 
 官方的是借助 “栈” 来实现的，那么同理递归也是可以的……
+
+
+
+
+
+# [剑指 Offer 11. 旋转数组的最小数字](https://leetcode-cn.com/problems/xuan-zhuan-shu-zu-de-zui-xiao-shu-zi-lcof/)
+
+把一个数组最开始的若干个元素搬到数组的末尾，我们称之为数组的旋转。输入一个递增排序的数组的一个旋转，输出旋转数组的最小元素。例如，数组 `[3,4,5,1,2]` 为 `[1,2,3,4,5]` 的一个旋转，该数组的最小值为1。 
+
+**示例 1：**
+
+```
+输入：[3,4,5,1,2]
+输出：1
+```
+
+**示例 2：**
+
+```
+输入：[2,2,2,0,1]
+输出：0
+```
+
+注意：本题与主站 154 题相同：https://leetcode-cn.com/problems/find-minimum-in-rotated-sorted-array-ii/
+
+
+
+主站的154是hard，这个为啥是easy？其实感觉和主站第81题解法一致
+
+这个题，第一眼想法就是二分。考虑一般情况下
+
+- 如果发生了旋转，那么最右的值一定是小于等于最左的。
+- 然后中间值与最右值进行对比，确定最小值是在左边还是右边。
+
+考虑最特殊的情况，数组全是一样的数字，那么二分也只能退化成遍历了。
+
+```java
+class Solution {
+    public int minArray(int[] numbers) {
+        // 如果没有旋转 直接返回第一个
+        if (numbers[0] < numbers[numbers.length - 1]){
+            return numbers[0];
+        }
+        return dfs(numbers, 0, numbers.length - 1);
+    }
+    
+    private int dfs(int[] nums, int l, int r){
+        if (l >= r){
+            return nums[l];
+        }
+
+      	// low + (high - low) / 2 更加好一些，可以防止溢出
+        int mid = (l + r) / 2;
+        if (nums[mid] == nums[l] && nums[mid] == nums[r]){
+            return Math.min(dfs(nums, l, mid - 1), dfs(nums, mid + 1, r));
+        }
+
+        if (nums[mid] <= nums[r]){
+            return dfs(nums, l, mid);
+        }else {
+            return dfs(nums, mid + 1, r);
+        }
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38.3 MB, 在所有 Java 提交中击败了37.76% 的用户
+```
+
+
+
+
+
+官方思路差不多，但是使用迭代，减少了栈的开销，内存使用上来说应该会少很多。
+
+```java
+class Solution {
+    public int minArray(int[] numbers) {
+        int low = 0;
+        int high = numbers.length - 1;
+        while (low < high) {
+            int pivot = low + (high - low) / 2;
+            if (numbers[pivot] < numbers[high]) {
+                high = pivot;
+            } else if (numbers[pivot] > numbers[high]) {
+                low = pivot + 1;
+            } else {
+                high -= 1;
+            }
+        }
+        return numbers[low];
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/xuan-zhuan-shu-zu-de-zui-xiao-shu-zi-lcof/solution/xuan-zhuan-shu-zu-de-zui-xiao-shu-zi-by-leetcode-s/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
