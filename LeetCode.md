@@ -13471,6 +13471,51 @@ class MinStack {
 
 第二次遍历，让长的那条先走完多出来的距离，然后两条链表同步向后，再判断节点是否相等。
 
+```java
+public class Solution {
+    public ListNode getIntersectionNode(ListNode headA, ListNode headB) {
+        int l1 = 0; 
+        int l2 = 0;
+        ListNode cur = headA;
+        while(cur != null){
+            cur = cur.next;
+            l1++;
+        }
+
+        cur = headB;
+        while(cur != null){
+            cur = cur.next;
+            l2++;
+        }
+
+        if(l2 > l1){
+            int i = l2 - l1;
+            while(i > 0){
+                headB = headB.next;
+                i--;
+            }
+        }else{
+            int i = l1 - l2;
+            while(i > 0){
+                headA = headA.next;
+                i--;
+            }
+        }
+
+        while(headA != null){
+            if(headA == headB){
+                return headA;
+            }
+            headA = headA.next;
+            headB = headB.next;
+        }
+        return null;
+    }
+}
+```
+
+
+
 
 
 想法二
