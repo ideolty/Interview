@@ -723,8 +723,8 @@ class Solution {
 
 评论高赞
 
-先序遍历树 A 中的每个节点 $n_A$ ；（对应函数 isSubStructure(A, B)）
-判断树 A 中 以 $n_A$ 为根节点的子树 是否包含树 B 。（对应函数 recur(A, B)）
+1. 先序遍历树 A 中的每个节点 $n_A$ ；（对应函数 isSubStructure(A, B)）
+2. 判断树 A 中 以 $n_A$ 为根节点的子树 是否包含树 B 。（对应函数 recur(A, B)）
 
 ```java
 class Solution {
