@@ -629,3 +629,119 @@ public:
 
 
 
+# [剑指 Offer 26. 树的子结构](https://leetcode-cn.com/problems/shu-de-zi-jie-gou-lcof/)
+
+输入两棵二叉树A和B，判断B是不是A的子结构。(约定空树不是任意一个树的子结构)
+
+B是A的子结构， 即 A中有出现和B相同的结构和节点值。
+
+例如:
+
+```
+给定的树 A:
+  	 3
+    / \
+   4   5
+  / \
+ 1   2
+ 
+给定的树 B：
+    4 
+  /
+ 1
+```
+
+返回 true，因为 B 与 A 的一个子树拥有相同的结构和节点值。
+
+**示例 1：**
+
+```
+输入：A = [1,2,3], B = [3,1]
+输出：false
+```
+
+**示例 2：**
+
+```
+输入：A = [3,4,5,1,2], B = [4,1]
+输出：true
+```
+
+**限制：**
+
+- 0 <= 节点个数 <= 10000
+
+
+
+还是dfs遍历，需要注意不要重复遍历。把每一个节点都看成是根节点，本课树是否匹配就看左右子树是否匹配，如果不匹配就继续从下一个节点开始尝试。
+
+```java
+class Solution {
+    public boolean isSubStructure(TreeNode A, TreeNode B) {
+        if (B == null || A == null){
+            return false;
+        }
+        return dfs(A, B, true);
+    }
+
+    private boolean dfs(TreeNode A, TreeNode B, boolean isRoot){
+        if (A == null && B == null){
+            return true;
+        }
+
+        if (A == null){
+            return false;
+        }
+
+        if (B == null){
+            return true;
+        }
+
+        if (A.val == B.val){
+            boolean left = dfs(A.left, B.left, false);
+            boolean right = dfs(A.right, B.right, false);
+            if (left && right){
+                return true;
+            }
+        }
+
+      	// 增加一个标志位 用来判断本轮是不是根节点 如果是在判断子树则不需要再继续递归
+        if (isRoot){
+            boolean left = dfs(A.left, B, true);
+            if (left) return true;
+            return dfs(A.right, B, true);
+        }
+
+        return false;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：40.1 MB, 在所有 Java 提交中击败了76.22% 的用户
+```
+
+
+
+评论高赞
+
+先序遍历树 A 中的每个节点 $n_A$ ；（对应函数 isSubStructure(A, B)）
+判断树 A 中 以 $n_A$ 为根节点的子树 是否包含树 B 。（对应函数 recur(A, B)）
+
+```java
+class Solution {
+    public boolean isSubStructure(TreeNode A, TreeNode B) {
+        return (A != null && B != null) && (recur(A, B) || isSubStructure(A.left, B) || isSubStructure(A.right, B));
+    }
+    boolean recur(TreeNode A, TreeNode B) {
+        if(B == null) return true;
+        if(A == null || A.val != B.val) return false;
+        return recur(A.left, B.left) && recur(A.right, B.right);
+    }
+}
+
+
+作者：jyd
+链接：https://leetcode-cn.com/problems/shu-de-zi-jie-gou-lcof/solution/mian-shi-ti-26-shu-de-zi-jie-gou-xian-xu-bian-li-p/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
