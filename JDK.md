@@ -2245,7 +2245,7 @@ public enum State {
 
   　　1. 保证了不同线程对这个变量进行操作时的可见性，即一个线程修改了某个变量的值，这新值对其他线程来说是立即可见的。
 
-  　　2. 禁止进行指令重排序。
+    　　2. 禁止进行指令重排序。
 
 
 
@@ -2286,7 +2286,7 @@ volatile的性质
 
 **3.有序性**：
 
-在Java内存模型中，允许编译器和处理器对指令进行重排序，但是重排序过程不会影响到单线程程序的执行（as-if-serial），却会影响到多线程并发执行的正确性。
+在Java内存模型中，允许编译器和处理器对指令进行重排序，但是重排序过程不会影响到单线程程序的执行（**as-if-serial**），却会影响到多线程并发执行的正确性。
 
 在Java里面，可以通过volatile关键字来保证一定的“有序性”。另外可以通过synchronized和Lock来保证有序性，很显然，synchronized和Lock保证每个时刻是有一个线程执行同步代码，相当于是让线程顺序执行同步代码，自然就保证了有序性。
 
@@ -2416,6 +2416,8 @@ synchronized 使用的锁存在 Java 对象头中。HotSpot 虚拟机的对象�
 
 
 ### 锁升级
+
+锁有四种状态：无锁状态、偏向锁、轻量级锁、重量级锁
 
 偏向锁 ->轻量级锁->重量级锁
 
@@ -4770,7 +4772,7 @@ jdk11
     static class ThreadLocalMap {
 
         /**
-         * Map中元素的键为线程对象，而值对应线程的变量副本
+         * Map中元素的键为线程对象，而值对应线程的变量副本 继承自一个弱引用对象
          * The entries in this hash map extend WeakReference, using
          * its main ref field as the key (which is always a
          * ThreadLocal object).  Note that null keys (i.e. entry.get()
@@ -4882,6 +4884,24 @@ jdk11
 
 
 [ThreadLocal就是这么简单](https://segmentfault.com/a/1190000014152795)
+
+
+
+> #### ThreadLocal 内存泄露问题 / 为什么ThreadLocal中的entry是一个软引用？
+
+假如Entry是一个强引用，那么由于在ThreadLocalMap对象中ThreadLocal对象是作为一个key存在的，一直保持着这个引用，那么你gc一直都无法回收，哪怕你把ThreadLocal对象设置为了null，直到这个ThreadLocalMap不再使用，而ThreadLocalMap与线程对象绑定，并不是所有的线程都有stop的时候，有的守护线程会一直运行，这样就会导致内存泄露。
+
+如果使用弱引用，当你想要清除ThreadLocal时，直接给ThreadLocal对象赋值null，gc来了之后，发现弱引用就会直接干掉。
+
+**那为什么会内存泄露呢？**
+
+因为当弱引entry的 key 被gc 之后，之前的key就变成了null，那么你的value就再也访问不到了，就泄露了。所以用完就需要remove
+
+
+
+与线程池配合用的时候，注意要及时清理ThreadLocal，以防拿到上一个任务缓存的对象，当然这一步线程池已经替我们做了。
+
+
 
 
 
@@ -5063,6 +5083,12 @@ ABA问题的解决思路就是使用版本号。在变量前面追加上版本�
 > #### 只能保证一个共享变量的原子操作
 
 CAS操作是针对一个变量的，如果对多个变量操作，1. 可以加锁来解决。2 .封装成对象类解决。思路就是多个合并成一个，例如多个布尔类型的可以合并成一个位运算。
+
+
+
+cas在底层实现会跟到native方法，再往后是C++，最终调用了一条汇编命令
+
+`lock comxchg` 其中comxchg是cpu的cas，但是他是非原子性的，而lock命令负责进行加锁，锁的是总线、缓存行、南桥。
 
 
 

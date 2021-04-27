@@ -478,7 +478,7 @@ Tomcat 的类加载器会优先尝试用 ExtClassLoader 去加载，因为  ExtC
 在Hotspot虚拟机中，对象在内存中的布局可以分为3快区域：**对象头**、**实例数据**和**对齐填充**。
 
 - **Hotspot虚拟机的对象头包括两部分信息**
-  - **第一部分用于存储对象自身的自身运行时数据，叫做标记字段**，标记字段用以存储 Java 虚拟机有关该对象的运行数据，如哈希码、GC 信息以及锁信息，官方称它为"Mark Word"。
+  - **第一部分用于存储对象自身的自身运行时数据，叫做标记字段**，标记字段用以存储 Java 虚拟机有关该对象的运行数据，如**哈希码、GC 信息以及锁信息**，官方称它为"Mark Word"。
   - **另一部分是类型指针**，即对象指向它的类元数据的指针，虚拟机通过这个指针来确定这个对象是那个类的实例。另外，如果对象是一个Java数组，那在对象头中还必须有一块用于记录数组长度的数据，因为虚拟机可以通过普通Java对象的元数据信息确定Java对象的大小，但是从数组的元数据中却无法确定数组的大小。
 - **实例数据部分是对象真正存储的有效信息**，也是在程序中所定义的各种类型的字段内容。无论是从父类继承下来的，还是在子类中定义的，都需要记录起来。
 - **对齐填充部分不是必然存在的，也没有什么特别的含义，仅仅起占位作用。**
@@ -1296,17 +1296,17 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
    jstat [-options] [vmid] [间隔时间/毫秒] [查询次数]
    常见options
   | class (类加载器) 
-| compiler (JIT) 
+  | compiler (JIT) 
   | gc (GC堆状态) 
-| gccapacity (各区大小) 
+  | gccapacity (各区大小) 
   | gccause (最近一次GC统计和原因) 
-| gcnew (新区统计)
+  | gcnew (新区统计)
   | gcnewcapacity (新区大小)
-| gcold (老区统计)
+  | gcold (老区统计)
   | gcoldcapacity (老区大小)
-| gcpermcapacity (永久区大小)
+  | gcpermcapacity (永久区大小)
   | gcutil (GC统计汇总)
-| printcompilation (HotSpot编译统计)
+  | printcompilation (HotSpot编译统计)
   
   ```
 
