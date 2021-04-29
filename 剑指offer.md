@@ -1014,6 +1014,86 @@ class Solution {
 
 
 
+# [剑指 Offer 34. 二叉树中和为某一值的路径](https://leetcode-cn.com/problems/er-cha-shu-zhong-he-wei-mou-yi-zhi-de-lu-jing-lcof/)
+
+输入一棵二叉树和一个整数，打印出二叉树中节点值的和为输入整数的所有路径。从树的根节点开始往下一直到叶节点所经过的节点形成一条路径。
+
+ 
+
+示例:
+给定如下二叉树，以及目标和 target = 22，
+
+```
+              5
+             / \
+            4   8
+           /   / \
+          11  13  4
+         /  \    / \
+        7    2  5   1
+```
+
+返回:
+
+```
+[
+   [5,4,11,2],
+   [5,8,4,5]
+]
+```
+
+**提示：**
+
+1. `节点总数 <= 10000`
+
+
+
+题目没说明白，是必须要从根节点到叶子节点的完整链路的和等于目标值才算吗？节点居然还能出现负数？？剪枝也没法剪了，d到底吧
+
+```java
+class Solution {
+    private List<List<Integer>> result = new ArrayList<>();
+
+    public List<List<Integer>> pathSum(TreeNode root, int target) {
+        if (root == null) return result;
+        dfs(root, target, new ArrayList<>());
+        return result;
+    }
+
+    private void dfs(TreeNode node, int target, List<Integer> list){
+        if (node.left == null && node.right == null){
+            if (target == node.val){
+                list.add(node.val);
+                result.add(new ArrayList<>(list));
+                list.remove(list.size() - 1);
+            }
+            return;
+        }
+
+        if (node.left != null){
+            list.add(node.val);
+            dfs(node.left, target - node.val, list);
+            list.remove(list.size() - 1);
+        }
+        if (node.right != null){
+            list.add(node.val);
+            dfs(node.right, target - node.val, list);
+            list.remove(list.size() - 1);
+        }
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38.9 MB, 在所有 Java 提交中击败了46.41% 的用户
+```
+
+
+
+
+
+
+
+
+
 # [剑指 Offer 50. 第一个只出现一次的字符](https://leetcode-cn.com/problems/di-yi-ge-zhi-chu-xian-yi-ci-de-zi-fu-lcof/)
 
 在字符串 s 中找出第一个只出现一次的字符。如果没有，返回一个单空格。 s 只包含小写字母。
@@ -1062,3 +1142,114 @@ class Solution {
 ```
 
 这种实在是太慢了。
+
+
+
+
+
+# [剑指 Offer 58 - I. 翻转单词顺序](https://leetcode-cn.com/problems/fan-zhuan-dan-ci-shun-xu-lcof/)
+
+输入一个英文句子，翻转句子中单词的顺序，但单词内字符的顺序不变。为简单起见，标点符号和普通字母一样处理。例如输入字符串"I am a student. "，则输出"student. a am I"。
+
+**示例 1：**
+
+```
+输入: "the sky is blue"
+输出: "blue is sky the"
+```
+
+示例 2：
+
+```
+输入: "  hello world!  "
+输出: "world! hello"
+解释: 输入字符串可以在前面或者后面包含多余的空格，但是反转后的字符不能包括。
+
+**示例 3：**
+
+```
+输入: "a good   example"
+输出: "example good a"
+解释: 如果两个单词间有多余的空格，将反转后单词间的空格减少到只含一个。
+```
+
+**说明：**
+
+- 无空格字符构成一个单词。
+- 输入字符串可以在前面或者后面包含多余的空格，但是反转后的字符不能包括。
+- 如果两个单词间有多余的空格，将反转后单词间的空格减少到只含一个。
+
+注意：本题与主站 151 题相同：https://leetcode-cn.com/problems/reverse-words-in-a-string/
+
+注意：此题对比原题有改动
+
+
+
+```java
+class Solution {
+    public String reverseWords(String s) {
+        if (s == null ) return "";
+        s = s.trim();
+        if (s.length() == 0) return "";
+        
+        char[] chars = s.toCharArray();
+        StringBuilder result = new StringBuilder();
+        for (int i = chars.length - 1; i >= 0; i--) {
+            StringBuilder stringBuilder = new StringBuilder();
+            char c = chars[i];
+            while (c != ' '){
+                stringBuilder.append(c);
+                if (i == 0){
+                    break;
+                }
+                i--;
+                c = chars[i];
+            }
+
+            if (stringBuilder.length() != 0){
+                result.append(stringBuilder.reverse()).append(" ");
+            }
+        }
+        result.deleteCharAt(result.length() - 1);
+        return result.toString();
+    }
+}
+执行用时：4 ms, 在所有 Java 提交中击败了42.61% 的用户
+内存消耗：38.2 MB, 在所有 Java 提交中击败了74.11% 的用户
+```
+
+
+
+评论区
+
+方法一：双指针
+
+算法解析：
+
+- 倒序遍历字符串 s ，记录单词左右索引边界 i , j ；
+- 每确定一个单词的边界，则将其添加至单词列表 res ；
+- 最终，将单词列表拼接为字符串，并返回即可。
+
+```java
+class Solution {
+    public String reverseWords(String s) {
+        s = s.trim(); // 删除首尾空格
+        int j = s.length() - 1, i = j;
+        StringBuilder res = new StringBuilder();
+        while(i >= 0) {
+            while(i >= 0 && s.charAt(i) != ' ') i--; // 搜索首个空格
+            res.append(s.substring(i + 1, j + 1) + " "); // 添加单词
+            while(i >= 0 && s.charAt(i) == ' ') i--; // 跳过单词间空格
+            j = i; // j 指向下个单词的尾字符
+        }
+        return res.toString().trim(); // 转化为字符串并返回
+    }
+}
+
+
+作者：jyd
+链接：https://leetcode-cn.com/problems/fan-zhuan-dan-ci-shun-xu-lcof/solution/mian-shi-ti-58-i-fan-zhuan-dan-ci-shun-xu-shuang-z/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
