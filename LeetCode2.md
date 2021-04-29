@@ -2937,139 +2937,6 @@ class Solution {
 
 
 
-# [230. 二叉搜索树中第K小的元素](https://leetcode-cn.com/problems/kth-smallest-element-in-a-bst/)
-
-给定一个二叉搜索树的根节点 root ，和一个整数 k ，请你设计一个算法查找其中第 k 个最小元素（从 1 开始计数）。
-
-示例 1：
-
-<img src="截图/leetCode/kthtree1.jpg" alt="img" style="zoom:67%;" />
-
-```
-输入：root = [3,1,4,null,2], k = 1
-输出：1
-```
-
-示例 2：
-
-<img src="截图/leetCode/kthtree2.jpg" alt="img" style="zoom:67%;" />
-
-```
-输入：root = [5,3,6,2,4,null,null,1], k = 3
-输出：3
-```
-
-提示：
-
-- 树中的节点数为 n 。
-- 1 <= k <= n <= 104
-- 0 <= Node.val <= 104
-
-
-进阶：如果二叉搜索树经常被修改（插入/删除操作）并且你需要频繁地查找第 k 小的值，你将如何优化算法？
-
-
-
-思考
-
-由于是二叉搜索树，根据树的性质，中序遍历的结果为一个从小到大的数组，那么找到第k个即可。
-
-```java
-class Solution {
-    int i = -1;
-    int cur = 1;
-    boolean condition = true;
-
-    public int kthSmallest(TreeNode root, int k) {
-        dfs(root, k);
-        return i;
-    }
-
-    public void dfs(TreeNode root, int k){
-        if (root == null){
-            return;
-        }
-
-        dfs(root.left, k);
-        if (cur == k && condition){
-            i = root.val;
-            condition = false;
-            return;
-        }else {
-            cur++;
-        }
-        dfs(root.right, k);
-    }
-}
-执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
-内存消耗：38.1 MB, 在所有 Java 提交中击败了84.47% 的用户
-```
-
-
-
-官方
-
-**方法一：递归**
-
-**算法：**
-
-通过构造 BST 的中序遍历序列，则第 `k-1` 个元素就是第 `k` 小的元素。
-
-```java
-class Solution {
-  public ArrayList<Integer> inorder(TreeNode root, ArrayList<Integer> arr) {
-    if (root == null) return arr;
-    inorder(root.left, arr);
-    arr.add(root.val);
-    inorder(root.right, arr);
-    return arr;
-  }
-
-  public int kthSmallest(TreeNode root, int k) {
-    ArrayList<Integer> nums = inorder(root, new ArrayList<Integer>());
-    return nums.get(k - 1);
-  }
-}
-
-
-作者：LeetCode
-链接：https://leetcode-cn.com/problems/kth-smallest-element-in-a-bst/solution/er-cha-sou-suo-shu-zhong-di-kxiao-de-yuan-su-by-le/
-来源：力扣（LeetCode）
-著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
-```
-
-**方法二：迭代**
-
-**算法：**
-
-在栈的帮助下，可以将方法一的递归转换为迭代，这样可以加快速度，因为这样可以不用遍历整个树，可以在找到答案后停止。
-
-```java
-class Solution {
-  public int kthSmallest(TreeNode root, int k) {
-    LinkedList<TreeNode> stack = new LinkedList<TreeNode>();
-
-    while (true) {
-      while (root != null) {
-        stack.add(root);
-        root = root.left;
-      }
-      root = stack.removeLast();
-      if (--k == 0) return root.val;
-      root = root.right;
-    }
-  }
-}
-
-
-作者：LeetCode
-链接：https://leetcode-cn.com/problems/kth-smallest-element-in-a-bst/solution/er-cha-sou-suo-shu-zhong-di-kxiao-de-yuan-su-by-le/
-来源：力扣（LeetCode）
-著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
-```
-
-
-
 # [155. 最小栈](https://leetcode-cn.com/problems/min-stack/)
 
 设计一个支持 push ，pop ，top 操作，并能在常数时间内检索到最小元素的栈。
@@ -3660,6 +3527,139 @@ class Solution {
 ```
 
 
+
+
+
+# [230. 二叉搜索树中第K小的元素](https://leetcode-cn.com/problems/kth-smallest-element-in-a-bst/)
+
+给定一个二叉搜索树的根节点 root ，和一个整数 k ，请你设计一个算法查找其中第 k 个最小元素（从 1 开始计数）。
+
+示例 1：
+
+<img src="截图/leetCode/kthtree1.jpg" alt="img" style="zoom:67%;" />
+
+```
+输入：root = [3,1,4,null,2], k = 1
+输出：1
+```
+
+示例 2：
+
+<img src="截图/leetCode/kthtree2.jpg" alt="img" style="zoom:67%;" />
+
+```
+输入：root = [5,3,6,2,4,null,null,1], k = 3
+输出：3
+```
+
+提示：
+
+- 树中的节点数为 n 。
+- 1 <= k <= n <= 104
+- 0 <= Node.val <= 104
+
+
+进阶：如果二叉搜索树经常被修改（插入/删除操作）并且你需要频繁地查找第 k 小的值，你将如何优化算法？
+
+
+
+思考
+
+由于是二叉搜索树，根据树的性质，中序遍历的结果为一个从小到大的数组，那么找到第k个即可。
+
+```java
+class Solution {
+    int i = -1;
+    int cur = 1;
+    boolean condition = true;
+
+    public int kthSmallest(TreeNode root, int k) {
+        dfs(root, k);
+        return i;
+    }
+
+    public void dfs(TreeNode root, int k){
+        if (root == null){
+            return;
+        }
+
+        dfs(root.left, k);
+        if (cur == k && condition){
+            i = root.val;
+            condition = false;
+            return;
+        }else {
+            cur++;
+        }
+        dfs(root.right, k);
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38.1 MB, 在所有 Java 提交中击败了84.47% 的用户
+```
+
+
+
+官方
+
+**方法一：递归**
+
+**算法：**
+
+通过构造 BST 的中序遍历序列，则第 `k-1` 个元素就是第 `k` 小的元素。
+
+```java
+class Solution {
+  public ArrayList<Integer> inorder(TreeNode root, ArrayList<Integer> arr) {
+    if (root == null) return arr;
+    inorder(root.left, arr);
+    arr.add(root.val);
+    inorder(root.right, arr);
+    return arr;
+  }
+
+  public int kthSmallest(TreeNode root, int k) {
+    ArrayList<Integer> nums = inorder(root, new ArrayList<Integer>());
+    return nums.get(k - 1);
+  }
+}
+
+
+作者：LeetCode
+链接：https://leetcode-cn.com/problems/kth-smallest-element-in-a-bst/solution/er-cha-sou-suo-shu-zhong-di-kxiao-de-yuan-su-by-le/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+**方法二：迭代**
+
+**算法：**
+
+在栈的帮助下，可以将方法一的递归转换为迭代，这样可以加快速度，因为这样可以不用遍历整个树，可以在找到答案后停止。
+
+```java
+class Solution {
+  public int kthSmallest(TreeNode root, int k) {
+    LinkedList<TreeNode> stack = new LinkedList<TreeNode>();
+
+    while (true) {
+      while (root != null) {
+        stack.add(root);
+        root = root.left;
+      }
+      root = stack.removeLast();
+      if (--k == 0) return root.val;
+      root = root.right;
+    }
+  }
+}
+
+
+作者：LeetCode
+链接：https://leetcode-cn.com/problems/kth-smallest-element-in-a-bst/solution/er-cha-sou-suo-shu-zhong-di-kxiao-de-yuan-su-by-le/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
 
 
 
