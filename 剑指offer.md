@@ -488,6 +488,51 @@ class Solution {
 
 本题返回的都是int，不用考虑溢出，但是在面试的时候，主要考察大数，而大数考察的是字符串来做加减。
 
+```java
+public class PrintNumbers17 {
+    public static void main(String[] args) {
+        PrintNumbers17 printNumbers17 = new PrintNumbers17();
+        List<StringBuilder> list = printNumbers17.printNumbers(3);
+        int divide = 1;
+        for (int i = 0; i < list.size(); i++) {
+            int leftRemoveNum = 3 - getSize(i);
+            System.out.println(list.get(i).substring(leftRemoveNum));
+        }
+    }
+
+    public static int getSize(long number) {
+        int count = 0;
+        while (number > 0) {
+            count += 1;
+            number = (number / 10);
+        }
+        return count;
+    }
+
+    public List<StringBuilder> printNumbers(int n) {
+        return dfs(n, n);
+    }
+
+    private List<StringBuilder> dfs(int level, int n){
+        List<StringBuilder> result = new ArrayList<>();
+        if (1 == level){
+            for (int i = 0; i <= 9; i++){
+                result.add(new StringBuilder().append(i));
+            }
+            return result;
+        }
+
+        List<StringBuilder> list = dfs(level - 1, n);
+        for (int i = 0; i <= 9; i++){
+            for (StringBuilder stringBuilder : list) {
+                result.add(new StringBuilder().append(i).append(stringBuilder));
+            }
+        }
+        return result;
+    }
+}
+```
+
 
 
 评论区
