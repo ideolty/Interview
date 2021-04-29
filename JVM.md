@@ -1352,6 +1352,8 @@ DirectByteBuffer类的内部还是调用了`unsafe.freeMemory(adress)`进行释�
 
 // todo 
 
+https://www.bilibili.com/video/BV1hK4y1N7Ky?p=15 待整理
+
 30  Java虚拟机的监控及诊断工具（命令行篇）| 31 Java虚拟机的监控及诊断工具（GUI篇）
 
 

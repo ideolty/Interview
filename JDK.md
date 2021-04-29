@@ -2245,7 +2245,7 @@ public enum State {
 
   　　1. 保证了不同线程对这个变量进行操作时的可见性，即一个线程修改了某个变量的值，这新值对其他线程来说是立即可见的。
 
-    　　2. 禁止进行指令重排序。
+        　　2. 禁止进行指令重排序。
 
 
 
@@ -2339,7 +2339,9 @@ volatile的性质
 
 > #### 单例模式DCL（双重确认），是否需要加volatile?
 
-肯定是需要的，原因当线程A在获取了Instance.class锁时，对ins进行 ins = new Instance() 初始化时，
+肯定是需要的，原因当线程A在获取了Instance.class锁时，对ins进行 ins = new Instance() 初始化时
+
+<img src="截图/JDK/image-20210428231121582.png" alt="image-20210428231204071" style="zoom:50%;" />
 
 1. 首先会调用new指令分配内存 `0 new #2<T>`
 2. 之后会调用构造方法进行内存数据初始化 `4 invokespecial #3 <T.<init>>`

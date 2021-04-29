@@ -903,3 +903,53 @@ class Solution {
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 ```
 
+
+
+# [剑指 Offer 50. 第一个只出现一次的字符](https://leetcode-cn.com/problems/di-yi-ge-zhi-chu-xian-yi-ci-de-zi-fu-lcof/)
+
+在字符串 s 中找出第一个只出现一次的字符。如果没有，返回一个单空格。 s 只包含小写字母。
+
+**示例:**
+
+```
+s = "abaccdeff"
+返回 "b"
+
+s = "" 
+返回 " "
+```
+
+**限制：**
+
+- 0 <= s 的长度 <= 50000
+
+
+
+```java
+class Solution {
+    public char firstUniqChar(String s) {
+        Map<Character, Integer> map = new HashMap<>();
+        char[] chars = s.toCharArray();
+        for (int i = 0; i < chars.length; i++) {
+            char c = chars[i];
+            Integer index = map.get(c);
+            if (index != null){
+                chars[i] = ' ';
+                chars[index] = ' ';
+            }else {
+                map.put(c, i);
+            }
+        }
+
+        for (char c : chars) {
+            if (c != ' ') return c;
+        }
+
+        return ' ';
+    }
+}
+执行用时：14 ms, 在所有 Java 提交中击败了74.22% 的用户
+内存消耗：38.8 MB, 在所有 Java 提交中击败了63.15% 的用户
+```
+
+这种实在是太慢了。
