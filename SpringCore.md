@@ -1552,6 +1552,8 @@ BeanFactory 的默认实现为 DefaultListableBeanFactory，其中 Bean生命周
 - Bean 销毁前阶段 - destroyBean 
 - Bean 销毁阶段 - destroyBean
 
+<img src="截图/Spring/core/spring 生命周期.png" alt="image-20210503105345842" style="zoom: 50%;" />
+
 
 
 > #### Spring Bean 元信息配置阶段 
