@@ -1552,6 +1552,10 @@ BeanFactory 的默认实现为 DefaultListableBeanFactory，其中 Bean生命周
 - Bean 销毁前阶段 - destroyBean 
 - Bean 销毁阶段 - destroyBean
 
+<img src="截图/Spring/core/spring 生命周期.png" alt="image-20210503105345842" style="zoom: 50%;" />
+
+<img src="截图/Spring/core/spring 生命周期2.png" alt="image-20210503110209972" style="zoom:50%;" />
+
 
 
 > #### Spring Bean 元信息配置阶段 
@@ -3128,7 +3132,7 @@ Spring MVC 解读——@Autowired、@Controller、@Service从原理层面来分�
 
 > ## 注解方式的事务实现机制
 
-​	在应用系统调用声明@Transactional 的目标方法时，Spring Framework 默认使用 AOP 代理，在代码运行时生成一个代理对象，根据@Transactional的属性配置信息，这个代理对象决定该声明@Transactional 的目标方法是否由拦截器 TransactionInterceptor 来使用拦截，在TransactionInterceptor 拦截时，会在在目标方法开始执行之前创建并加入事务，并执行目标方法的逻辑, 最后根据执行情况是否出现异常，利用抽象事务管理器AbstractPlatformTransactionManager 操作数据源 DataSource 提交或回滚事务。
+​	在应用系统调用声明@Transactional 的目标方法时，Spring Framework 默认使用 AOP 代理，在代码运行时生成一个代理对象，根据@Transactional的属性配置信息，这个代理对象决定该声明@Transactional 的目标方法是否由拦截器 TransactionInterceptor 来使用拦截，在 **TransactionInterceptor** 拦截时，会在在目标方法开始执行之前创建并加入事务，并执行目标方法的逻辑, 最后根据执行情况是否出现异常，利用抽象事务管理器AbstractPlatformTransactionManager 操作数据源 DataSource 提交或回滚事务。
 
 ![Spring 事务实现机制](截图/Spring/core/Spring 事务实现机制.jpg)
 
@@ -3158,6 +3162,86 @@ try {
     transactionManager.rollback(transStatus);
 }
 ```
+
+
+
+`org.springframework.transaction.interceptor.TransactionInterceptor#invoke`
+
+```java
+	@Override
+	@Nullable
+	public Object invoke(MethodInvocation invocation) throws Throwable {
+		// Work out the target class: may be {@code null}.
+		// The TransactionAttributeSource should be passed the target class
+		// as well as the method, which may be from an interface.
+		Class<?> targetClass = (invocation.getThis() != null ? AopUtils.getTargetClass(invocation.getThis()) : null);
+
+		// Adapt to TransactionAspectSupport's invokeWithinTransaction...
+		return invokeWithinTransaction(invocation.getMethod(), targetClass, new CoroutinesInvocationCallback() {
+			@Override
+			@Nullable
+			public Object proceedWithInvocation() throws Throwable {
+        		// 这里使用了类似与切面的责任链式的方法调用
+				return invocation.proceed();
+			}
+			@Override
+			public Object getTarget() {
+				return invocation.getThis();
+			}
+			@Override
+			public Object[] getArguments() {
+				return invocation.getArguments();
+			}
+		});
+	}
+```
+
+
+
+在 `invokeWithinTransaction` 对象中会对原方法进行包装，在方法的前与后处理事务内容。
+
+`org.springframework.transaction.interceptor.TransactionAspectSupport#invokeWithinTransaction`
+
+```java
+	......
+    	if (txAttr == null || !(ptm instanceof CallbackPreferringPlatformTransactionManager)) {
+			// Standard transaction demarcation with getTransaction and commit/rollback calls.
+			TransactionInfo txInfo = createTransactionIfNecessary(ptm, txAttr, joinpointIdentification);
+
+			Object retVal;
+			try {
+                // 自己实现了一个类似与 @around 的功能 这里会调用责任链的下一个结点
+				// This is an around advice: Invoke the next interceptor in the chain.
+				// This will normally result in a target object being invoked.
+				retVal = invocation.proceedWithInvocation();
+			}
+			catch (Throwable ex) {
+				// target invocation exception
+                // 事务提交失败 那么回滚
+				completeTransactionAfterThrowing(txInfo, ex);
+				throw ex;
+			}
+			finally {
+				cleanupTransactionInfo(txInfo);
+			}
+
+			if (retVal != null && vavrPresent && VavrDelegate.isVavrTry(retVal)) {
+				// Set rollback-only in case of Vavr failure matching our rollback rules...
+				TransactionStatus status = txInfo.getTransactionStatus();
+				if (status != null && txAttr != null) {
+					retVal = VavrDelegate.evaluateTryFailure(retVal, txAttr, status);
+				}
+			}
+
+            // 事务处理成功 那么就提交
+			commitTransactionAfterReturning(txInfo);
+			return retVal;
+		}
+
+......
+```
+
+
 
 
 

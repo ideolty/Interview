@@ -571,6 +571,12 @@ reputMessageService.start()负责启动reputMessageService，负责读取commitL
 
 RocketMQ没有真正意义的push，都是pull，虽然有push类，但实际底层实现采用的是**长轮询机制**，即拉取方式。
 
+RocketMQ 和 Kafka 都选择了拉模式
+
+
+
+[kafka数据如何存_消息队列之推还是拉，RocketMQ 和 Kafka 是如何做的？](https://blog.csdn.net/weixin_39638464/article/details/112174631)
+
 
 
 > #### 为什么要主动拉取消息而不使用事件监听方式？

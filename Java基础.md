@@ -413,7 +413,7 @@ JAVA NIO有两种解释：一种叫非阻塞IO（Non-blocking I/O），另一种
 
 NIO的主要组成部分
 
-- Buffer，高效的数据容器，除了布尔类型，所有原始数据类型都有相应的Bufer实现。 
+- Buffer，高效的数据容器，除了布尔类型，所有原始数据类型都有相应的Buffer实现。 
 - Channel，类似在Linux之类操作系统上看到的文件描述符，是NIO中被用来支持批量式IO操作的一种抽象。 File或者Socket，通常被认为是比较高层次的抽象，而Channel则是更加操作系统底层的一种抽象，这也使得NIO得以充分利用现代操作系统底层机制，获得特定场景的性能优化，例如，DMA（Direct Memory Access）等。不同层次的抽象是相互关联的，我们可以通过Socket获取Channel，反之亦然。
 -  Selector，是NIO实现多路复用的基础，它提供了一种高效的机制，可以检测到注册在Selector上的多个Channel中，是否有Channel处于就绪状态，进而实现了单线程对 多Channel的高效管理。 Selector同样是基于底层操作系统机制，不同模式、不同版本都存在区别，例如，在最新的代码库里，相关实现如下： Linux上依赖于epoll。 Windows上NIO2（AIO）模式则是依赖于iocp。
 -  Chartset，提供Unicode字符串定义，NIO也提供了相应的编解码器等，例如，通过下面的方式进行字符串到ByteBufer的转换
@@ -424,16 +424,16 @@ NIO的主要组成部分
 
 基本属性： 
 
-- capcity，它反映这个Bufer到底有多大，也就是数组的长度。 
+- capacity，它反映这个Buffer到底有多大，也就是数组的长度。 
 - position，要操作的数据起始位置。 
 - limit，相当于操作的限额。在读取或者写入时，limit的意义很明显是不一样的。比如，读取操作时，很可能将limit设置到所容纳数据的上限；而在写入时，则会设置容量或容量 以下的可写限度。 
-- mark，记录上一次postion的位置，默认是0，算是一个便利性的考虑，往往不是必须的。
+- mark，记录上一次position的位置，默认是0，算是一个便利性的考虑，往往不是必须的。
 
 
 
 **类型**：
 
-Direct Buffer：如果我们看Buffer的方法定义，你会发现它定义了isDirect()方法，返回当前Bufer是否是Direct类型。这是因为Java提供了堆内和堆外（Direct）Bufer，我们可以以它的allocate或者allocateDirect方法直接创建。 
+Direct Buffer：如果我们看Buffer的方法定义，你会发现它定义了isDirect()方法，返回当前Buffer是否是Direct类型。这是因为Java提供了堆内和堆外（Direct）Buffer，我们可以以它的allocate或者allocateDirect方法直接创建。 
 
 MappedByteBuffer：它将文件按照指定大小直接映射为内存区域，当程序访问这个内存区域时将直接操作这块儿文件数据，省去了将数据从内核空间向用户空间传输的损耗。我 们可以使用FileChannel.map创建MappedByteBuffer，它本质上也是种Direct Buffer
 
@@ -441,17 +441,17 @@ MappedByteBuffer：它将文件按照指定大小直接映射为内存区域，�
 
 **数垃圾收集**：
 
-- 大多数垃圾收集过程中，都不会主动收集Direct Bufer，它的垃圾收集过程，就是基于Cleaner（一个内部实现）和幻象引用 （PhantomReference）机制，其本身不是public类型，内部实现了一个Deallocator负责销毁的逻辑。对它的销毁往往要拖到full GC的时候，所以使用不当很容易导致OutOfMemoryError。 
-- 对于Direct Bufer的回收，有几个建议： 
+- 大多数垃圾收集过程中，都不会主动收集Direct Buffer，它的垃圾收集过程，就是基于Cleaner（一个内部实现）和幻象引用 （PhantomReference）机制，其本身不是public类型，内部实现了一个Deallocator负责销毁的逻辑。对它的销毁往往要拖到full GC的时候，所以使用不当很容易导致OutOfMemoryError。 
+- 对于Direct Buffer的回收，有几个建议： 
   - 在应用程序中，显式地调用System.gc()来强制触发。
-  -  另外一种思路是，在大量使用Direct Bufer的部分框架中，框架会自己在程序中调用释放方法，Netty就是这么做的。
-  -  重复使用Direct Bufer。
+  -  另外一种思路是，在大量使用Direct Buffer的部分框架中，框架会自己在程序中调用释放方法，Netty就是这么做的。
+  -  重复使用Direct Buffer。
 
 
 
 **跟踪和诊断Direct Bufer内存占用**
 
-因为通常的垃圾收集日志等记录，并不包含Direct Bufer等信息。在JDK 8之后的版本，我们可以方便地使用Native Memory Tracking（NMT）特性来进行诊断
+因为通常的垃圾收集日志等记录，并不包含Direct Buffer等信息。在JDK 8之后的版本，我们可以方便地使用Native Memory Tracking（NMT）特性来进行诊断
 
 ```cmd
 -XX:NativeMemoryTracking={summary|detail}
@@ -1084,9 +1084,9 @@ public class Driver extends NonRegisteringDriver implements java.sql.Driver {
 
 3. 定位到该进程内，15153 的线程CPU占用高，进一步分析内存堆栈的情况
 
-   使用`jstack -l 14724 (进程id) > 14724.stack `将进程内的线程情况乱重定向到14724.stack这个文件，方便查看
+   使用`jstack -l 14724 (进程id) > 14724.stack `将进程内的线程情况重定向到14724.stack这个文件，方便查看
 
-4. 之后可以把那个线程好转为16进制，这是因为最后文件里的线程号是16进制的方便grep定位
+4. 之后可以把那个线程号转为16进制，这是因为最后文件里的线程号是16进制的方便grep定位
 
 
 
