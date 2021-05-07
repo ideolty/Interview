@@ -416,8 +416,16 @@ https://juejin.im/post/5c6d1ecbe51d4567a238ab8b
 
 ![pageCache](截图/Kafka/pageCache.png)
 
+<img src="截图/Kafka/io与zero copy.png" alt="image-20210507220319342" style="zoom:50%;" />
+
 1. NIO 的网络通信方式
+
 2. log文件磁盘顺序写
-3. 零拷贝
-4. mmap，或者说pageCache，使用内存映射的方式，将内核的内存空间映射到kafka的内存空间，减少了系统调用，也不需要进行用户态与内核态的切换。
+
+3. 读数据的时候采用零拷贝 使用linux的系统调用 sendfile
+
+4. 写数据的时候采用mmap模型，或者说pageCache，使用内存映射的方式，将内核的内存空间映射到kafka的内存空间，减少了系统调用，也不需要进行用户态与内核态的切换。
+
+   写的时候mmap其实相当于吧用于空间，内核空间，磁盘文件3者打通，kafka存储的时候会存segment文件，假设这个实体文件1个G，那么会在内存中开辟一个1个G的mmap区域。
+
 5. 消息异步、批量、压缩发送
