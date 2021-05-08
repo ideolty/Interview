@@ -1203,6 +1203,68 @@ https://leetcode-cn.com/problems/convert-sorted-list-to-binary-search-tree/solut
 
 
 
+# [113. 路径总和 II](https://leetcode-cn.com/problems/path-sum-ii/)
+
+给你二叉树的根节点 root 和一个整数目标和 targetSum ，找出所有 从根节点到叶子节点 路径总和等于给定目标和的路径。
+
+叶子节点 是指没有子节点的节点。
+
+**示例 1：**
+
+<img src="截图/leetCode/pathsumii1.jpg" alt="img" style="zoom:50%;" />
+
+```
+输入：root = [5,4,8,11,null,13,4,7,2,null,null,5,1], targetSum = 22
+输出：[[5,4,11,2],[5,8,4,5]]
+```
+
+
+
+思考
+
+注意两个细节：
+
+1. 题目没说这个树非空，记得提前判断一下。
+2. 题目没说所有节点的值非负，所以完全可能存在负数，那么就不能剪枝了，需要一路遍历到叶子节点才能判断本条路径是否符合条件了。
+
+
+
+使用标准的递归来写回方便一些。
+
+```java
+class Solution {
+    private List<List<Integer>> result = new ArrayList<>();
+
+    public List<List<Integer>> pathSum(TreeNode root, int targetSum) {
+        if (root == null) return result;
+        dfs(root, targetSum, new ArrayList<>());
+        return result;
+    }
+
+    private void dfs(TreeNode root, int targetSum, List<Integer> list){
+        if (root.right == null && root.left == null){
+            if (targetSum - root.val == 0){
+                list.add(root.val);
+                result.add(new ArrayList<>(list));
+                list.remove(list.size() - 1);
+            }
+            return;
+        }
+
+        list.add(root.val);
+        if (root.left != null){
+            dfs(root.left, targetSum - root.val, list);
+        }
+        if (root.right != null){
+            dfs(root.right, targetSum - root.val, list);
+        }
+        list.remove(list.size() - 1);
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38.8 MB, 在所有 Java 提交中击败了57.57% 的用户
+```
+
 
 
 
