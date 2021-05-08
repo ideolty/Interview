@@ -2307,6 +2307,126 @@ public class Solution {
 
 
 
+# [143. 重排链表](https://leetcode-cn.com/problems/reorder-list/)
+
+给定一个单链表 L：L0→L1→…→Ln-1→Ln ，
+将其重新排列后变为： L0→Ln→L1→Ln-1→L2→Ln-2→…
+
+你不能只是单纯的改变节点内部的值，而是需要实际的进行节点交换。
+
+示例 1:
+```
+给定链表 1->2->3->4, 重新排列为 1->4->2->3.
+```
+示例 2:
+```
+给定链表 1->2->3->4->5, 重新排列为 1->5->2->4->3.
+```
+
+
+
+想法一：
+
+链表倒转。先遍历一遍链表，得到长度，然后把后半段「奇数则前半段多一个」的节点单独拎出来，然后进行链表的倒转。之后开始进行两个链表的合并；
+
+想法二：
+
+借助数组，这样相当于给节点固定了一个顺序，这里为了方便，使用栈。
+
+
+
+这里我为了写的方便，使用了想法二，不知道为什么耗时比较高。
+
+```java
+class Solution {
+    public void reorderList(ListNode head) {
+        Stack<ListNode> stack = new Stack<>();
+        ListNode node = head;
+        int count = 0;
+        while (node != null){
+            stack.push(node);
+            node = node.next;
+            count++;
+        }
+
+        node = new ListNode(-1);
+        int num = 0;
+        while (count >= 0){
+            if ((num & 1) == 0){
+                node.next = head;
+                head = head.next;
+            }else {
+                node.next = stack.pop();
+            }
+            node = node.next;
+            count--;
+            num++;
+        }
+        node.next = null;
+    }
+}
+执行用时：3 ms, 在所有 Java 提交中击败了41.63% 的用户
+内存消耗：40.9 MB, 在所有 Java 提交中击败了74.61% 的用户
+```
+
+
+
+官方的思路与我一致，贴一个写的漂亮的
+
+**方法一：线性表**
+
+```java
+class Solution {
+    public void reorderList(ListNode head) {
+        if (head == null) {
+            return;
+        }
+        List<ListNode> list = new ArrayList<ListNode>();
+        ListNode node = head;
+        while (node != null) {
+            list.add(node);
+            node = node.next;
+        }
+        int i = 0, j = list.size() - 1;
+      	// 这里的重排 写的很漂亮一口气排完了2个节点
+        while (i < j) {
+            list.get(i).next = list.get(j);
+            i++;
+            if (i == j) {
+                break;
+            }
+            list.get(j).next = list.get(i);
+            j--;
+        }
+        list.get(i).next = null;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/reorder-list/solution/zhong-pai-lian-biao-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+**方法二：寻找链表中点 + 链表逆序 + 合并链表**
+
+注意到目标链表即为将原链表的左半端和反转后的右半端合并后的结果。
+
+这样我们的任务即可划分为三步：
+
+1. 找到原链表的中点（参考「[876. 链表的中间结点](https://leetcode-cn.com/problems/middle-of-the-linked-list/)」）。
+
+   我们可以使用快慢指针来 O(N) 地找到链表的中间节点。
+
+2. 将原链表的右半端反转（参考「[206. 反转链表](https://leetcode-cn.com/problems/reverse-linked-list/)」）。
+
+   我们可以使用迭代法实现链表的反转。
+
+3. 将原链表的两端合并。
+
 
 
 # [146. LRU 缓存机制](https://leetcode-cn.com/problems/lru-cache/)
