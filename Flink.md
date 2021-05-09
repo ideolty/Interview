@@ -63,3 +63,43 @@ TaskManager节点之间的数据交互有提供network manager模块，他基于
 ### JobGraph
 
 ![image-20210508232949174](截图/Flink/JobGraph结构图.png)
+
+
+
+# 集群运行模式
+
+![image-20210509084040478](截图/Flink/集群运行模式.png)
+
+## Session
+
+![image-20210509084130391](截图/Flink/session模式.png)
+
+## Per-Job
+
+![image-20210509084201954](截图/Flink/per-job模式.png)
+
+## Application mode
+
+![image-20210509084345060](截图/Flink/application mode.png)
+
+
+
+在集群的部署模式中，除了以上三种集群运行的模式支持部署外，还可以进行Native集群部署，他的特点是根据job的资源申请，动态的启动TaskManager满足计算需求。	
+
+
+
+# Flink On Yarn
+
+![image-20210509084853160](截图/Flink/yarn集群架构原理.png)
+
+
+
+session模式
+
+![image-20210509085042635](截图/Flink/flink on yarn session.png)
+
+
+
+Per-job模式
+
+![image-20210509085307048](../../../Library/Application Support/typora-user-images/image-20210509085307048.png)
