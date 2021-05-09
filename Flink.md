@@ -103,3 +103,51 @@ session模式
 Per-job模式
 
 ![image-20210509085307048](../../../Library/Application Support/typora-user-images/image-20210509085307048.png)
+
+
+
+# 时间窗口
+
+![image-20210509220739461](截图/Flink/时间类型.png)
+
+
+
+## WaterMark
+
+![image-20210509221019470](截图/Flink/WaterMark.png)
+
+
+
+作用、生成、更新、传递等
+
+
+
+![image-20210509222114956](截图/Flink/watermark使用.png)
+
+对于window来说，通过watermark来判断窗口统计的时机。上图，假设5分钟一个窗口，最大的延时时间为10分钟，使用的append模式。
+
+![image-20210509223133750](../../../Library/Application Support/typora-user-images/image-20210509223133750.png)
+
+
+
+
+
+![image-20210509223236623](截图/Flink/watermark使用总结.png)
+
+
+
+**生成策略**
+
+**Periodic WaterMarks**
+
+根据最大的envent time 减去一个最大的延迟时间
+
+
+
+**Punctuated WaterMarks**
+
+在事件流中，基于一个固定的事件来生成
+
+
+
+## Windows 窗口
