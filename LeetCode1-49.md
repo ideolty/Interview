@@ -630,6 +630,10 @@ class Solution {
 
 
 
+推荐先把编辑距离搞懂，再看本题，思路极其相似，编辑距离有比较好的视频，可以帮助理解，本题的视频感觉不太行。
+
+
+
 官方
 
 **方法一：动态规划**
@@ -803,6 +807,10 @@ or dp[i][j] = dp[i][j-2] // 没有匹配的情况
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 
 
+
+还有一条评论也很不错
+
+https://leetcode-cn.com/problems/regular-expression-matching/solution/zheng-ze-biao-da-shi-pi-pei-by-leetcode-solution/452279
 
 
 
