@@ -1203,6 +1203,46 @@ https://leetcode-cn.com/problems/convert-sorted-list-to-binary-search-tree/solut
 
 
 
+# [112. 路径总和](https://leetcode-cn.com/problems/path-sum/)
+
+给你二叉树的根节点 root 和一个表示目标和的整数 targetSum ，判断该树中是否存在 根节点到叶子节点 的路径，这条路径上所有节点值相加等于目标和 targetSum 。
+
+叶子节点 是指没有子节点的节点。
+
+```java
+class Solution {
+    public boolean hasPathSum(TreeNode root, int targetSum) {
+        if (root == null) return false;
+        return dfs(root, targetSum);
+    }
+    private boolean dfs(TreeNode root, int targetSum){
+        if (root.left == null && root.right == null){
+            return targetSum == root.val;
+        }
+
+        boolean left = false;
+        if (root.left != null){
+            left = dfs(root.left, targetSum - root.val);
+        }
+
+        if (left){
+            return true;
+        }
+
+        if (root.right != null){
+            return dfs(root.right, targetSum - root.val);
+        }
+        return false;
+    }
+}
+```
+
+
+
+
+
+
+
 # [113. 路径总和 II](https://leetcode-cn.com/problems/path-sum-ii/)
 
 给你二叉树的根节点 root 和一个整数目标和 targetSum ，找出所有 从根节点到叶子节点 路径总和等于给定目标和的路径。
