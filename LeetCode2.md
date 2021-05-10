@@ -1915,6 +1915,249 @@ https://leetcode-cn.com/problems/binary-tree-maximum-path-sum/solution/er-cha-sh
 
 
 
+# [129. 求根节点到叶节点数字之和](https://leetcode-cn.com/problems/sum-root-to-leaf-numbers/)
+
+给你一个二叉树的根节点 root ，树中每个节点都存放有一个 0 到 9 之间的数字。
+
+每条从根节点到叶节点的路径都代表一个数字：
+
+- 例如，从根节点到叶节点的路径 1 -> 2 -> 3 表示数字 123 。
+
+计算从根节点到叶节点生成的 所有数字之和 。
+
+叶节点 是指没有子节点的节点。
+
+示例：
+
+![img](截图/leetCode/num2tree.jpg)
+
+```
+输入：root = [4,9,0,5,1]
+输出：1026
+解释：
+从根到叶子节点路径 4->9->5 代表数字 495
+从根到叶子节点路径 4->9->1 代表数字 491
+从根到叶子节点路径 4->0 代表数字 40
+因此，数字总和 = 495 + 491 + 40 = 1026
+```
+
+
+
+dfs深度优先，枚举所有的可能，get不到这主要是考察什么。
+
+```java
+class Solution {
+    private int sum = 0;
+
+    public int sumNumbers(TreeNode root) {
+        dfs(root, 0);
+        return sum;
+    }
+
+    private void dfs(TreeNode root, int value){
+        if (root.right == null && root.left == null){
+            sum += value * 10 + root.val;
+            return;
+        }
+
+        if (root.left != null){
+            dfs(root.left, value * 10 + root.val);
+        }
+
+        if (root.right != null){
+            dfs(root.right, value * 10 + root.val);
+        }
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：35.7 MB, 在所有 Java 提交中击败了93.10% 的用户
+```
+
+
+
+# [130. 被围绕的区域](https://leetcode-cn.com/problems/surrounded-regions/)
+
+给你一个 m x n 的矩阵 board ，由若干字符 'X' 和 'O' ，找到所有被 'X' 围绕的区域，并将这些区域里所有的 'O' 用 'X' 填充。
+
+**示例 1：**
+
+![img](截图/leetCode/xogrid.jpg)
+
+```
+输入：board = [["X","X","X","X"],["X","O","O","X"],["X","X","O","X"],["X","O","X","X"]]
+输出：[["X","X","X","X"],["X","X","X","X"],["X","X","X","X"],["X","O","X","X"]]
+解释：被围绕的区间不会存在于边界上，换句话说，任何边界上的 'O' 都不会被填充为 'X'。 任何不在边界上，或不与边界上的 'O' 相连的 'O' 最终都会被填充为 'X'。如果两个元素在水平或垂直方向相邻，则称它们是“相连”的。
+```
+
+
+
+这个题目没啥技巧啊，就是dfs考察写代码的能力，与之前的螺旋矩阵的题目很像。
+
+```java
+class Solution {
+    private List<Integer> direct = new ArrayList<>();
+    private int row;
+    private int col;
+
+    public void solve(char[][] board) {
+        direct.add(1);
+        direct.add(2);
+        direct.add(3);
+        direct.add(4);
+
+        row = board.length;
+        col = board[0].length;
+
+        int n = 0;
+        int m = 0;
+
+        // 遍历第一行
+        for (; n < col; n++){
+            // 往下进行dfs
+            dfs(board, m, n, 1);
+        }
+        n--;
+        m++;
+
+        for (; m < row; m++){
+            dfs(board, m, n, 4);
+        }
+        m--;
+        n--;
+
+        for (; n >= 0; n--){
+            dfs(board, m, n, 2);
+        }
+        n++;
+        m--;
+
+        for (; m >= 0; m--){
+            dfs(board, m, n, 3);
+        }
+
+        for (int i = 0; i < board.length; i++) {
+            char[] chars = board[i];
+            for (int j = 0; j < chars.length; j++) {
+                char c = board[i][j];
+                if (c == '1'){
+                    board[i][j] = 'O';
+                    continue;
+                }
+                if (c == 'O'){
+                    board[i][j] = 'X';
+                }
+            }
+        }
+    }
+
+    /**
+     * 上下左右 1234
+     * 四个顶点特殊处理
+     * @param board
+     * @param source 是从哪个方向来的或者说不要再去遍历哪个方向 防止重复走
+     */
+    private void dfs(char[][] board, int row, int col, int source){
+        if (0 > row || row >= this.row){
+            return;
+        }
+        if (0 > col || col >= this.col){
+            return;
+        }
+
+        char c = board[row][col];
+        if ((row == 0 && col == 0) || (row == this.row - 1 && col == 0)
+                || (row == 0 && col == this.col - 1) || (row == this.row - 1) && col == this.col - 1) {
+            if (c == 'O'){
+                board[row][col] = '1';
+            }
+            return;
+        }
+
+        if (c == 'X' || c == '1') return;
+
+        board[row][col] = '1';
+
+        for (Integer dir : direct) {
+            if (dir == source) continue;
+            switch (dir){
+                case 1:
+                    dfs(board, row - 1, col, 2);
+                    break;
+                case 2:
+                    dfs(board, row + 1, col, 1);
+                    break;
+                case 3:
+                    dfs(board, row, col - 1, 4);
+                    break;
+                case 4:
+                    dfs(board, row, col + 1, 3);
+                    break;
+            }
+        }
+    }
+}
+执行用时：2 ms, 在所有 Java 提交中击败了92.84% 的用户
+内存消耗：40.5 MB, 在所有 Java 提交中击败了65.18% 的用户
+```
+
+
+
+官方
+
+**方法一：深度优先搜索**
+
+```java
+class Solution {
+    int n, m;
+
+    public void solve(char[][] board) {
+        n = board.length;
+        if (n == 0) {
+            return;
+        }
+        m = board[0].length;
+        for (int i = 0; i < n; i++) {
+            dfs(board, i, 0);
+            dfs(board, i, m - 1);
+        }
+        for (int i = 1; i < m - 1; i++) {
+            dfs(board, 0, i);
+            dfs(board, n - 1, i);
+        }
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                if (board[i][j] == 'A') {
+                    board[i][j] = 'O';
+                } else if (board[i][j] == 'O') {
+                    board[i][j] = 'X';
+                }
+            }
+        }
+    }
+
+    public void dfs(char[][] board, int x, int y) {
+        if (x < 0 || x >= n || y < 0 || y >= m || board[x][y] != 'O') {
+            return;
+        }
+        board[x][y] = 'A';
+        dfs(board, x + 1, y);
+        dfs(board, x - 1, y);
+        dfs(board, x, y + 1);
+        dfs(board, x, y - 1);
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/surrounded-regions/solution/bei-wei-rao-de-qu-yu-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
 # [136. 只出现一次的数字](https://leetcode-cn.com/problems/single-number/) :new_moon_with_face:
 
 给定一个非空整数数组，除了某个元素只出现一次以外，其余每个元素均出现两次。找出那个只出现了一次的元素。
@@ -5245,6 +5488,54 @@ class Solution {
 费马平方和 : 奇质数能表示为两个平方数之和的充分必要条件是该质数被 4 除余 1 。
 
 翻译过来就是：当且仅当一个自然数的质因数分解中，满足 4k+3 形式的质数次方数均为偶数时，该自然数才能被表示为两个平方数之和。
+
+
+
+# [872. 叶子相似的树](https://leetcode-cn.com/problems/leaf-similar-trees/)
+
+
+
+简单难度的题目，就是dfs拿出所有叶子节点，然后比较。
+
+```java
+class Solution {
+    public boolean leafSimilar(TreeNode root1, TreeNode root2) {
+        List<Integer> list1 = new ArrayList<>();
+        List<Integer> list2 = new ArrayList<>();
+        getLeafList(root1, list1);
+        getLeafList(root2, list2);
+
+        if (list1.size() != list2.size()) return false;
+        for (int i = 0; i < list1.size(); i++) {
+            Integer val1 = list1.get(i);
+            Integer val2 = list2.get(i);
+            if (!val1.equals(val2)) return false;
+        }
+        return true;       
+    }
+
+    private void getLeafList(TreeNode root, List<Integer> list){
+        if (root.right == null && root.left == null){
+            list.add(root.val);
+            return; 
+        }
+        
+        if (root.left != null){
+            getLeafList(root.left, list);
+        }
+        
+        if (root.right != null){
+            getLeafList(root.right, list);
+        }
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：35.5 MB, 在所有 Java 提交中击败了100.00% 的用户
+```
+
+
+
+
 
 
 
