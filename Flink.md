@@ -181,3 +181,36 @@ Per-job模式
 #### Session Windows
 
 ![session window](截图/Flink/session window.png)
+
+
+
+### Window Trigger
+
+![windows trigger](截图/Flink/windows trigger.png)
+
+
+
+### Window Evictor
+
+![image-20210510222235457](截图/Flink/windows evictor.png)
+
+
+
+### Window Function
+
+![image-20210510222824428](截图/Flink/window function.png)
+
+
+
+## Windows 多流合并
+
+多流合并类型
+
+- window join
+- Interval join
+
+
+
+
+
+## Process function
