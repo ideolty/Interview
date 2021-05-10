@@ -1,3 +1,5 @@
+
+
 # 综述
 
 目前为应付面试，记录一下介绍性质的文字、一些面试题，以及一些比较好的资料，待之后再整理。
@@ -151,3 +153,31 @@ Per-job模式
 
 
 ## Windows 窗口
+
+![image-20210510215730933](截图/Flink/window抽象概念.png)
+
+
+
+### Window Assigner
+
+窗口分配器：用来将数据流中的元素分配到不同的窗口。
+
+![image-20210510220246418](截图/Flink/窗口类型.png)
+
+
+
+#### Sliding Windows
+
+![image-20210510220420238](截图/Flink/sliding windows.png)
+
+
+
+#### Tumbling Windows
+
+![tumbling windows](截图/Flink/tumbling windows.png)
+
+
+
+#### Session Windows
+
+![session window](截图/Flink/session window.png)
