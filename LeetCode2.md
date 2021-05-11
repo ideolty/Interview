@@ -1573,6 +1573,164 @@ class Solution {
 
 
 
+# [116. 填充每个节点的下一个右侧节点指针](https://leetcode-cn.com/problems/populating-next-right-pointers-in-each-node/) :star:
+
+给定一个 **完美二叉树** ，其所有叶子节点都在同一层，每个父节点都有两个子节点。二叉树定义如下：
+
+```c++
+struct Node {
+  int val;
+  Node *left;
+  Node *right;
+  Node *next;
+}
+```
+
+填充它的每个 next 指针，让这个指针指向其下一个右侧节点。如果找不到下一个右侧节点，则将 next 指针设置为 NULL。
+
+初始状态下，所有 next 指针都被设置为 NULL。
+
+**进阶：**
+
+- 你只能使用常量级额外空间。
+- 使用递归解题也符合要求，本题中递归程序占用的栈空间不算做额外的空间复杂度。
+
+
+
+**示例：**
+
+![img](截图/leetCode/116_sample.png)
+
+```
+输入：root = [1,2,3,4,5,6,7]
+输出：[1,#,2,3,#,4,5,6,7,#]
+解释：给定二叉树如图 A 所示，你的函数应该填充它的每个 next 指针，以指向其下一个右侧节点，如图 B 所示。序列化的输出按层序遍历排列，同一层节点由 next 指针连接，'#' 标志着每一层的结束。
+```
+
+
+
+如果创建了一个长度为叶子节点的队列，这个能算常数级额外空间吗？应该不行吧。层序遍历都是需要借助队列的。
+
+提示里面说递归的方法栈不算，那么就用递归。
+
+```java
+class Solution {
+    public Node connect(Node root) {
+        if (root == null) return null;
+        dfs(root.left, root.right);
+        return root;
+    }
+
+    private void dfs(Node left, Node right){
+        if (left == null){
+            return;
+        }
+
+        left.next = right;
+        dfs(left.left, left.right);
+        dfs(left.right, right.left);
+        dfs(right.left, right.right);
+    }
+}
+执行用时：2 ms, 在所有 Java 提交中击败了69.18% 的用户
+内存消耗：38.6 MB, 在所有 Java 提交中击败了73.57% 的用户
+```
+
+时间效率非常难看，这是因为有重复遍历的部分，仔细观察递归的流程发现5号节点的左子树与6号节点的右子树重复遍历了，进行改进如下：增加一个标志位用来判断是否是中间两个节点下来的，是的话就少遍历两条路径即可。
+
+```java
+class Solution {
+    public Node connect(Node root) {
+        if (root == null) return null;
+        dfs(root.left, root.right, false);
+        return root;
+    }
+
+    private void dfs(Node left, Node right, boolean isMid){
+        if (left == null){
+            return;
+        }
+
+        left.next = right;
+        if (isMid){
+            dfs(left.right, right.left, true);
+        }else {
+            dfs(left.left, left.right, false);
+            dfs(left.right, right.left, true);
+            dfs(right.left, right.right, false);
+        }
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38.5 MB, 在所有 Java 提交中击败了85.23% 的用户
+```
+
+
+
+官方的思路真不错，一时没转过来。
+
+**方法二：使用已建立的 $text{next}$ 指针**
+
+**思路**
+
+1. 从根节点开始，由于第 0 层只有一个节点，所以不需要连接，直接为第 1 层节点建立 $\text{next}$ 指针即可。该算法中需要注意的一点是，当我们为第 N 层节点建立 $\text{next}$ 指针时，处于第 N−1 层。当第 N 层节点的 $\text{next}$ 指针全部建立完成后，移至第 N 层，建立第 N+1 层节点的 $\text{next}$ 指针。
+
+2. 遍历某一层的节点时，这层节点的 $\text{next}$ 指针已经建立。因此我们只需要知道这一层的最左节点，就可以按照链表方式遍历，不需要使用队列。
+
+<img src="截图/leetCode/116-5.png" alt="fig5" style="zoom: 25%;" />
+
+```java
+class Solution {
+    public Node connect(Node root) {
+        if (root == null) {
+            return root;
+        }
+        
+        // 从根节点开始
+        Node leftmost = root;
+        
+        while (leftmost.left != null) {
+            
+            // 遍历这一层节点组织成的链表，为下一层的节点更新 next 指针
+            Node head = leftmost;
+            
+            while (head != null) {
+                
+                // CONNECTION 1
+                head.left.next = head.right;
+                
+                // CONNECTION 2
+                if (head.next != null) {
+                    head.right.next = head.next.left;
+                }
+                
+                // 指针向后移动
+                head = head.next;
+            }
+            
+            // 去下一层的最左的节点
+            leftmost = leftmost.left;
+        }
+        
+        return root;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/populating-next-right-pointers-in-each-node/solution/tian-chong-mei-ge-jie-dian-de-xia-yi-ge-you-ce-2-4/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
+
+
 
 
 # [121. 买卖股票的最佳时机](https://leetcode-cn.com/problems/best-time-to-buy-and-sell-stock/)
