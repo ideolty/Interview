@@ -1203,6 +1203,114 @@ https://leetcode-cn.com/problems/convert-sorted-list-to-binary-search-tree/solut
 
 
 
+# [111. 二叉树的最小深度](https://leetcode-cn.com/problems/minimum-depth-of-binary-tree/)
+
+给定一个二叉树，找出其最小深度。
+
+最小深度是从根节点到最近叶子节点的最短路径上的节点数量。
+
+**说明：**叶子节点是指没有子节点的节点。
+
+**示例 1：**
+
+```
+输入：root = [3,9,20,null,null,15,7]
+输出：2
+```
+
+
+
+找最大深度，那么明显的广度优先会合适一点，一旦找到了一个叶子节点，那么立刻可以确定深度了。
+
+```java
+class Solution {
+    public int minDepth(TreeNode root) {
+        if (root == null) return 0;
+        Queue<TreeNode> queue = new ArrayDeque<>();
+        queue.offer(root);
+
+        int level = 0;
+        while (!queue.isEmpty()){
+            level++;
+
+            int size = queue.size();
+            while (size > 0){
+                TreeNode node = queue.poll();
+                if (node.right == null && node.left == null){
+                    return level;
+                }
+                if (node.right != null){
+                    queue.offer(node.right);
+                }
+                if (node.left != null){
+                    queue.offer(node.left);
+                }
+                size--;
+            }
+        }
+
+        return level;
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了99.83% 的用户
+内存消耗：57.6 MB, 在所有 Java 提交中击败了98.90% 的用户
+```
+
+
+
+官方BFS的写法
+
+```java
+class Solution {
+    class QueueNode {
+        TreeNode node;
+        int depth;
+
+        public QueueNode(TreeNode node, int depth) {
+            this.node = node;
+            this.depth = depth;
+        }
+    }
+
+    public int minDepth(TreeNode root) {
+        if (root == null) {
+            return 0;
+        }
+
+        Queue<QueueNode> queue = new LinkedList<QueueNode>();
+        queue.offer(new QueueNode(root, 1));
+        while (!queue.isEmpty()) {
+            QueueNode nodeDepth = queue.poll();
+            TreeNode node = nodeDepth.node;
+            int depth = nodeDepth.depth;
+            if (node.left == null && node.right == null) {
+                return depth;
+            }
+            if (node.left != null) {
+                queue.offer(new QueueNode(node.left, depth + 1));
+            }
+            if (node.right != null) {
+                queue.offer(new QueueNode(node.right, depth + 1));
+            }
+        }
+
+        return 0;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/minimum-depth-of-binary-tree/solution/er-cha-shu-de-zui-xiao-shen-du-by-leetcode-solutio/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
 # [112. 路径总和](https://leetcode-cn.com/problems/path-sum/)
 
 给你二叉树的根节点 root 和一个表示目标和的整数 targetSum ，判断该树中是否存在 根节点到叶子节点 的路径，这条路径上所有节点值相加等于目标和 targetSum 。
