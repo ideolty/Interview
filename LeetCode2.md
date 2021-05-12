@@ -991,6 +991,51 @@ class Solution {
 
 
 
+# [108. 将有序数组转换为二叉搜索树](https://leetcode-cn.com/problems/convert-sorted-array-to-binary-search-tree/)
+
+给你一个整数数组 nums ，其中元素已经按 升序 排列，请你将其转换为一棵 高度平衡 二叉搜索树。
+
+高度平衡 二叉树是一棵满足「每个节点的左右两个子树的高度差的绝对值不超过 1 」的二叉树。
+
+
+
+简单题
+
+由于需要是平衡的树，并且给的数组也已经有序了，那么直接可以去数组的中间节点，然后分为左右子树，递归处理。
+
+```java
+class Solution {
+    public TreeNode sortedArrayToBST(int[] nums) {
+        return dfs(nums, 0, nums.length - 1);
+    }
+
+    private TreeNode dfs(int[] nums, int lo, int hi){
+        if (hi == lo){
+            return new TreeNode(nums[hi]);
+        }
+        if (hi - lo == 1){
+            TreeNode node = new TreeNode(nums[lo]);
+            node.right = new TreeNode(nums[hi]);
+            return node;
+        }
+
+        int mid = lo + (hi - lo) / 2;
+        TreeNode node = new TreeNode(nums[mid]);
+        node.left = dfs(nums, lo, mid - 1);
+        node.right = dfs(nums, mid + 1, hi);
+        return node;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38 MB, 在所有 Java 提交中击败了85.17% 的用户
+```
+
+
+
+
+
+
+
 # [109. 有序链表转换二叉搜索树](https://leetcode-cn.com/problems/convert-sorted-list-to-binary-search-tree/) :star:
 
 给定一个单链表，其中的元素按升序排序，将其转换为高度平衡的二叉搜索树。
@@ -1200,6 +1245,56 @@ public:
     }
 https://leetcode-cn.com/problems/convert-sorted-list-to-binary-search-tree/solution/you-xu-lian-biao-zhuan-huan-er-cha-sou-suo-shu-1-3/550589
 ```
+
+
+
+# [110. 平衡二叉树](https://leetcode-cn.com/problems/balanced-binary-tree/)
+
+给定一个二叉树，判断它是否是高度平衡的二叉树。
+
+本题中，一棵高度平衡二叉树定义为：
+
+    一个二叉树每个节点 的左右两个子树的高度差的绝对值不超过 1 。
+
+
+
+题目明示了判断左右两个子树的高度差，那么递归求高度就可以了
+
+```java
+class Solution {
+    public boolean isBalanced(TreeNode root) {
+        if (root == null) return true;
+        return dfs(root) != -6;
+    }
+
+    private int dfs(TreeNode root){
+        if (root.right == null && root.left == null){
+            return 1;
+        }
+
+        int left = 0;
+        int right = 0;
+        if (root.left != null){
+            left = dfs(root.left);
+        }
+
+        if (root.right != null){
+            right = dfs(root.right);
+        }
+        if (left == -6 || right == -6 || Math.abs(left - right) > 1){
+            return -6;
+        }
+
+        return Math.max(left, right) + 1;
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了99.99% 的用户
+内存消耗：38.3 MB, 在所有 Java 提交中击败了86.00% 的用户
+```
+
+
+
+
 
 
 
