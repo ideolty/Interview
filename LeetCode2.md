@@ -2243,6 +2243,101 @@ https://leetcode-cn.com/problems/binary-tree-maximum-path-sum/solution/er-cha-sh
 
 
 
+# [125. 验证回文串](https://leetcode-cn.com/problems/valid-palindrome/)
+
+给定一个字符串，验证它是否是回文串，只考虑字母和数字字符，可以忽略字母的大小写。
+
+说明：本题中，我们将空字符串定义为有效的回文串。
+
+示例 1:
+
+```
+输入: "A man, a plan, a canal: Panama"
+输出: true
+```
+
+示例 2:
+
+```
+输入: "race a car"
+输出: false
+```
+
+
+
+这题目就简单的双指针
+
+```java
+import java.util.Locale;
+class Solution {
+    public boolean isPalindrome(String s) {
+        if (s == null || s.length() == 0) return true;
+        int lo = 0;
+        int hi = s.length() - 1;
+        s = s.toLowerCase(Locale.ENGLISH);
+        while (lo <= hi){
+            char left = s.charAt(lo);
+            if ((left < 97 && left > 57) || left > 122 || left < 48) {
+                lo++;
+                continue;
+            }
+
+            char right = s.charAt(hi);
+            if ((right < 97 && right > 57) || right > 122 || right < 48) {
+                hi--;
+                continue;
+            }
+
+            if (left != right){
+                return false;
+            }
+            lo++;
+            hi--;
+        }
+        return true;
+    }
+}
+执行用时：3 ms, 在所有 Java 提交中击败了92.77% 的用户
+内存消耗：38.4 MB, 在所有 Java 提交中击败了77.77% 的用户
+```
+
+
+
+官方
+
+```java
+class Solution {
+    public boolean isPalindrome(String s) {
+        int n = s.length();
+        int left = 0, right = n - 1;
+        while (left < right) {
+            while (left < right && !Character.isLetterOrDigit(s.charAt(left))) {
+                ++left;
+            }
+            while (left < right && !Character.isLetterOrDigit(s.charAt(right))) {
+                --right;
+            }
+            if (left < right) {
+                if (Character.toLowerCase(s.charAt(left)) != Character.toLowerCase(s.charAt(right))) {
+                    return false;
+                }
+                ++left;
+                --right;
+            }
+        }
+        return true;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/valid-palindrome/solution/yan-zheng-hui-wen-chuan-by-leetcode-solution/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
 
 
 # [128. 最长连续序列](https://leetcode-cn.com/problems/longest-consecutive-sequence/) :fearful:
@@ -2760,6 +2855,186 @@ class Solution {
 ```
 
 
+
+# [138. 复制带随机指针的链表](https://leetcode-cn.com/problems/copy-list-with-random-pointer/) :new_moon_with_face:
+
+给你一个长度为 n 的链表，每个节点包含一个额外增加的随机指针 random ，该指针可以指向链表中的任何节点或空节点。
+
+构造这个链表的 深拷贝。 深拷贝应该正好由 n 个 全新 节点组成，其中每个新节点的值都设为其对应的原节点的值。新节点的 next 指针和 random 指针也都应指向复制链表中的新节点，并使原链表和复制链表中的这些指针能够表示相同的链表状态。复制链表中的指针都不应指向原链表中的节点 。
+
+例如，如果原链表中有 X 和 Y 两个节点，其中 X.random --> Y 。那么在复制链表中对应的两个节点 x 和 y ，同样有 x.random --> y 。
+
+返回复制链表的头节点。
+
+用一个由 n 个节点组成的链表来表示输入/输出中的链表。每个节点用一个 [val, random_index] 表示：
+
+- val：一个表示 Node.val 的整数。
+- random_index：随机指针指向的节点索引（范围从 0 到 n-1）；如果不指向任何节点，则为  null 。
+
+你的代码 只 接受原链表的头节点 head 作为传入参数。
+
+
+
+最朴素的方式，使用两个map缓存节点，结果实在是太惨了。
+
+```java
+class Solution {
+    public Node copyRandomList(Node head) {
+        Node pre = new Node(-1);
+        Node newHead = pre;
+        Node node = head;
+        Map<Node, Integer> map = new HashMap<>();
+        Map<Integer, Node> copyMap = new HashMap<>();
+
+        int index = 1;
+        while (node != null){
+            Node tmp = new Node(node.val);
+            pre.next = tmp;
+            map.put(node, index);
+            copyMap.put(index, tmp);
+            pre = pre.next;
+            node = node.next;
+            index++;
+        }
+
+        node = head;
+        pre = newHead.next;
+        while (node != null){
+            Node random = node.random;
+            if (random == null){
+                pre.random = null;
+            }else {
+                Integer integer = map.get(node.random);
+                pre.random = copyMap.get(integer);
+            }
+            pre = pre.next;
+            node = node.next;
+        }
+        return newHead.next;
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了14.68% 的用户
+内存消耗：38.6 MB, 在所有 Java 提交中击败了5.76% 的用户
+```
+
+
+
+官方
+
+方法一与方法二
+
+官方讲的好复杂，评论区：
+
+```java
+		public Node copyRandomList(Node head) {
+        HashMap<Node, Node> copyMap = new HashMap<>();
+
+        // copy val
+        Node cur = head;
+        while (cur != null) {
+            Node copy = new Node(cur.val);
+            copyMap.put(cur, copy);
+            cur = cur.next;
+        }
+
+        // copy next and random
+        cur = head;
+        while (cur != null) {
+            Node copy = copyMap.get(cur);
+            copy.next = copyMap.get(cur.next);
+            copy.random = copyMap.get(cur.random);
+
+            cur = cur.next;
+        }
+
+        return copyMap.getOrDefault(head, null);
+    }
+https://leetcode-cn.com/problems/copy-list-with-random-pointer/solution/fu-zhi-dai-sui-ji-zhi-zhen-de-lian-biao-by-leetcod/779463
+```
+
+
+
+方法三：
+
+1. 遍历原来的链表并拷贝每一个节点，将拷贝节点放在原来节点的旁边，创造出一个旧节点和新节点交错的链表。
+
+![image.png](截图/leetCode/138-1-image.png)
+
+![image.png](截图/leetCode/138-2.png)
+
+2. 迭代这个新旧节点交错的链表，并用旧节点的 random 指针去更新对应新节点的 random 指针。比方说， B 的 random 指针指向 A ，意味着 B' 的 random 指针指向 A' 。
+3. 现在 `random` 指针已经被赋值给正确的节点， `next` 指针也需要被正确赋值，以便将新的节点正确链接同时将旧节点重新正确链接。
+
+```java
+/*
+// Definition for a Node.
+class Node {
+    public int val;
+    public Node next;
+    public Node random;
+
+    public Node() {}
+
+    public Node(int _val,Node _next,Node _random) {
+        val = _val;
+        next = _next;
+        random = _random;
+    }
+};
+*/
+public class Solution {
+  public Node copyRandomList(Node head) {
+
+    if (head == null) {
+      return null;
+    }
+
+    // Creating a new weaved list of original and copied nodes.
+    Node ptr = head;
+    while (ptr != null) {
+
+      // Cloned node
+      Node newNode = new Node(ptr.val);
+
+      // Inserting the cloned node just next to the original node.
+      // If A->B->C is the original linked list,
+      // Linked list after weaving cloned nodes would be A->A'->B->B'->C->C'
+      newNode.next = ptr.next;
+      ptr.next = newNode;
+      ptr = newNode.next;
+    }
+
+    ptr = head;
+
+    // Now link the random pointers of the new nodes created.
+    // Iterate the newly created list and use the original nodes' random pointers,
+    // to assign references to random pointers for cloned nodes.
+    while (ptr != null) {
+      ptr.next.random = (ptr.random != null) ? ptr.random.next : null;
+      ptr = ptr.next.next;
+    }
+
+    // Unweave the linked list to get back the original linked list and the cloned list.
+    // i.e. A->A'->B->B'->C->C' would be broken to A->B->C and A'->B'->C'
+    Node ptr_old_list = head; // A->B->C
+    Node ptr_new_list = head.next; // A'->B'->C'
+    Node head_old = head.next;
+    while (ptr_old_list != null) {
+      ptr_old_list.next = ptr_old_list.next.next;
+      ptr_new_list.next = (ptr_new_list.next != null) ? ptr_new_list.next.next : null;
+      ptr_old_list = ptr_old_list.next;
+      ptr_new_list = ptr_new_list.next;
+    }
+    return head_old;
+  }
+}
+
+
+作者：LeetCode
+链接：https://leetcode-cn.com/problems/copy-list-with-random-pointer/solution/fu-zhi-dai-sui-ji-zhi-zhen-de-lian-biao-by-leetcod/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
 
 
 
