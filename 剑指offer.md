@@ -1090,6 +1090,97 @@ class Solution {
 
 
 
+# [剑指 Offer 36. 二叉搜索树与双向链表](https://leetcode-cn.com/problems/er-cha-sou-suo-shu-yu-shuang-xiang-lian-biao-lcof/)
+
+输入一棵二叉搜索树，将该二叉搜索树转换成一个排序的循环双向链表。要求不能创建任何新的节点，只能调整树中节点指针的指向。
+
+![img](截图/leetCode/bstdlloriginalbst.png)
+
+我们希望将这个二叉搜索树转化为双向循环链表。链表中的每个节点都有一个前驱和后继指针。对于双向循环链表，第一个节点的前驱是最后一个节点，最后一个节点的后继是第一个节点。
+
+下图展示了上面的二叉搜索树转化成的链表。“head” 表示指向链表中有最小元素的节点。
+
+![img](截图/leetCode/bstdllreturndll.png)
+
+特别地，我们希望可以就地完成转换操作。当转化完成以后，树中节点的左指针需要指向前驱，树中节点的右指针需要指向后继。还需要返回链表中的第一个节点的指针。
+
+
+
+观察两张图，可以发现这就是一个中序遍历后的结果，然后再额外维护一下双向指针就可以了。题目说是要求就地转换，但是没有说不可以使用额外的节点。
+
+```java
+class Solution {
+    private Node head = new Node(-1);
+    private Node current = head;
+
+    public Node treeToDoublyList(Node root) {
+        if (root == null) return null;
+
+        dfs(root);
+        // 补全双向的链接
+        Node pre = current;
+        current = head.right;
+        while (current.right != null){
+            current.left = pre;
+            pre = current;
+            current = current.right;
+        }
+        current.left = pre;
+        current.right = head.right;
+        return head.right;
+    }
+
+    private void dfs(Node node){
+        if (node == null){
+            return;
+        }
+
+        dfs(node.left);
+        current.right = node;
+        current = node;
+        dfs(node.right);
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：37.6 MB, 在所有 Java 提交中击败了92.43% 的用户
+```
+
+
+
+评论区高赞
+
+两步合为了一步，在递归的同时维护了双向指针。
+
+```java
+class Solution {
+    Node pre, head;
+    public Node treeToDoublyList(Node root) {
+        if(root == null) return null;
+        dfs(root);
+        head.left = pre;
+        pre.right = head;
+        return head;
+    }
+    void dfs(Node cur) {
+        if(cur == null) return;
+        dfs(cur.left);
+        if(pre != null) pre.right = cur;
+        else head = cur;
+        cur.left = pre;
+        pre = cur;
+        dfs(cur.right);
+    }
+}
+
+
+作者：jyd
+链接：https://leetcode-cn.com/problems/er-cha-sou-suo-shu-yu-shuang-xiang-lian-biao-lcof/solution/mian-shi-ti-36-er-cha-sou-suo-shu-yu-shuang-xian-5/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
 
 
 
