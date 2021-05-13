@@ -1145,6 +1145,81 @@ class Solution {
 
 
 
+# [剑指 Offer 53 - I. 在排序数组中查找数字 I](https://leetcode-cn.com/problems/zai-pai-xu-shu-zu-zhong-cha-zhao-shu-zi-lcof/)
+
+统计一个数字在排序数组中出现的次数。
+
+**示例 1:**
+
+```
+输入: nums = [5,7,7,8,8,10], target = 8
+输出: 2
+```
+
+**示例 2:**
+
+```
+输入: nums = [5,7,7,8,8,10], target = 6
+输出: 0
+```
+
+**限制：**
+
+```
+0 <= 数组长度 <= 50000
+```
+
+注意：本题与主站 34 题相同（仅返回值不同）：https://leetcode-cn.com/problems/find-first-and-last-position-of-element-in-sorted-array/
+
+
+
+简单题，先二分然后再双指针。
+
+```java
+class Solution {
+    public int search(int[] nums, int target) {
+        int lo = 0;
+        int hi = nums.length - 1;
+        int shot = -1;
+
+        while (lo <= hi){
+            int mid = lo + (hi - lo) / 2;
+            if (target == nums[mid]){
+                shot = mid;
+                break;
+            }
+            if (target > nums[mid]){
+                lo = mid + 1;
+            }else {
+                hi = mid - 1;
+            }
+        }
+        if (shot == -1){
+            return 0;
+        }
+
+        int count = 1;
+        lo = shot;
+        hi = shot;
+        while (++hi < nums.length && nums[hi] == nums[shot]){
+            count++;
+        }
+        while (--lo >= 0 && nums[lo] == nums[shot]){
+            count++;
+        }
+        return count;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：41.1 MB, 在所有 Java 提交中击败了91.80% 的用户
+```
+
+
+
+
+
+
+
 # [剑指 Offer 56 - I. 数组中数字出现的次数](https://leetcode-cn.com/problems/shu-zu-zhong-shu-zi-chu-xian-de-ci-shu-lcof/) :cry:
 
 一个整型数组 `nums` 里除两个数字之外，其他数字都出现了两次。请写程序找出这两个只出现一次的数字。要求时间复杂度是O(n)，空间复杂度是O(1)。
