@@ -1362,3 +1362,76 @@ class Solution {
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 ```
 
+
+
+# [剑指 Offer 58 - II. 左旋转字符串](https://leetcode-cn.com/problems/zuo-xuan-zhuan-zi-fu-chuan-lcof/)
+
+字符串的左旋转操作是把字符串前面的若干个字符转移到字符串的尾部。请定义一个函数实现字符串左旋转操作的功能。比如，输入字符串"abcdefg"和数字2，该函数将返回左旋转两位得到的结果"cdefgab"。
+
+**示例 1：**
+
+```
+输入: s = "abcdefg", k = 2
+输出: "cdefgab"
+```
+
+**示例 2：**
+
+```
+输入: s = "lrloseumgh", k = 6
+输出: "umghlrlose"
+```
+
+**限制：**
+
+- `1 <= k < s.length <= 10000`
+
+
+
+简单题，热个身
+
+```java
+class Solution {
+    public String reverseLeftWords(String s, int n) {
+        if (n > s.length()) return s;
+        return s.substring(n) + s.substring(0, n);
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38.1 MB, 在所有 Java 提交中击败了77.17% 的用户
+```
+
+
+
+评论区高赞的骚操作
+
+**方法一：字符串切片**
+
+**方法二：列表遍历拼接**
+
+算法流程：
+
+- 新建一个 list(Python)、StringBuilder(Java) ，记为 res ；
+- 先向 res 添加 “第 n + 1 位至末位的字符” ；
+- 再向 res 添加 “首位至第 n 位的字符” ；
+- 将 res 转化为字符串并返回。
+
+利用求余运算，可以简化代码。
+
+```java
+class Solution {
+    public String reverseLeftWords(String s, int n) {
+        StringBuilder res = new StringBuilder();
+        for(int i = n; i < n + s.length(); i++)
+            res.append(s.charAt(i % s.length()));
+        return res.toString();
+    }
+}
+
+
+作者：jyd
+链接：https://leetcode-cn.com/problems/zuo-xuan-zhuan-zi-fu-chuan-lcof/solution/mian-shi-ti-58-ii-zuo-xuan-zhuan-zi-fu-chuan-qie-p/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
