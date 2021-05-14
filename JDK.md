@@ -2164,7 +2164,7 @@ public enum State {
 
 - 在执行同步代码块的过程中，遇到异常而导致线程终止。
 
-- 在执行同步代码块的过程中，执行了锁所属对象的wait()方法，这个线程会释放锁，进行对象的等待池。
+- 在执行同步代码块的过程中，执行了锁所属对象的wait()方法，这个线程会释放锁，进入对象的等待池。
 
   除了以上情况外，只要持有锁的线程还没有执行完同步代码块，就不会释放锁。因此在以下情况下，线程不会释放锁：
 
@@ -2241,11 +2241,9 @@ public enum State {
 
 要想并发程序正确地执行，必须要保证原子性、可见性以及有序性。只要有一个没有被保证，就有可能会导致程序运行不正确。
 
-
-
   　　1. 保证了不同线程对这个变量进行操作时的可见性，即一个线程修改了某个变量的值，这新值对其他线程来说是立即可见的。
 
-        　　2. 禁止进行指令重排序。
+  　　2. 禁止进行指令重排序。
 
 
 
@@ -2298,7 +2296,7 @@ volatile的性质
 
 1. 它确保指令重排序时不会把其后面的指令排到内存屏障之前的位置，也不会把前面的指令排到内存屏障的后面；即在执行到内存屏障这句指令时，在它前面的操作已经全部完成；
 
-   2. 它会强制将对缓存的修改操作**立即**写入主存；
+2. 它会强制将对缓存的修改操作**立即**写入主存；
 3. 如果是**写操作**，它会导致其他CPU中对应的缓存行无效。
 
 具体场景是对于一个volatile变量：
@@ -2779,7 +2777,7 @@ final boolean nonfairTryAcquire(int acquires) {
 **获取锁的过程**：
 
    	1. 先通过tryAcquireShared()尝试获取共享锁。尝试成功的话，则直接返回；
-   	        	2. 尝试失败的话，则通过doAcquireShared()不断的循环并尝试获取锁，若有需要，则阻塞等待。doAcquireShared()在循环中每次尝试获取锁时，都是通过tryAcquireShared()来进行尝试的。
+   	2. 尝试失败的话，则通过doAcquireShared()不断的循环并尝试获取锁，若有需要，则阻塞等待。doAcquireShared()在循环中每次尝试获取锁时，都是通过tryAcquireShared()来进行尝试的。
 
 
 
@@ -3156,6 +3154,10 @@ wait/notify
 `lock.notify` 的意思是：叫醒，随机叫醒等待队列里面的任何一个线程。notify并不释放锁，只是告诉调用过wait方法的线程可以去参与获得锁的竞争了。
 
 疑问：如果先`lock.notify();` 唤醒了其他的线程，但是本线程并没有调用 `lock.wait();` 释放锁，那么其他线程应当会进入同步队列竞争锁，由于加锁失败，应该还是会变成堵塞状态，当调用了 `lock.wait();` 语句时，由操作系统唤醒？ //todo
+
+
+
+这里应该是需要分清楚等待队列与阻塞队列，调用wait方法后，进入的是等待队列，被唤醒之后，抢锁失败是进入阻塞队列，由操作系统进行唤醒。
 
 
 
@@ -3987,7 +3989,7 @@ public void shutdown() {
 
 - **线程池状态**
 
-  1. Running
+  1. RUNNING
   2. SHUTDOWN
   3. STOP
   4. TIDYING
@@ -5230,8 +5232,8 @@ String/StringBuilder/StringBuffer
 
 1. String 、StringBuffer、StringBuilder继承于CharSequence接口，CharSequence就是字符序列，String, StringBuilder和StringBuffer本质上都是通过**字符数组**实现的。
 2. **String为字符串常量**，StringBuilder和StringBuffer都是**可变的**字符序列。它是典型的Immutable类，被声明成为final class，所有属性也都是final的。也由于它的不可变性，类似拼接、裁剪字符串等动作，都会产生新的String对象。
-3. StringBufer本质是一个线程安全的可修改字符序列（char，JDK 9以后是byte）数组，它保证了**线程安全**(synchronized)，也随之带来了额外的性能开销，所以除非有线程安全的需要，不然还是推荐使用它的后继者，也就是StringBuilder。
-4. StringBuilder是Java 1.5中新增的，在能力上和StringBufer没有本质区别，但是它去掉了线程安全的部分，有效减小了开销，是绝大部分情况下进行字符串拼接的首选，StringBuilder是**非线程安全**的，
+3. StringBuffer本质是一个线程安全的可修改字符序列（char，JDK 9以后是byte）数组，它保证了**线程安全**(synchronized)，也随之带来了额外的性能开销，所以除非有线程安全的需要，不然还是推荐使用它的后继者，也就是StringBuilder。
+4. StringBuilder是Java 1.5中新增的，在能力上和StringBuffer没有本质区别，但是它去掉了线程安全的部分，有效减小了开销，是绝大部分情况下进行字符串拼接的首选，StringBuilder是**非线程安全**的，
 5. 执行速度，**运行速度快慢为：StringBuilder > StringBuffer > String**
 
 
