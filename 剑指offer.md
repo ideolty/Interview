@@ -1012,6 +1012,82 @@ class Solution {
 
 
 
+# [剑指 Offer 33. 二叉搜索树的后序遍历序列](https://leetcode-cn.com/problems/er-cha-sou-suo-shu-de-hou-xu-bian-li-xu-lie-lcof/)
+
+输入一个整数数组，判断该数组是不是某二叉搜索树的后序遍历结果。如果是则返回 `true`，否则返回 `false`。假设输入的数组的任意两个数字都互不相同。
+
+ 
+
+这个就是考察后续遍历的性质。
+
+- 最后一个节点一定是根节点。
+- 由于是二叉搜索树，那么比根小的一定是在左子树。遍历前面的数字，找到第一个比根大的数字，后面的都是右子树。
+- 递归判断左右子树是不是二叉搜索树。
+
+```java
+class Solution {
+    public boolean verifyPostorder(int[] postorder) {
+        return isBinaryTress(postorder, 0, postorder.length - 1);
+
+    }
+
+    private boolean isBinaryTress(int[] postorder, int left, int right){
+        if (left >= right){
+            return true;
+        }
+
+        int root = postorder[right];
+        int rightIndex = right;
+        for (int i = left; i < right; i++){
+            if (postorder[i] > root){
+                rightIndex = i;
+                break;
+            }
+        }
+
+        for (int i = rightIndex + 1; i < right; i++){
+            if (postorder[i] < root){
+                return false;
+            }
+        }
+
+        return isBinaryTress(postorder, left, rightIndex - 1) && isBinaryTress(postorder, rightIndex, right - 1);
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：36 MB, 在所有 Java 提交中击败了32.09% 的用户
+```
+
+
+
+评论区写的超级漂亮的代码
+
+```java
+class Solution {
+    public boolean verifyPostorder(int[] postorder) {
+        return recur(postorder, 0, postorder.length - 1);
+    }
+    boolean recur(int[] postorder, int i, int j) {
+        if(i >= j) return true;
+        int p = i;
+        while(postorder[p] < postorder[j]) p++;
+        int m = p;
+        while(postorder[p] > postorder[j]) p++;
+        return p == j && recur(postorder, i, m - 1) && recur(postorder, m, j - 1);
+    }
+}
+
+
+作者：jyd
+链接：https://leetcode-cn.com/problems/er-cha-sou-suo-shu-de-hou-xu-bian-li-xu-lie-lcof/solution/mian-shi-ti-33-er-cha-sou-suo-shu-de-hou-xu-bian-6/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
 
 
 # [剑指 Offer 34. 二叉树中和为某一值的路径](https://leetcode-cn.com/problems/er-cha-shu-zhong-he-wei-mou-yi-zhi-de-lu-jing-lcof/)
