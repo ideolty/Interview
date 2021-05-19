@@ -4038,6 +4038,58 @@ class Solution {
 
 
 
+# [153. 寻找旋转排序数组中的最小值](https://leetcode-cn.com/problems/find-minimum-in-rotated-sorted-array/)
+
+已知一个长度为 n 的数组，预先按照升序排列，经由 1 到 n 次 旋转 后，得到输入数组。例如，原数组 nums = [0,1,2,4,5,6,7] 在变化后可能得到：
+
+- 若旋转 `4` 次，则可以得到 `[4,5,6,7,0,1,2]`
+- 若旋转 `7` 次，则可以得到 `[0,1,2,4,5,6,7]`
+
+注意，数组 [a[0], a[1], a[2], ..., a[n-1]] 旋转一次 的结果为数组 [a[n-1], a[0], a[1], a[2], ..., a[n-2]] 。
+
+给你一个元素值 互不相同 的数组 nums ，它原来是一个升序排列的数组，并按上述情形进行了多次旋转。请你找出并返回数组中的 最小元素 。
+
+**示例 1：**
+
+```
+输入：nums = [3,4,5,1,2]
+输出：1
+解释：原数组为 [1,2,3,4,5] ，旋转 3 次得到输入数组。
+```
+
+
+
+本题与[81. 搜索旋转排序数组 II](https://leetcode-cn.com/problems/search-in-rotated-sorted-array-ii/)，[33. 搜索旋转排序数组](https://leetcode-cn.com/problems/search-in-rotated-sorted-array/) 高度相似，那么解法也是一样的。
+
+```java
+class Solution {
+    public int findMin(int[] nums) {
+        if (nums[0] < nums[nums.length - 1]){
+            return nums[0];
+        }
+
+        int left = 0;
+        int right = nums.length - 1;
+        int mid = 0;
+        while (left <= right){
+            mid = left + (right - left) / 2;
+            if (nums[mid] < nums[right]){
+                right = mid;
+            }else {
+                left = mid + 1;
+            }
+        }
+        return nums[mid];
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：37.8 MB, 在所有 Java 提交中击败了76.03% 的用户
+```
+
+
+
+
+
 # [155. 最小栈](https://leetcode-cn.com/problems/min-stack/)
 
 设计一个支持 push ，pop ，top 操作，并能在常数时间内检索到最小元素的栈。
@@ -4313,6 +4365,138 @@ public class Solution {
     }
 }
 ```
+
+
+
+# [162. 寻找峰值](https://leetcode-cn.com/problems/find-peak-element/) :star:
+
+峰值元素是指其值大于左右相邻值的元素。
+
+给你一个输入数组 nums，找到峰值元素并返回其索引。数组可能包含多个峰值，在这种情况下，返回 任何一个峰值 所在位置即可。
+
+你可以假设 nums[-1] = nums[n] = -∞ 。
+
+**示例 1：**
+
+```
+输入：nums = [1,2,3,1]
+输出：2
+解释：3 是峰值元素，你的函数应该返回其索引 2。
+```
+
+示例 2：
+
+```
+输入：nums = [1,2,1,3,5,6,4]
+输出：1 或 5 
+解释：你的函数可以返回索引 1，其峰值元素为 2；
+     或者返回索引 5， 其峰值元素为 6。
+```
+
+**提示：**
+
+- 1 <= nums.length <= 1000
+- $-2^{31} <= nums[i] <= 2^{31} - 1$
+- 对于所有有效的 i 都有 nums[i] != nums[i + 1]
+
+**进阶：**你可以实现时间复杂度为 `O(logN)` 的解决方案吗？
+
+
+
+依据提议，相邻的元素是不会相等的。依据进阶的 $O(logn)$ 让人联想到树的结构。但是除了线性的解题，我还是想不到别的方案。
+
+```java
+class Solution {
+    public int findPeakElement(int[] nums) {
+        if (nums.length == 1){
+            return 0;
+        }
+        if (nums[0] > nums[1]){
+            return 0;
+        }
+        if (nums[nums.length - 1] > nums[nums.length - 2]){
+            return nums.length - 1;
+        }
+
+        for (int i = 1; i < nums.length - 1; i++) {
+            if (nums[i] > nums[i - 1] && nums[i] > nums[i + 1]){
+                return i;
+            }
+        }
+        return -1;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：38.1 MB, 在所有 Java 提交中击败了58.98% 的用户
+```
+
+我不是太懂，线性的解答为什么还是击败了100.00%……
+
+
+
+
+
+官方
+
+**方法一: 线性扫描**
+
+```java
+public class Solution {
+    public int findPeakElement(int[] nums) {
+        for (int i = 0; i < nums.length - 1; i++) {
+            if (nums[i] > nums[i + 1])
+                return i;
+        }
+        return nums.length - 1;
+    }
+}
+
+
+作者：LeetCode
+链接：https://leetcode-cn.com/problems/find-peak-element/solution/xun-zhao-feng-zhi-by-leetcode/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+可以分为3种情况来讨论，但是哪种情况都不需要判断前面那节。
+
+
+
+**方法二：递归二分查找**
+
+我们可以将 nums 数组中的任何给定序列视为交替的升序和降序序列。通过利用这一点，以及“可以返回任何一个峰作为结果”的要求，我们可以利用二分查找来找到所需的峰值元素。
+
+在简单的二分查找中，我们处理的是一个有序数列，并通过在每一步减少搜索空间来找到所需要的数字。在本例中，我们对二分查找进行一点修改。首先从数组 nums 中找到中间的元素 mid。若该元素恰好位于降序序列或者一个局部下降坡度中（通过将 nums[i] 与右侧比较判断)，则说明峰值会在本元素的左边。于是，我们将搜索空间缩小为 mid 的左边(包括其本身)，并在左侧子数组上重复上述过程。
+
+若该元素恰好位于升序序列或者一个局部上升坡度中（通过将 nums[i] 与右侧比较判断)，则说明峰值会在本元素的右边。于是，我们将搜索空间缩小为 mid 的右边，并在右侧子数组上重复上述过程。
+
+就这样，我们不断地缩小搜索空间，直到搜索空间中只有一个元素，该元素即为峰值元素。
+
+```java
+public class Solution {
+    public int findPeakElement(int[] nums) {
+        return search(nums, 0, nums.length - 1);
+    }
+    public int search(int[] nums, int l, int r) {
+        if (l == r)
+            return l;
+        int mid = (l + r) / 2;
+        if (nums[mid] > nums[mid + 1])
+            return search(nums, l, mid);
+        return search(nums, mid + 1, r);
+    }
+}
+
+
+作者：LeetCode
+链接：https://leetcode-cn.com/problems/find-peak-element/solution/xun-zhao-feng-zhi-by-leetcode/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+巧妙的二分了斜率。
+
+
 
 
 
