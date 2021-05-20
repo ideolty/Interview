@@ -2267,6 +2267,189 @@ class Solution {
 
 
 
+# [692. 前K个高频单词](https://leetcode-cn.com/problems/top-k-frequent-words/)
+
+给一非空的单词列表，返回前 k 个出现次数最多的单词。
+
+返回的答案应该按单词出现频率由高到低排序。如果不同的单词有相同出现频率，按字母顺序排序。
+
+示例 1：
+
+```
+输入: ["i", "love", "leetcode", "i", "love", "coding"], k = 2
+输出: ["i", "love"]
+解析: "i" 和 "love" 为出现次数最多的两个单词，均为2次。
+    注意，按字母顺序 "i" 在 "love" 之前。
+```
+
+
+
+示例 2：
+
+```
+输入: ["the", "day", "is", "sunny", "the", "the", "the", "sunny", "is", "is"], k = 4
+输出: ["the", "is", "sunny", "day"]
+解析: "the", "is", "sunny" 和 "day" 是出现次数最多的四个单词，
+    出现次数依次为 4, 3, 2 和 1 次。
+```
+
+ 
+
+注意：
+
+- 假定 k 总为有效值， 1 ≤ k ≤ 集合元素数。
+- 输入的单词均由小写字母组成。
+
+ 
+
+
+扩展练习：
+
+- 尝试以 O(n log k) 时间复杂度和 O(n) 空间复杂度解决。
+
+
+
+~~感觉这就是一个非常标准的字典树的应用。每个树的节点值存储上一个次数，输入的数组长度为 n ，树的查询为logk，时间复杂度刚刚好满足。~~
+
+对优先队列的结构还是没有理解透彻，这个相当于 RLU ，最近最少未使用。
+
+
+
+给出一个字典树的实现
+
+```java
+class Solution {
+    public List<String> topKFrequent(String[] words, int k) {
+        Node root = new Node();
+        Node cur = root;
+
+        // 遍历所有字符串 构建字典树
+        for (String word : words) {
+            for (int i = 0; i < word.length(); i++) {
+                char c = word.charAt(i);
+                Node next = cur.map.get(c);
+                if (next == null){
+                    next = new Node();
+                    next.setKey(cur.key + c);
+                    cur.map.put(c, next);
+                }
+                cur = next;
+
+                if (i == word.length() - 1){
+                    next.count = next.count + 1;
+                }
+            }
+            cur = root;
+        }
+
+        // 遍历字典树拿到topk
+        List<Node> list = new ArrayList<>();
+        visit(root, list);
+
+        List<String> result = list.stream().sorted((Node node1, Node node2) -> {
+            if (node1.count > node2.count){
+                return -1;
+            }else if (node1.count < node2.count){
+                return 1;
+            }else {
+                return node1.key.compareTo(node2.key);
+            }
+        }).limit(k).map(Node::getKey).collect(Collectors.toList());
+        return result;
+    }
+
+     private void visit(Node node, List<Node> result){
+        if (node == null){
+            return;
+        }
+
+        if (node.count != 0){
+            result.add(node);
+        }
+
+        node.map.forEach((k, v) -> {
+            visit(v, result);
+        });
+    }
+
+    private class Node{
+        private String key = "";
+        private Map<Character, Node> map = new HashMap<>();
+        private int count = 0;
+
+        public String getKey() {
+            return key;
+        }
+
+        public void setKey(String key) {
+            this.key = key;
+        }
+
+        public Map<Character, Node> getMap() {
+            return map;
+        }
+
+        public void setMap(Map<Character, Node> map) {
+            this.map = map;
+        }
+
+        public int getCount() {
+            return count;
+        }
+
+        public void setCount(int count) {
+            this.count = count;
+        }
+    }
+}
+执行用时：30 ms, 在所有 Java 提交中击败了5.35% 的用户
+内存消耗：39.6 MB, 在所有 Java 提交中击败了5.31% 的用户
+```
+
+
+
+官方
+
+```java
+class Solution {
+    public List<String> topKFrequent(String[] words, int k) {
+        Map<String, Integer> cnt = new HashMap<String, Integer>();
+        for (String word : words) {
+            cnt.put(word, cnt.getOrDefault(word, 0) + 1);
+        }
+        PriorityQueue<Map.Entry<String, Integer>> pq = new PriorityQueue<Map.Entry<String, Integer>>(new Comparator<Map.Entry<String, Integer>>() {
+            public int compare(Map.Entry<String, Integer> entry1, Map.Entry<String, Integer> entry2) {
+                return entry1.getValue() == entry2.getValue() ? entry2.getKey().compareTo(entry1.getKey()) : entry1.getValue() - entry2.getValue();
+            }
+        });
+        for (Map.Entry<String, Integer> entry : cnt.entrySet()) {
+            pq.offer(entry);
+            if (pq.size() > k) {
+                pq.poll();
+            }
+        }
+        List<String> ret = new ArrayList<String>();
+        while (!pq.isEmpty()) {
+            ret.add(pq.poll().getKey());
+        }
+        Collections.reverse(ret);
+        return ret;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/top-k-frequent-words/solution/qian-kge-gao-pin-dan-ci-by-leetcode-solu-3qk0/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
 # [872. 叶子相似的树](https://leetcode-cn.com/problems/leaf-similar-trees/)
 
 
