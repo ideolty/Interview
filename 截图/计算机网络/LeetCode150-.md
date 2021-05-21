@@ -1,3 +1,62 @@
+
+
+# [151. 翻转字符串里的单词](https://leetcode-cn.com/problems/reverse-words-in-a-string/)
+
+给定一个字符串，逐个翻转字符串中的每个单词。
+
+说明：
+
+- 无空格字符构成一个 单词 。
+- 输入字符串可以在前面或者后面包含多余的空格，但是反转后的字符不能包括。
+- 如果两个单词间有多余的空格，将反转后单词间的空格减少到只含一个。
+
+**示例 1：**
+
+```
+输入："the sky is blue"
+输出："blue is sky the"
+```
+
+**示例 4：**
+
+```
+输入：s = "  Bob    Loves  Alice   "
+输出："Alice Loves Bob"
+```
+
+
+
+没啥好说的
+
+```java
+class Solution {
+    public String reverseWords(String s) {
+        s = s.trim();
+        int left = s.length();
+        StringBuilder sb = new StringBuilder();
+        for (int i = s.length() - 1; i >= 0; i--){
+            char c = s.charAt(i);
+            if (c == ' ' && s.charAt(i + 1) != ' '){
+                sb.append(s, i + 1, left);
+                sb.append(" ");
+                while (s.charAt(i) == ' '){
+                    i--;
+                }
+                left = i + 1;
+            }
+        }
+        sb.append(s, 0, left);
+        return sb.toString();
+    }
+}
+执行用时：3 ms, 在所有 Java 提交中击败了96.13% 的用户
+内存消耗：38.5 MB, 在所有 Java 提交中击败了71.30% 的用户
+```
+
+使用了 `StringBuilder` 写起来舒服一点，就导致耗时比较多。
+
+
+
 # [153. 寻找旋转排序数组中的最小值](https://leetcode-cn.com/problems/find-minimum-in-rotated-sorted-array/)
 
 已知一个长度为 n 的数组，预先按照升序排列，经由 1 到 n 次 旋转 后，得到输入数组。例如，原数组 nums = [0,1,2,4,5,6,7] 在变化后可能得到：
