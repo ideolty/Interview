@@ -519,6 +519,73 @@ public class Solution {
 
 
 
+# [165. 比较版本号](https://leetcode-cn.com/problems/compare-version-numbers/)
+
+给你两个版本号 `version1` 和 `version2` ，请你比较它们。
+
+示例 1：
+
+```
+输入：version1 = "1.01", version2 = "1.001"
+输出：0
+解释：忽略前导零，"01" 和 "001" 都表示相同的整数 "1"
+```
+
+示例 2：
+
+```
+输入：version1 = "1.0", version2 = "1.0.0"
+输出：0
+解释：version1 没有指定下标为 2 的修订号，即视为 "0"
+```
+
+
+
+老老实实在写逻辑就可以了，偷懒使用了api，把所有的字符串转为了数据进行处理，当然会导致效率降低
+
+```java
+class Solution {
+    public int compareVersion(String version1, String version2) {
+        String[] split1 = version1.split("\\.");
+        String[] split2 = version2.split("\\.");
+        int length = Math.min(split1.length, split2.length);
+        for (int i = 0; i < length; i++) {
+            if (Integer.parseInt(split1[i]) > Integer.parseInt(split2[i])){
+                return 1;
+            }
+
+            if (Integer.parseInt(split1[i]) < Integer.parseInt(split2[i])){
+                return -1;
+            }
+        }
+
+        if (split1.length == split2.length){
+            return 0;
+        }
+
+        if (split1.length > split2.length){
+            for (int i = split2.length; i < split1.length; i++){
+                if (Integer.parseInt(split1[i]) != 0){
+                    return 1;
+                }
+            }
+            return 0;
+        }
+
+        for (int i = split1.length; i < split2.length; i++){
+            if (Integer.parseInt(split2[i]) != 0){
+                return -1;
+            }
+        }
+        return 0;
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了82.86% 的用户
+内存消耗：36.4 MB, 在所有 Java 提交中击败了79.64% 的用户
+```
+
+
+
 
 
 # [169. 多数元素](https://leetcode-cn.com/problems/majority-element/)
