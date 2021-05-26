@@ -2636,3 +2636,144 @@ class Solution {
 
 
 
+
+
+# [1190. 反转每对括号间的子串](https://leetcode-cn.com/problems/reverse-substrings-between-each-pair-of-parentheses/)
+
+给出一个字符串 s（仅含有小写英文字母和括号）。
+
+请你按照从括号内到外的顺序，逐层反转每对匹配括号中的字符串，并返回最终的结果。
+
+注意，您的结果中 不应 包含任何括号。
+
+ 
+
+**示例 1：**
+
+```
+输入：s = "(abcd)"
+输出："dcba"
+```
+
+**示例 2：**
+
+```
+输入：s = "(u(love)i)"
+输出："iloveu"
+```
+
+**示例 3：**
+
+```
+输入：s = "(ed(et(oc))el)"
+输出："leetcode"
+```
+
+**示例 4：**
+
+```
+输入：s = "a(bcdefghijkl(mno)p)q"
+输出："apmnolkjihgfedcbq"
+```
+
+
+
+朴素的想法是对栈的应用，遇见非 ")" 就压栈，遇见 ")" 就弹栈直到遇见括号另一半。在弹栈的时候，顺便就完成了反转。但是效率看起来很低啊。
+
+```java
+class Solution {
+    public String reverseParentheses(String s) {
+        Stack<Character> stack = new Stack<>();
+        char[] chars = s.toCharArray();
+        for (char c : chars) {
+            if (c == ')'){
+                // 弹出栈中元素 直到出现一个 '('
+                StringBuilder builder = new StringBuilder();
+                while (true){
+                    Character pop = stack.pop();
+                    if (pop == '(') break;
+                    builder.append(pop);
+                }
+                // 反转完成后再放入栈中
+                for (char c1 : builder.toString().toCharArray()) {
+                    stack.push(c1);
+                }
+            }else {
+                stack.push(c);
+            }
+        }
+
+        StringBuilder result = new StringBuilder();
+        while (!stack.isEmpty()){
+            result.append(stack.pop());
+        }
+        return result.reverse().toString();
+    }
+}
+执行用时：6 ms, 在所有 Java 提交中击败了40.47% 的用户
+内存消耗：38.3 MB, 在所有 Java 提交中击败了38.95% 的用户
+```
+
+
+
+官方
+
+ **方法一：栈**
+
+ **方法二：预处理括号**
+
+思路及算法
+
+我们可以将括号的反转理解为逆序地遍历括号，如下图：
+
+![fig1](截图/leetCode/1190.png)
+
+1. 第一步我们向右移动到左括号，此时我们跳跃到该左括号对应的右括号（进入了更深一层）；
+2. 第二到第三步我们在括号内部向左移动（完成了更深层的遍历）；
+3. 第四步我们向左移动到左括号，此时我们跳跃到该左括号对应的右括号（返回到上一层）；
+4. 第五步我们在括号外向右移动（继续遍历）。
+
+读者们可以自行尝试模拟两层乃至多层括号嵌套的移动方案，规律可以从当前的单层括号中总结出来。
+
+假设我们沿着某个方向移动，此时遇到了括号，那么我们只需要首先跳跃到该括号对应的另一个括号所在处，然后改变我们的移动方向即可。这个方案同时适用于遍历时进入更深一层，以及完成当前层的遍历后返回到上一层的方案。
+
+在实际代码中，我们需要预处理出每一个括号对应的另一个括号所在的位置，这一部分我们可以使用栈解决。当我们预处理完成后，即可在线性时间内完成遍历，遍历的字符串顺序即为反转后的字符串。
+
+```java
+class Solution {
+    public String reverseParentheses(String s) {
+        int n = s.length();
+        int[] pair = new int[n];
+        Deque<Integer> stack = new LinkedList<Integer>();
+        for (int i = 0; i < n; i++) {
+            if (s.charAt(i) == '(') {
+                stack.push(i);
+            } else if (s.charAt(i) == ')') {
+                int j = stack.pop();
+                pair[i] = j;
+                pair[j] = i;
+            }
+        }
+
+        StringBuffer sb = new StringBuffer();
+        int index = 0, step = 1;
+        while (index < n) {
+            if (s.charAt(index) == '(' || s.charAt(index) == ')') {
+                index = pair[index];
+                step = -step;
+            } else {
+                sb.append(s.charAt(index));
+            }
+            index += step;
+        }
+        return sb.toString();
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/reverse-substrings-between-each-pair-of-parentheses/solution/fan-zhuan-mei-dui-gua-hao-jian-de-zi-chu-gwpv/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
