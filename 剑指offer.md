@@ -950,6 +950,79 @@ class Solution {
 
 
 
+# [剑指 Offer 27. 二叉树的镜像](https://leetcode-cn.com/problems/er-cha-shu-de-jing-xiang-lcof/)
+
+请完成一个函数，输入一个二叉树，该函数输出它的镜像。
+
+例如输入：
+
+     			4
+        /   \
+      2     7
+     / \   / \
+    1   3 6   9
+
+镜像输出：
+
+         4
+        /   \
+      7     2
+     / \   / \
+    9   6 3   1
+**示例 1：**
+
+```
+输入：root = [4,2,7,1,3,6,9]
+输出：[4,7,2,9,6,3,1]
+```
+
+限制：
+
+- 0 <= 节点个数 <= 1000
+
+注意：本题与主站 226 题相同：https://leetcode-cn.com/problems/invert-binary-tree/
+
+
+
+题目主要主要迭代或者递归的时候注意一下，如果是在原树上改，不要覆盖了节点。由于题目没说要原地修改，那么当然是新来一棵树更简单。
+
+```java
+class Solution {
+    public TreeNode mirrorTree(TreeNode root) {
+        if (root == null) return null;
+        TreeNode target = new TreeNode(root.val);
+        dfs(root, target);
+        return target;
+    }
+
+
+    private void dfs(TreeNode source, TreeNode target){
+        if (source == null) return;
+
+        target.val = source.val;
+        if (source.left != null){
+            target.right = new TreeNode();
+        }
+        if (source.right != null){
+            target.left = new TreeNode();
+        }
+
+        dfs(source.left, target.right);
+        dfs(source.right, target.left);
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：35.8 MB, 在所有 Java 提交中击败了51.07% 的用户
+```
+
+
+
+
+
+
+
+
+
 # [剑指 Offer 32 - I. 从上到下打印二叉树](https://leetcode-cn.com/problems/cong-shang-dao-xia-da-yin-er-cha-shu-lcof/)
 
 从上到下打印出二叉树的每个节点，同一层的节点按照从左到右的顺序打印。
