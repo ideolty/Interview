@@ -2076,6 +2076,53 @@ class Solution {
 
 
 
+# [24. 两两交换链表中的节点](https://leetcode-cn.com/problems/swap-nodes-in-pairs/)
+
+给定一个链表，两两交换其中相邻的节点，并返回交换后的链表。
+
+**你不能只是单纯的改变节点内部的值**，而是需要实际的进行节点交换。
+
+**示例 1：**
+
+![img](截图/leetCode/swap_ex1.jpg)
+
+```
+输入：head = [1,2,3,4]
+输出：[2,1,4,3]
+```
+
+
+
+逻辑就比较简单，考验一个对链表操作的熟练度
+
+```java
+class Solution {
+    public ListNode swapPairs(ListNode head) {
+        if (head == null) return null;
+        if (head.next == null) return head;
+
+        ListNode pre = new ListNode();
+        ListNode root = pre;
+        ListNode cur = head;
+        while (cur != null && cur.next != null) {
+            pre.next = cur.next;
+
+            ListNode next = cur.next.next;
+            cur.next.next = cur;
+            cur.next = next;
+
+            pre = cur;
+            cur = next;
+        }
+        return root.next;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：36 MB, 在所有 Java 提交中击败了65.53% 的用户
+```
+
+
+
 # [28. 实现 strStr()](https://leetcode-cn.com/problems/implement-strstr/)
 实现 strStr() 函数。
 给你两个字符串 haystack 和 needle ，请你在 haystack 字符串中找出 needle 字符串出现的第一个位置（下标从 0 开始）。如果不存在，则返回  -1 。
