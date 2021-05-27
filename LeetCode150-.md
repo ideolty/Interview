@@ -2216,6 +2216,111 @@ class Solution {
 
 
 
+# [461. 汉明距离](https://leetcode-cn.com/problems/hamming-distance/)
+
+两个整数之间的[汉明距离](https://baike.baidu.com/item/汉明距离)指的是这两个数字对应二进制位不同的位置的数目。
+
+给出两个整数 `x` 和 `y`，计算它们之间的汉明距离。
+
+**注意：**
+ 0 ≤ `x`, `y` < $2^{31}$.
+
+**示例:**
+
+```
+输入: x = 1, y = 4
+
+输出: 2
+
+解释:
+1   (0 0 0 1)
+4   (0 1 0 0)
+       ↑   ↑
+
+上面的箭头指出了对应二进制位不同的位置。
+```
+
+
+
+拿来熟悉二进制操作的。先做异或得出所有不同的二进制位，然后想办法把值为1的位置给敲出来。
+
+```java
+class Solution {
+    public int hammingDistance(int x, int y) {
+        int i = x ^ y;
+        int count = 0;
+        while (i != 0){
+            if ((i & 1) == 1){
+                count++;
+            }
+            i = i >> 1;
+        }
+
+        return count;
+    }
+}
+执行用时：0 ms, 在所有 Java 提交中击败了100.00% 的用户
+内存消耗：35.4 MB, 在所有 Java 提交中击败了21.77% 的用户
+```
+
+
+
+官方
+
+方法一：内置位计数功能
+
+```java
+class Solution {
+    public int hammingDistance(int x, int y) {
+        return Integer.bitCount(x ^ y);
+    }
+}
+```
+
+工程中应该直接用这个。
+
+方法二：移位实现位计数
+
+```java
+class Solution {
+    public int hammingDistance(int x, int y) {
+        int s = x ^ y, ret = 0;
+        while (s != 0) {
+            ret += s & 1;
+            s >>= 1;
+        }
+        return ret;
+    }
+}
+```
+
+笨办法，但是写的漂亮
+
+方法三：Brian Kernighan\text{Brian Kernighan}Brian Kernighan 算法
+
+```java
+class Solution {
+    public int hammingDistance(int x, int y) {
+        int s = x ^ y, ret = 0;
+        while (s != 0) {
+            s &= s - 1;
+            ret++;
+        }
+        return ret;
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/hamming-distance/solution/yi-ming-ju-chi-by-leetcode-solution-u1w7/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+`s & (s - 1)​` 相当于敲掉 s 的最左边的一位1。
+
+
+
 # [557. 反转字符串中的单词 III](https://leetcode-cn.com/problems/reverse-words-in-a-string-iii/)
 
 给定一个字符串，你需要反转字符串中每个单词的字符顺序，同时仍保留空格和单词的初始顺序。
