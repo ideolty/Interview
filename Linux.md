@@ -99,9 +99,9 @@ CS、SS、DS、ES 仍然是 16 位的，但是不再是段的起始地址。段�
 ```mermaid
 graph LR
 BIOS --> 引导扇区booting.img --> diskboot.img --> lzma_decompress.img -- 
-"实模式到保护模式
-建立分段分页
-打开地址线"
+"1. 实模式到保护模式；
+ 2. 建立分段分页；
+ 3. 打开地址线；"
 --> kernel.img -- 选择一个操作系统 --> 启动内核
 
 ```
@@ -119,6 +119,225 @@ BIOS --> 引导扇区booting.img --> diskboot.img --> lzma_decompress.img --
 - 集权与授权，打开 Gate A20，也就是第 21 根地址线的控制线。在实模式 8086 下面，一共就 20 个地址线，可访问 1M 的地址空间。如果超过了这个限度怎么办呢？当然是绕回来了。在保护模式下，第 21 根要起作用了，于是我们就需要打开 Gate A20。
 
   切换保护模式的函数 DATA32 call real_to_prot 会打开 Gate A20，也就是第 21 根地址线的控制线。
+
+
+
+## 内核初始化
+
+内核的启动从入口函数 start_kernel() 开始。在 init/main.c 文件中，start_kernel 相当于内核的 main 函数。打开这个函数，你会发现，里面是各种各样初始化函数 XXXX_init。
+
+<img src="截图/Linux/内核模块.jpeg" alt="下载" style="zoom:25%;" />
+
+最后，start_kernel() 调用的是 rest_init()，用来做其他方面的初始化。
+
+
+
+### 进程管理模块
+
+> #### 创建0号、1号进程
+
+在操作系统里面，先要有个创始进程，有一行指令 `set_task_stack_end_magic(&init_task)`。这里面有一个参数 init_task，它的定义是 `struct task_struct init_task = INIT_TASK(init_task)`。它是系统创建的第一个进程，我们称为**0 号进程**。这是唯一一个没有通过 fork 或者 kernel_thread 产生的进程，是进程列表的第一个。
+
+之后，rest_init 用 kernel_thread(kernel_init, NULL, CLONE_FS) 创建第二个进程，这个是**1 号进程**。1 号进程对于操作系统来讲，有“划时代”的意义。因为它将运行一个用户进程，随着进程的变多，最终形成一棵进程树。
+
+当有多个线程之后，需要做好线程的权限控制。 x86 提供了分层的权限机制，把区域分成了四个 Ring，越往里权限越高，越往外权限越低。
+
+<img src="截图/Linux/ring.jpeg" alt="下载" style="zoom:25%;" />
+
+操作系统很好地利用了这个机制，将能够访问关键资源的代码放在 Ring0，我们称为**内核态**（Kernel Mode）；将普通的程序代码放在 Ring3，我们称为**用户态**（User Mode）。
+
+系统此时处于保护模式，保护模式除了可访问空间大一些，还有另一个重要功能，就是“保护”，也就是说，当处于用户态的代码想要执行更高权限的指令，这种行为是被禁止的。
+
+
+
+> #### 从用户态到内核态
+
+当一个用户态的程序运行到一半，要访问一个核心资源，例如访问网卡发一个网络包，就需要暂停当前的运行，调用系统调用，接下来就轮到内核中的代码运行了。首先，内核将从系统调用传过来的包，在网卡上排队，轮到的时候就发送。发送完了，系统调用就结束了，返回用户态，让暂停运行的程序接着运行。
+
+这个暂停其实就是把程序运行到一半的情况保存下来。例如，我们知道，内存是用来保存程序运行时候的中间结果的，现在要暂时停下来，这些中间结果不能丢，因为再次运行的时候，还要基于这些中间结果接着来。另外就是，当前运行到代码的哪一行了，当前的栈在哪里，这些都是在寄存器里面的。
+
+所以，暂停的那一刻，要把当时 CPU 的寄存器的值全部暂存到一个地方，这个地方可以放在进程管理系统很容易获取的地方。当系统调用完毕，返回的时候，再从这个地方将寄存器的值恢复回去，就能接着运行了。
+
+这个过程就是这样的：**用户态 - 系统调用 - 保存寄存器 - 内核态执行系统调用 - 恢复寄存器 - 返回用户态，然后接着运行。**
+
+
+
+> #### 从内核态到用户态
+
+当前执行 kernel_thread 这个函数创建1号进程的时候，我们还在内核态，现在我们就来跨越这道屏障，到用户态去运行一个程序。这该怎么办呢？很少听说“先内核态再用户态”的。
+
+kernel_thread 的参数是一个函数 kernel_init，也就是这个进程会运行这个函数。
+
+- 在 kernel_init 里面，会调用 kernel_init_freeable()。之后，代码会运行 run_init_process 函数，底层最终调用的是 do_execve。
+
+- execve 是一个系统调用，它的作用是运行一个执行文件。加一个 do_ 的往往是内核系统调用的实现。
+
+  - 它会尝试运行 ramdisk 的“/init”，或者普通文件系统上的“/sbin/init” “/etc/init” “/bin/init” “/bin/sh”。
+
+  - 不同版本的 Linux 会选择不同的文件启动，但是只要有一个起来了就可以
+
+    
+
+利用执行 init 文件的机会，从内核态回到用户态。
+
+- 从系统调用的过程可以得到启发，“用户态 - 系统调用 - 保存寄存器 - 内核态执行系统调用 - 恢复寄存器 - 返回用户态”，然后接着运行。而咱们刚才运行 init，是调用 do_execve，正是上面的过程的后半部分，从内核态执行系统调用开始。
+- do_execve->do_execveat_common->exec_binprm->search_binary_handler，在 search_binary_handler 方法中会调用 load_binary 加载二进制的文件。
+- 也就是说，要运行一个程序，需要加载这个二进制文件，这就是我们常说的**项目执行计划书**。它是有一定格式的。Linux 下一个常用的格式是**ELF**
+- 最后调用 start_thread。
+  - 手动补上了原来系统调用里，保存寄存器的一个步骤。
+  - 最后的 force_iret 方法是用于从系统调用中返回。这个时候会恢复寄存器。从哪里恢复呢？按说是从进入系统调用的时候，保存的寄存器里面拿出。好在上面的函数补上了寄存器。CS 和指令指针寄存器 IP 恢复了，指向用户态下一个要执行的语句。DS 和函数栈指针 SP 也被恢复了，指向用户态函数栈的栈顶。所以，下一条指令，就从用户态开始运行了。
+
+
+
+> #### ramdisk 的作用
+
+- 一开始到用户态的是 ramdisk 的 init，后来会启动真正根文件系统上的 init，成为所有用户态进程的祖先。
+
+- 此时回到用户态是没有文件系统的。
+
+  因为 init 程序是在文件系统上的，文件系统一定是在一个存储设备上的，例如硬盘。Linux 访问存储设备，要有驱动才能访问。如果存储系统数目很有限，那驱动可以直接放到内核里面，反正前面我们加载过内核到内存里了，现在可以直接对存储系统进行访问。但是存储系统越来越多了，如果所有市面上的存储系统的驱动都默认放进内核，内核就太大了。只好先弄一个基于内存的文件系统。内存访问是不需要驱动的，这个就是 ramdisk。这个时候，ramdisk 是根文件系统。
+
+- 然后开始运行 ramdisk 上的 /init。等它运行完了就已经在用户态了。/init 这个程序会先根据存储系统的类型加载驱动，有了驱动就可以设置真正的根文件系统了。有了真正的根文件系统，ramdisk 上的 /init 会启动文件系统上的 init。
+
+
+
+
+
+> #### **创建 2 号进程**
+
+内核态的根进程。`kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES) `又一次使用 kernel_thread 函数创建进程。
+
+
+
+
+
+###  系统调用模块
+
+Linux 提供了 glibc 这个中介，glibc 对系统调用进行了封装，它更熟悉系统调用的细节，并且可以封装成更加友好的接口。
+
+在 glibc 的源代码中，有个文件 syscalls.list，里面列着所有 glibc 的函数对应的系统调用。另外，glibc 还有一个脚本 make-syscall.sh，可以根据配置文件，对于每一个封装好的系统调用，生成一个文件。这个文件里面定义了一些宏，例如 #define SYSCALL_NAME open。
+
+glibc 还有一个文件 syscall-template.S，使用上面这个宏，定义了这个系统调用的调用方式。里面对于任何一个系统调用，会调用 **`DO_CALL`**。这也是一个宏，这个宏 32 位和 64 位的定义是不一样的。
+
+
+
+> #### 32 位系统调用过程
+
+<img src="截图/Linux/32bit_syscall.jpeg" alt="下载" style="zoom:25%;" />
+
+```c
+#define DO_CALL(syscall_name, args)                           \
+    PUSHARGS_##args                               \
+    DOARGS_##args                                 \
+    movl $SYS_ify (syscall_name), %eax;                          \
+    ENTER_KERNEL                                  \
+    POPARGS_##args
+```
+
+这里，我们将请求参数放在寄存器里面，根据系统调用的名称，得到系统调用号，放在寄存器 eax 里面，然后执行 ENTER_KERNEL。
+
+
+
+这里面的 ENTER_KERNEL 是
+
+```
+# define ENTER_KERNEL int $0x80
+```
+
+int 就是 interrupt，也就是“中断”的意思。int $0x80 就是触发一个软中断，通过它就可以陷入（trap）内核。
+
+在内核启动的时候，还记得有一个 trap_init()，其中有这样的代码：
+
+```c
+set_system_intr_gate(IA32_SYSCALL_VECTOR, entry_INT80_32);
+```
+
+这是一个软中断的陷入门。当接收到一个系统调用的时候，entry_INT80_32 就被调用了。
+
+```
+ENTRY(entry_INT80_32)
+        ASM_CLAC
+        pushl   %eax                    /* pt_regs->orig_ax */
+        SAVE_ALL pt_regs_ax=$-ENOSYS    /* save rest */
+        movl    %esp, %eax
+        call    do_syscall_32_irqs_on
+.Lsyscall_32_done:
+......
+.Lirq_return:
+	INTERRUPT_RETURN
+```
+
+通过 push 和 SAVE_ALL 将当前用户态的寄存器，保存在 pt_regs 结构里面。
+
+进入内核之前，保存所有的寄存器，然后调用 do_syscall_32_irqs_on。在do_syscall_32_irqs_on中，将系统调用号从 eax 里面取出来，然后根据系统调用号，在系统调用表中找到相应的函数进行调用，并将寄存器中保存的参数取出来，作为函数参数。根据宏定义，`#define ia32_sys_call_table sys_call_table`，系统调用就是放在这个表里面。
+
+当系统调用结束之后，在 entry_INT80_32 之后，紧接着调用的是 INTERRUPT_RETURN，我们能够找到它的定义，也就是 iret。
+
+```c
+#define INTERRUPT_RETURN     
+```
+
+iret 指令将原来用户态保存的现场恢复回来，包含代码段、指令指针寄存器等。这时候用户态进程恢复执行。
+
+
+
+> #### 64 位系统调用过程
+
+<img src="截图/Linux/64bit_syscall.jpeg" alt="下载" style="zoom:25%;" />
+
+
+
+```c
+#define DO_CALL(syscall_name, args)					      \
+  lea SYS_ify (syscall_name), %rax;					      \
+  syscall
+```
+
+和之前一样，还是将系统调用名称转换为系统调用号，放到寄存器 rax。这里是真正进行调用，不是用中断了，而是改用 syscall 指令了。并且，传递参数的寄存器也变了。
+
+syscall 指令还使用了一种特殊的寄存器，叫**特殊模块寄存器**（Model Specific Registers，简称 MSR）。这种寄存器是 CPU 为了完成某些特殊控制功能为目的的寄存器，其中就有系统调用。
+
+在系统初始化的时候，trap_init 除了初始化上面的中断模式，这里面还会调用 `cpu_init->syscall_init`。这里面有这样的代码：
+
+```c
+wrmsrl(MSR_LSTAR, (unsigned long)entry_SYSCALL_64);
+```
+
+rdmsr 和 wrmsr 是用来读写特殊模块寄存器的。MSR_LSTAR 就是这样一个特殊的寄存器，当 syscall 指令调用的时候，会从这个寄存器里面拿出函数地址来调用，也就是调用 entry_SYSCALL_64。
+
+在 arch/x86/entry/entry_64.S 中定义了 entry_SYSCALL_64。这里先保存了很多寄存器到 pt_regs 结构里面，例如用户态的代码段、数据段、保存参数的寄存器，然后调用 entry_SYSCALL64_slow_pat->do_syscall_64。
+
+在 do_syscall_64 里面，从 rax 里面拿出系统调用号，然后根据系统调用号，在系统调用表 sys_call_table 中找到相应的函数进行调用，并将寄存器中保存的参数取出来，作为函数参数。
+
+所以，无论是 32 位，还是 64 位，都会到系统调用表 sys_call_table 这里来。
+
+64 位的系统调用返回的时候，执行的是 USERGS_SYSRET64。这里，返回用户态的指令变成了 sysretq。
+
+
+
+
+
+> #### 系统调用表
+
+系统调用表 sys_call_table 是怎么形成的？
+
+- 32 位的系统调用表定义在面 arch/x86/entry/syscalls/syscall_32.tbl 文件里。
+
+- 64 位的系统调用定义在另一个文件 arch/x86/entry/syscalls/syscall_64.tbl 里。
+
+- 系统调用在内核中的实现函数要有一个声明。声明往往在 include/linux/syscalls.h 文件中。
+
+- 真正的实现这个系统调用，一般在一个.c 文件里面，例如 sys_open 的实现在 fs/open.c 里面。
+
+  
+
+声明和实现都好了。接下来，在编译的过程中，需要根据 syscall_32.tbl 和 syscall_64.tbl 生成自己的 unistd_32.h 和 unistd_64.h。生成方式在 arch/x86/entry/syscalls/Makefile 中。
+
+这里面会使用两个脚本，其中第一个脚本 arch/x86/entry/syscalls/syscallhdr.sh，会在文件中生成 #define __NR_open；第二个脚本 arch/x86/entry/syscalls/syscalltbl.sh，会在文件中生成 __SYSCALL(__NR_open, sys_open)。这样，unistd_32.h 和 unistd_64.h 是对应的系统调用号和系统调用实现函数之间的对应关系。
+
+在文件 arch/x86/entry/syscall_32.c，定义了这样一个表，里面 include 了这个头文件，从而所有的 sys_ 系统调用都在这个表里面了。
+
+同理，在文件 arch/x86/entry/syscall_64.c，定义了这样一个表，里面 include 了这个头文件，这样所有的 sys_ 系统调用就都在这个表里面了。
 
 
 
