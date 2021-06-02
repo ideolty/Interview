@@ -807,7 +807,7 @@ struct list_head sibling;       /* linkage in my parent's children list */
 
 
 
-> #### 进程权限
+### 进程权限
 
 在 Linux 里面，对于进程权限的定义如下：
 
@@ -950,6 +950,8 @@ struct files_struct             *files;
 
 
 
+### 函数栈
+
 内核栈部分还有两个成员变量，涉及到用户态的执行和内核态的执行。
 
 ![下载](截图/Linux/函数栈工作对比.jpeg)
@@ -1035,7 +1037,7 @@ Linux 给每个 task 都分配了内核栈。
 
 
 
-> #### 调度策略与调度类
+### 调度策略与调度类
 
 在 Linux 里面，进程大概可以分成两种。
 
@@ -1341,6 +1343,275 @@ const struct sched_class fair_sched_class = {
 这样整个运行的场景就串起来了，在每个 CPU 上都有一个队列 rq，这个队列里面包含多个子队列，例如 rt_rq 和 cfs_rq，不同的队列有不同的实现方式，cfs_rq 就是用红黑树实现的。
 
 当有一天，某个 CPU 需要找下一个任务执行的时候，会按照优先级依次调用调度类，不同的调度类操作不同的队列。当然 rt_sched_class 先被调用，它会在 rt_rq 上找下一个任务，只有找不到的时候，才轮到 fair_sched_class 被调用，它会在 cfs_rq 上找下一个任务。这样保证了实时任务的优先级永远大于普通任务。
+
+
+
+### 调度触发方式
+
+主要有两种方式，主动调度与抢占式调度。
+
+#### 主动调度
+
+![下载](截图/Linux/主动调度流程.png)
+
+计算机主要处理计算、网络、存储三个方面。计算主要是 CPU 和内存的合作；网络和存储则多是和外部设备的合作；在操作外部设备的时候，往往需要让出 CPU，选择调用 schedule() 函数。
+
+接下来，我们就来看**schedule 函数的调用过程**。
+
+```c
+asmlinkage __visible void __sched schedule(void)
+{
+	struct task_struct *tsk = current;
+ 
+ 
+	sched_submit_work(tsk);
+	do {
+		preempt_disable();
+		__schedule(false);
+		sched_preempt_enable_no_resched();
+	} while (need_resched());
+}
+```
+
+这段代码的主要逻辑是在 __schedule 函数中实现的。这个函数比较复杂，我们分几个部分来讲解。
+
+```c
+static void __sched notrace __schedule(bool preempt)
+{
+	struct task_struct *prev, *next;
+	unsigned long *switch_count;
+	struct rq_flags rf;
+	struct rq *rq;
+	int cpu;
+ 
+ 
+	cpu = smp_processor_id();
+	rq = cpu_rq(cpu);
+	prev = rq->curr;
+  
+  next = pick_next_task(rq, prev, &rf);
+  clear_tsk_need_resched(prev);
+  clear_preempt_need_resched();
+```
+
+- 首先，在当前的 CPU 上，我们取出任务队列 rq。
+
+- `task_struct *prev` 指向这个 CPU 的任务队列上面正在运行的那个进程 curr。为啥是 prev？因为一旦将来它被切换下来，那它就成了前任了。
+
+- 获取下一个任务，`task_struct *next` 指向下一个任务，这就是**继任**。
+
+  pick_next_task的实现如下:
+
+  ```c
+  static inline struct task_struct *
+  pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
+  {
+  	const struct sched_class *class;
+  	struct task_struct *p;
+  	/*
+  	 * Optimization: we know that if all tasks are in the fair class we can call that function directly, but only if the @prev task wasn't of a higher scheduling class, because otherwise those loose the opportunity to pull in more work from other CPUs.
+  	 */
+  	if (likely((prev->sched_class == &idle_sched_class ||
+  		    prev->sched_class == &fair_sched_class) &&
+  		   rq->nr_running == rq->cfs.h_nr_running)) {
+  		p = fair_sched_class.pick_next_task(rq, prev, rf);
+  		if (unlikely(p == RETRY_TASK))
+  			goto again;
+  		/* Assumes fair_sched_class->next == idle_sched_class */
+  		if (unlikely(!p))
+  			p = idle_sched_class.pick_next_task(rq, prev, rf);
+  		return p;
+  	}
+  again:
+  	for_each_class(class) {
+  		p = class->pick_next_task(rq, prev, rf);
+  		if (p) {
+  			if (unlikely(p == RETRY_TASK))
+  				goto again;
+  			return p;
+  		}
+  	}
+  }
+  ```
+
+  - 我们来看 again 这里，就是咱们上一节讲的依次调用调度类。但是这里有了一个优化，因为大部分进程是普通进程，所以大部分情况下会调用上面的逻辑，调用的就是 fair_sched_class.pick_next_task。
+  - 根据上面对于 fair_sched_class 的定义，它调用的是 pick_next_task_fair，对于 CFS 调度类，取出相应的队列 cfs_rq，这就是我们上面讲的那棵红黑树。
+
+  ```c
+  		struct sched_entity *curr = cfs_rq->curr;
+  		if (curr) {
+  			if (curr->on_rq)
+  				update_curr(cfs_rq);
+  			else
+  				curr = NULL;
+  ......
+  		}
+  		se = pick_next_entity(cfs_rq, curr);
+      p = task_of(se);
+  
+  
+      if (prev != p) {
+        struct sched_entity *pse = &prev->se;
+    ......
+        put_prev_entity(cfs_rq, pse);
+        set_next_entity(cfs_rq, se);
+      }
+  
+  
+      return p
+  ```
+
+  - 取出当前正在运行的任务 curr，如果依然是可运行的状态，也即处于进程就绪状态，则调用 update_curr 更新 vruntime。update_curr 咱们上一节就见过了，它会根据实际运行时间算出 vruntime 来。
+  - 接着，pick_next_entity 从红黑树里面，取最左边的一个节点。
+  - task_of 得到下一个调度实体对应的 task_struct，如果发现继任和前任不一样，这就说明有一个更需要运行的进程了，就需要更新红黑树了。前面前任的 vruntime 更新过了，put_prev_entity 放回红黑树，会找到相应的位置，然后 set_next_entity 将继任者设为当前任务。
+
+- 第三步，当选出的继任者和前任不同，就要进行上下文切换，继任者进程正式进入运行。
+
+  ```c
+  if (likely(prev != next)) {
+  		rq->nr_switches++;
+  		rq->curr = next;
+  		++*switch_count;
+  ......
+  		rq = context_switch(rq, prev, next, &rf);
+  
+  ```
+
+  
+
+
+
+> #### 进程上下文切换
+
+上下文切换主要干两件事情，一是切换进程空间，也即虚拟内存；二是切换寄存器和 CPU 上下文。
+
+context_switch
+
+```c
+/*
+ * context_switch - switch to the new MM and the new thread's register state.
+ */
+static __always_inline struct rq *
+context_switch(struct rq *rq, struct task_struct *prev,
+	       struct task_struct *next, struct rq_flags *rf)
+{
+	struct mm_struct *mm, *oldmm;
+......
+	mm = next->mm;
+	oldmm = prev->active_mm;
+......
+	switch_mm_irqs_off(oldmm, mm, next);
+......
+	/* Here we just switch the register state and the stack. */
+	switch_to(prev, next, prev);
+	barrier();
+	return finish_task_switch(prev);
+}
+```
+
+- 这里首先是内存空间的切换，里面涉及内存管理的内容比较多。
+
+- 接下来，我们看 switch_to。它就是寄存器和栈的切换，它调用到了 __switch_to_asm。这是一段汇编代码，主要用于栈的切换。
+
+  - 对于 32 位操作系统来讲，切换的是栈顶指针 esp。
+  - 对于 64 位操作系统来讲，切换的是栈顶指针 rsp。
+
+- 最终，都返回了 __switch_to 这个函数。这个函数对于 32 位和 64 位操作系统虽然有不同的实现，但里面做的事情是差不多的。所以我这里仅仅列出 64 位操作系统做的事情。
+
+  ```c
+  __visible __notrace_funcgraph struct task_struct *
+  __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
+  {
+  	struct thread_struct *prev = &prev_p->thread;
+  	struct thread_struct *next = &next_p->thread;
+  ......
+  	int cpu = smp_processor_id();
+  	struct tss_struct *tss = &per_cpu(cpu_tss, cpu);
+  ......
+  	load_TLS(next, cpu);
+  ......
+  	this_cpu_write(current_task, next_p);
+   
+   
+  	/* Reload esp0 and ss1.  This changes current_thread_info(). */
+  	load_sp0(tss, next);
+  ......
+  	return prev_p;
+  }
+  ```
+
+这里面有一个 Per CPU 的结构体 tss。
+
+在 x86 体系结构中，提供了一种以硬件的方式进行进程切换的模式，对于每个进程，x86 希望在内存里面维护一个 TSS（Task State Segment，任务状态段）结构。这里面有所有的寄存器。
+
+另外，还有一个特殊的寄存器 TR（Task Register，任务寄存器），指向某个进程的 TSS。更改 TR 的值，将会触发硬件保存 CPU 所有寄存器的值到当前进程的 TSS 中，然后从新进程的 TSS 中读出所有寄存器值，加载到 CPU 对应的寄存器中。但是这样有个缺点。我们做进程切换的时候，没必要每个寄存器都切换，这样每个进程一个 TSS，就需要全量保存，全量切换，动作太大了。
+
+于是，Linux 操作系统想了一个办法。还记得在系统初始化的时候，会调用 cpu_init 吗？这里面会给每一个 CPU 关联一个 TSS，然后将 TR 指向这个 TSS，然后在操作系统的运行过程中，TR 就不切换了，永远指向这个 TSS。TSS 用数据结构 tss_struct 表示。
+
+在 Linux 中，真的参与进程切换的寄存器很少，主要的就是栈顶寄存器。于是，在 task_struct 里面，还有一个我们原来没有注意的成员变量 thread。这里面保留了要切换进程的时候需要修改的寄存器。
+
+```c
+/* CPU-specific state of this task: */
+	struct thread_struct		thread;
+```
+
+**所谓的进程切换，就是将某个进程的 thread_struct 里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。**
+
+例如 __switch_to 中的 load_sp0，就是将下一个进程的 thread_struct 的 sp0 的值加载到 tss_struct 里面去。
+
+
+
+// todo 整体流程还需要再理顺
+
+到此就完成了进程的切换
+
+- 从进程 A 切换到进程 B，用户栈要不要切换呢？当然要，其实早就已经切换了，就在切换内存空间的时候。每个进程的用户栈都是独立的，都在内存空间里面。
+
+- 那内核栈呢？已经在 __switch_to 里面切换了，也就是将 current_task 指向当前的 task_struct。里面的 void *stack 指针，指向的就是当前的内核栈。
+
+- 内核栈的栈顶指针呢？在 __switch_to_asm 里面已经切换了栈顶指针，并且将栈顶指针在 __switch_to 加载到了 TSS 里面。
+
+- 用户栈的栈顶指针呢？如果当前在内核里面的话，它当然是在内核栈顶部的 pt_regs 结构里面呀。当从内核返回用户态运行的时候，pt_regs 里面有所有当时在用户态的时候运行的上下文信息，就可以开始运行了。
+
+  [^问题]: 如果当前是在用户态呢？栈顶指针是从哪里拿？是和内核的栈顶指针一样switch_to_asm里面处理吗？ 貌似用户态不可以操作寄存器进行cpu上下文切换
+
+  
+
+
+
+> #### 指令指针的保存与恢复
+
+这里先明确一点，进程的调度都最终会调用到 __schedule 函数。为了方便记住，姑且给它起个名字，就叫“**进程调度第一定律**”。
+
+我们用最前面的例子仔细分析这个过程。本来一个进程 A 在用户态是要写一个文件的，写文件的操作用户态没办法完成，就要通过系统调用到达内核态。在这个切换的过程中，用户态的指令指针寄存器是保存在 pt_regs 里面的，到了内核态，就开始沿着写文件的逻辑一步一步执行，结果发现需要等待，于是就调用 __schedule 函数。
+
+这个时候，进程 A 在内核态的指令指针是指向 __schedule 了。这里请记住，A 进程的内核栈会保存这个 __schedule 的调用，而且知道这是从 btrfs_wait_for_no_snapshoting_writes 这个函数里面进去的。
+
+__schedule 里面经过上面的层层调用，到达了 context_switch 的最后三行指令（其中 barrier 语句是一个编译器指令，用于保证 switch_to 和 finish_task_switch 的执行顺序，不会因为编译阶段优化而改变，这里咱们可以忽略它）。
+
+```c
+switch_to(prev, next, prev);
+barrier();
+return finish_task_switch(prev);
+```
+
+当进程 A 在内核里面执行 switch_to 的时候，内核态的指令指针也是指向这一行的。但是在 switch_to 里面，将寄存器和栈都切换到成了进程 B 的，唯一没有变的就是指令指针寄存器。当 switch_to 返回的时候，指令指针寄存器指向了下一条语句 finish_task_switch。
+
+但这个时候的 finish_task_switch 已经不是进程 A 的 finish_task_switch 了，而是进程 B 的 finish_task_switch 了。
+
+这样合理吗？你怎么知道进程 B 当时被切换下去的时候，执行到哪里了？恢复 B 进程执行的时候一定在这里呢？这时候就要用到咱的“进程调度第一定律”了。
+
+当年 B 进程被别人切换走的时候，也是调用 __schedule，也是调用到 switch_to，被切换成为 C 进程的，所以，B 进程当年的下一个指令也是 finish_task_switch，这就说明指令指针指到这里是没有错的。
+
+接下来，我们要从 finish_task_switch 完毕后，返回 __schedule 的调用了。返回到哪里呢？按照函数返回的原理，当然是从内核栈里面去找，是返回到 btrfs_wait_for_no_snapshoting_writes 吗？当然不是了，因为 btrfs_wait_for_no_snapshoting_writes 是在 A 进程的内核栈里面的，它早就被切换走了，应该从 B 进程的内核栈里面找。
+
+假设，B 就是最前面例子里面调用 tap_do_read 读网卡的进程。它当年调用 __schedule 的时候，是从 tap_do_read 这个函数调用进去的。
+
+当然，B 进程的内核栈里面放的是 tap_do_read。于是，从 __schedule 返回之后，当然是接着 tap_do_read 运行，然后在内核运行完毕后，返回用户态。这个时候，B 进程内核栈的 pt_regs 也保存了用户态的指令指针寄存器，就接着在用户态的下一条指令开始运行就可以了。
+
+
+
+
 
 
 
