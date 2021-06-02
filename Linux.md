@@ -1031,6 +1031,8 @@ Linux 给每个 task 都分配了内核栈。
 
 对于操作系统来讲，它面对的 CPU 的数量是有限的，干活儿都是它们，但是进程数目远远超过 CPU 的数目，因而就需要进行进程的调度，有效地分配 CPU 的时间，既要保证进程的最快响应，也要保证进程之间的公平。这也是一个非常复杂的、需要平衡的事情。
 
+<img src="截图/Linux/调度整体流程.jpeg" alt="下载" style="zoom:25%;" />
+
 
 
 > #### 调度策略与调度类
@@ -1063,7 +1065,7 @@ unsigned int rt_priority;
 
 优先级其实就是一个数值，对于实时进程，优先级的范围是 0～99；对于普通进程，优先级的范围是 100～139。数值越小，优先级越高。从这里可以看出，所有的实时进程都比普通进程优先级要高。
 
-
+------
 
 **实时调度策略**
 
@@ -1077,7 +1079,7 @@ unsigned int rt_priority;
 
 - 还有一种新的策略是**SCHED_DEADLINE**，是按照任务的 deadline 进行调度的。当产生一个调度点的时候，DL 调度器总是选择其 deadline 距离当前时间点最近的那个任务，并调度它执行。
 
-
+------
 
 **普通调度策略**
 
@@ -1108,13 +1110,237 @@ sched_class 有几种实现：
 
 这里实时进程的调度策略 RR 和 FIFO 相对简单一些，而且由于咱们平时常遇到的都是普通进程，在这里，咱们就重点分析普通进程的调度问题。普通进程使用的调度策略是 fair_sched_class，顾名思义，对于普通进程来讲，公平是最重要的。
 
-
+------
 
 **完全公平调度算法**
 
+在 Linux 里面，实现了一个基于 CFS 的调度算法。CFS 全称 Completely Fair Scheduling，叫完全公平调度。
+
+- 首先，需要记录下进程的运行时间。CPU 会提供一个时钟，过一段时间就触发一个时钟中断，这个我们叫 Tick。CFS 会为每一个进程安排一个虚拟运行时间 vruntime。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。
+- 显然，那些 vruntime 少的，原来受到了不公平的对待，需要给它补上，所以会优先运行这样的进程。
+
+```c
+/*
+ * Update the current task's runtime statistics.
+ */
+static void update_curr(struct cfs_rq *cfs_rq)
+{
+	struct sched_entity *curr = cfs_rq->curr;
+	u64 now = rq_clock_task(rq_of(cfs_rq));
+	u64 delta_exec;
+......
+	delta_exec = now - curr->exec_start;
+......
+	curr->exec_start = now;
+......
+	curr->sum_exec_runtime += delta_exec;
+......
+	curr->vruntime += calc_delta_fair(delta_exec, curr);
+	update_min_vruntime(cfs_rq);
+......
+}
+ 
+ 
+/*
+ * delta /= w
+ */
+static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
+{
+	if (unlikely(se->load.weight != NICE_0_LOAD))
+        /* delta_exec * weight / lw.weight */
+		delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
+	return delta;
+}
+```
+
+在这里得到当前的时间，以及这次的时间片开始的时间，两者相减就是这次运行的时间 delta_exec ，但是得到的这个时间其实是实际运行的时间，需要做一定的转化才作为虚拟运行时间 vruntime。转化方法如下：
+
+`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD / 权重`
+
+这就是说，同样的实际运行时间，给高权重的算少了，低权重的算多了，但是当选取下一个运行进程的时候，还是按照最小的 vruntime 来的，这样高权重的获得的实际运行时间自然就多了。
+
+------
+
+**调度队列与调度实体**
+
+![下载](截图/Linux/调度实体关系图.jpeg)
 
 
 
+CFS 需要一个数据结构来对 vruntime 进行排序，找出最小的那个。这个能够排序的数据结构不但需要查询的时候，能够快速找到最小的，更新的时候也需要能够快速的调整排序，要知道 vruntime 可是经常在变的，变了再插入这个数据结构，就需要重新排序。
+
+能够平衡查询和更新速度的是树，在这里使用的是红黑树。**红黑树的的节点是应该包括 vruntime 的，称为调度实体**。
+
+在 task_struct 中有这样的成员变量：
+
+```c
+struct sched_entity se;
+struct sched_rt_entity rt;
+struct sched_dl_entity dl;
+```
+
+这里有实时调度实体 sched_rt_entity，Deadline 调度实体 sched_dl_entity，以及完全公平算法调度实体 sched_entity。
+
+不光 CFS 调度策略需要有这样一个数据结构进行排序，其他的调度策略也同样有自己的数据结构进行排序，因为任何一个策略做调度的时候，都是要区分谁先运行谁后运行。而进程根据自己是实时的，还是普通的类型，通过这个成员变量，将自己挂在某一个数据结构里面，和其他的进程排序，等待被调度。如果这个进程是个普通进程，则通过 sched_entity，将自己挂在这棵红黑树上。
+
+对于普通进程的调度实体定义如下，这里面包含了 vruntime 和权重 load_weight，以及对于运行时间的统计。
+
+```c
+struct sched_entity {
+	struct load_weight		load;
+	struct rb_node			run_node;
+	struct list_head		group_node;
+	unsigned int			on_rq;
+	u64				exec_start;
+	u64				sum_exec_runtime;
+	u64				vruntime;
+	u64				prev_sum_exec_runtime;
+	u64				nr_migrations;
+	struct sched_statistics		statistics;
+......
+};
+```
+
+下图是一个红黑树的例子:
+
+<img src="截图/Linux/sched_entity_rbt.jpeg" alt="下载" style="zoom: 25%;" />
+
+所有可运行的进程通过不断地插入操作最终都存储在以时间为顺序的红黑树中，vruntime 最小的在树的左侧，vruntime 最多的在树的右侧。 CFS 调度策略会选择红黑树最左边的叶子节点作为下一个将获得 cpu 的任务。
+
+
+
+**红黑树存放位置**
+
+每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列 rt_rq 和一个 CFS 运行队列 cfs_rq，在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。
+
+```c
+struct rq {
+	/* runqueue lock: */
+	raw_spinlock_t lock;
+	unsigned int nr_running;
+	unsigned long cpu_load[CPU_LOAD_IDX_MAX];
+......
+	struct load_weight load;
+	unsigned long nr_load_updates;
+	u64 nr_switches;
+ 
+ 
+	struct cfs_rq cfs;
+	struct rt_rq rt;
+	struct dl_rq dl;
+......
+	struct task_struct *curr, *idle, *stop;
+......
+};
+```
+
+对于普通进程公平队列 cfs_rq，定义如下：
+
+```c
+/* CFS-related fields in a runqueue */
+struct cfs_rq {
+	struct load_weight load;
+	unsigned int nr_running, h_nr_running;
+ 
+ 
+	u64 exec_clock;
+	u64 min_vruntime;
+#ifndef CONFIG_64BIT
+	u64 min_vruntime_copy;
+#endif
+	struct rb_root tasks_timeline;
+	struct rb_node *rb_leftmost;
+ 
+ 
+	struct sched_entity *curr, *next, *last, *skip;
+......
+};
+```
+
+这里面 rb_root 指向的就是红黑树的根节点，这个红黑树在 CPU 看起来就是一个队列，不断的取下一个应该运行的进程。rb_leftmost 指向的是最左面的节点。
+
+------
+
+**调度类工作流程**
+
+调度类的定义如下：
+
+```c
+struct sched_class {
+	const struct sched_class *next;
+ 
+ 
+	void (*enqueue_task) (struct rq *rq, struct task_struct *p, int flags);
+	void (*dequeue_task) (struct rq *rq, struct task_struct *p, int flags);
+	void (*yield_task) (struct rq *rq);
+	bool (*yield_to_task) (struct rq *rq, struct task_struct *p, bool preempt);
+ 
+ 
+	void (*check_preempt_curr) (struct rq *rq, struct task_struct *p, int flags);
+ 
+ 
+	struct task_struct * (*pick_next_task) (struct rq *rq,
+						struct task_struct *prev,
+						struct rq_flags *rf);
+	void (*put_prev_task) (struct rq *rq, struct task_struct *p);
+ 
+ 
+	void (*set_curr_task) (struct rq *rq);
+	void (*task_tick) (struct rq *rq, struct task_struct *p, int queued);
+	void (*task_fork) (struct task_struct *p);
+	void (*task_dead) (struct task_struct *p);
+ 
+ 
+	void (*switched_from) (struct rq *this_rq, struct task_struct *task);
+	void (*switched_to) (struct rq *this_rq, struct task_struct *task);
+	void (*prio_changed) (struct rq *this_rq, struct task_struct *task, int oldprio);
+	unsigned int (*get_rr_interval) (struct rq *rq,
+					 struct task_struct *task);
+	void (*update_curr) (struct rq *rq)
+```
+
+这个结构定义了很多种方法，用于在队列上操作任务。这里请大家注意第一个成员变量，是一个指针，指向下一个调度类。
+
+上面有写过，调度类分为下面这几种：
+
+```c
+extern const struct sched_class stop_sched_class;
+extern const struct sched_class dl_sched_class;
+extern const struct sched_class rt_sched_class;
+extern const struct sched_class fair_sched_class;
+extern const struct sched_class idle_sched_class;
+```
+
+它们其实是放在一个链表上的。这里我们以调度最常见的操作，**取下一个任务**为例，这里面有一个 for_each_class 循环，沿着上面的顺序，依次调用每个调度类的方法。这就说明，调度的时候是从优先级最高的调度类到优先级低的调度类，依次执行。而对于每种调度类，有自己的实现，例如，CFS 就有 fair_sched_class。
+
+```c
+const struct sched_class fair_sched_class = {
+	.next			= &idle_sched_class,
+	.enqueue_task		= enqueue_task_fair,
+	.dequeue_task		= dequeue_task_fair,
+	.yield_task		= yield_task_fair,
+	.yield_to_task		= yield_to_task_fair,
+	.check_preempt_curr	= check_preempt_wakeup,
+	.pick_next_task		= pick_next_task_fair,
+	.put_prev_task		= put_prev_task_fair,
+	.set_curr_task          = set_curr_task_fair,
+	.task_tick		= task_tick_fair, 
+	.task_fork		= task_fork_fair,
+	.prio_changed		= prio_changed_fair,
+	.switched_from		= switched_from_fair,
+	.switched_to		= switched_to_fair,
+	.get_rr_interval	= get_rr_interval_fair,
+	.update_curr		= update_curr_fair,
+};
+```
+
+对于同样的 pick_next_task 选取下一个要运行的任务这个动作，不同的调度类有自己的实现。fair_sched_class 的实现是 pick_next_task_fair，rt_sched_class 的实现是 pick_next_task_rt。
+
+我们会发现这两个函数是操作不同的队列，pick_next_task_rt 操作的是 rt_rq，pick_next_task_fair 操作的是 cfs_rq。
+
+这样整个运行的场景就串起来了，在每个 CPU 上都有一个队列 rq，这个队列里面包含多个子队列，例如 rt_rq 和 cfs_rq，不同的队列有不同的实现方式，cfs_rq 就是用红黑树实现的。
+
+当有一天，某个 CPU 需要找下一个任务执行的时候，会按照优先级依次调用调度类，不同的调度类操作不同的队列。当然 rt_sched_class 先被调用，它会在 rt_rq 上找下一个任务，只有找不到的时候，才轮到 fair_sched_class 被调用，它会在 cfs_rq 上找下一个任务。这样保证了实时任务的优先级永远大于普通任务。
 
 
 
