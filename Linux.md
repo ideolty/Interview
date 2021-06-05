@@ -543,14 +543,6 @@ pts 的父进程是 sshd，bash 的父进程是 pts，ps -ef 这个命令的父�
 
 
 
-
-
-
-
-
-
-
-
 ## 线程创建
 
 <img src="截图/Linux/线程创建流程图.jpeg" alt="下载" style="zoom: 25%;" />
@@ -614,7 +606,7 @@ int pthread_key_create(pthread_key_t *key, void (*destructor)(void*))
 
 在 Linux 里面，无论是进程，还是线程，到了内核里面，我们统一都叫任务（Task），由一个统一的结构**task_struct**进行管理。 Linux 内核有一个**链表**，将所有的 task_struct 串起来。接下来，我们来看每一个任务都应该包含哪些字段。
 
-<img src="截图/Linux/task_struct.jpeg" alt="下载" style="zoom:25%;" />
+<img src="截图/Linux/task_struct.jpeg" alt="下载" style="zoom: 33%;" />
 
 
 
@@ -966,7 +958,7 @@ struct files_struct             *files;
 
 ![下载](截图/Linux/函数栈工作对比.jpeg)
 
-> #### 用户态函数栈
+#### 用户态函数栈
 
 在用户态中，程序的执行往往是一个函数调用另一个函数。函数调用都是通过栈来进行的，其实就是指令跳转，从代码的一个地方跳到另外一个地方。这里比较棘手的问题是，参数和返回地址应该怎么传递过去呢？
 
@@ -1000,7 +992,7 @@ struct files_struct             *files;
 
 
 
-> #### 内核态函数栈
+#### 内核态函数栈
 
 接下来，我们通过系统调用，从进程的内存空间到内核中了。内核中也有各种各样的函数调用来调用去的，也需要这样一个机制，这时候，上面的成员变量 stack，也就是内核栈，就派上了用场。
 
