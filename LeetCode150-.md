@@ -2321,6 +2321,261 @@ class Solution {
 
 
 
+
+
+# [494. 目标和](https://leetcode-cn.com/problems/target-sum/) :star: :warning:
+
+给你一个整数数组 nums 和一个整数 target 。
+
+向数组中的每个整数前添加 '+' 或 '-' ，然后串联起所有整数，可以构造一个 表达式 ：
+
+- 例如，nums = [2, 1] ，可以在 2 之前添加 '+' ，在 1 之前添加 '-' ，然后串联起来得到表达式 "+2-1" 。
+
+返回可以通过上述方法构造的、运算结果等于 target 的不同 表达式 的数目。
+
+ 
+
+示例 1：
+
+```
+输入：nums = [1,1,1,1,1], target = 3
+输出：5
+解释：一共有 5 种方法让最终目标和为 3 。
+-1 + 1 + 1 + 1 + 1 = 3
++1 - 1 + 1 + 1 + 1 = 3
++1 + 1 - 1 + 1 + 1 = 3
++1 + 1 + 1 - 1 + 1 = 3
++1 + 1 + 1 + 1 - 1 = 3
+```
+
+示例 2：
+
+```
+输入：nums = [1], target = 1
+输出：1
+```
+
+提示：
+
+- 1 <= nums.length <= 20
+- 0 <= nums[i] <= 1000
+- 0 <= sum(nums[i]) <= 1000
+- -1000 <= target <= 100
+
+
+
+对于这种求数量的题目，使用dfs迭代的方法一定会超时，题目肯定是dp。
+
+// todo 自己没做出来 空一段时间再做
+
+
+
+
+
+官方动态规划版
+
+记数组的元素和为 $\textit{sum}$
+
+，添加 $\textit{-}$ 号的元素之和为 $\textit{neg}$，则其余添加 $\texttt{+}$ 的元素之和为 $\textit{sum}-\textit{neg}$，得到的表达式的结果为
+$$
+(sum−neg)−neg=sum−2⋅neg=target
+$$
+即
+$$
+\textit{neg}=\dfrac{\textit{sum}-\textit{target}}{2}
+$$
+由于数组 $\textit{nums}$ 中的元素都是非负整数，$\textit{neg}$ 也必须是非负整数，所以上式成立的前提是 $\textit{sum}-\textit{target}$是非负偶数。若不符合该条件可直接返回 0。
+
+若上式成立，问题转化成在数组 $\textit{nums}$ 中选取若干元素，使得这些元素之和等于 $\textit{neg}$，计算选取元素的方案数。我们可以使用动态规划的方法求解。
+
+定义二维数组 $\textit{dp}$，**其中 $\textit{dp}[i][j]$表示在数组 $\textit{nums}$ 的前 i 个数中选取元素，使得这些元素之和等于 j 的方案数**。假设数组 $\textit{nums}$ 的长度为 n，则最终答案为 $\textit{dp}[n][\textit{neg}]$。
+
+当没有任何元素可以选取时，元素和只能是 0，对应的方案数是 1，因此动态规划的边界条件是：
+$$
+\textit{dp}[0][j]=\begin{cases} 1, & j=0 \\ 0, & j \ge 1 \end{cases}
+$$
+当 $1 \le i \le n$ 时，对于数组 $\textit{nums}$ 中的第 i 个元素 $\textit{num}$（i 的计数从 1 开始），遍历 $0 \le j \le \textit{neg}$，计算 $\textit{dp}[i][j]$的值：
+
+- 如果$j < \textit{num}$，则不能选 $\textit{num}$，此时有 $\textit{dp}[i][j] = \textit{dp}[i - 1][j][j]$；
+
+  [^问题1]: 这个不能算是简单的背包问题吧，题目要求每个数前面必须填符号，不能不选吧？
+
+- 如果$j \ge \textit{num}$，则如果不选 $\textit{num}$，方案数是 $\textit{dp}[i - 1][j]$，如果选 $\textit{num}$，方案数是 $\textit{dp}[i - 1][j - \textit{num}]$，此时有 $\textit{dp}[i][j] = \textit{dp}[i - 1][j] + \textit{dp}[i - 1][j - \textit{num}]$。
+
+  [^问题2]: 既然选了，只能选择 + 号吗，- 号的情况如何处理？
+
+因此状态转移方程如下：
+$$
+\textit{dp}[i][j]=\begin{cases} \textit{dp}[i - 1][j], & j<\textit{nums}[i] \\ \textit{dp}[i - 1][j] + \textit{dp}[i - 1][j - \textit{nums}[i]], & j \ge \textit{nums}[i] \end{cases}
+$$
+最终得到 $\textit{dp}[n][\textit{neg}]$ 的值即为答案。
+
+由此可以得到空间复杂度为 $O(n \times \textit{neg})$ 的实现。
+
+```java
+class Solution {
+    public int findTargetSumWays(int[] nums, int target) {
+        int sum = 0;
+        for (int num : nums) {
+            sum += num;
+        }
+        int diff = sum - target;
+        if (diff < 0 || diff % 2 != 0) {
+            return 0;
+        }
+        int n = nums.length, neg = diff / 2;
+        int[][] dp = new int[n + 1][neg + 1];
+        dp[0][0] = 1;
+        for (int i = 1; i <= n; i++) {
+            int num = nums[i - 1];
+            for (int j = 0; j <= neg; j++) {
+                dp[i][j] = dp[i - 1][j];
+                if (j >= num) {
+                    dp[i][j] += dp[i - 1][j - num];
+                }
+            }
+        }
+        return dp[n][neg];
+    }
+}
+```
+
+由于 dp 的每一行的计算只和上一行有关，因此可以使用滚动数组的方式，去掉 dp 的第一个维度，将空间复杂度优化到 O(neg)。
+
+实现时，内层循环需采用倒序遍历的方式，这种方式保证转移来的是 $dp[i−1][]$ 中的元素值。
+
+```java
+class Solution {
+    public int findTargetSumWays(int[] nums, int target) {
+        int sum = 0;
+        for (int num : nums) {
+            sum += num;
+        }
+        int diff = sum - target;
+        if (diff < 0 || diff % 2 != 0) {
+            return 0;
+        }
+        int neg = diff / 2;
+        int[] dp = new int[neg + 1];
+        dp[0] = 1;
+        for (int num : nums) {
+            for (int j = neg; j >= num; j--) {
+                dp[j] += dp[j - num];
+            }
+        }
+        return dp[neg];
+    }
+}
+
+
+作者：LeetCode-Solution
+链接：https://leetcode-cn.com/problems/target-sum/solution/mu-biao-he-by-leetcode-solution-o0cp/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+官方版本难以理解的地方实在是太多了，已经在相关内容上打上下标了。
+
+分享一个评论
+
+> 原问题等同于： 找到nums一个正子集P和一个负子集N，使得总和等于target。即sum(P) - sum(N) == target，
+> 即sum(P) + sum(N) + sum(P) - sum(N) == target + sum(P) + sum(N)
+> 即2 * sum(P) == target + sum(nums)， 其中target + sum(nums)必须>=0且为偶数，否则等式不可能成立。
+> 则问题转换为：存在多少个子集P，使sum(P) == (target + sum(nums))/2。
+>
+> dp[i][j]表示前i个元素有多少个目标和为j的子集。$dp[0][0] = 1$
+>        1. $dp[i][j] = dp[i-1][j]$
+>     2. 如果nums[0...i-2]存在目标和为j-nums[i-1]的子集，则dp[i][j] += dp[i-1][j-nums[i-1]]
+>
+> https://leetcode-cn.com/problems/target-sum/solution/mu-biao-he-by-leetcode-solution-o0cp/975024
+
+
+
+网友解法
+
+此方法，通俗易懂，还写明了作者解题时的思考方式，学习之。
+
+**定义状态**
+
+搞清楚需要输出的结果后，就可以来想办法画一个表格，也就是定义dp数组的含义。根据背包问题的经验，可以将$dp[ i ][ j ]$定义为从数组nums中 0 - i 的元素进行加减可以得到 j 的方法数量。
+
+**状态转移方程**
+
+搞清楚状态以后，我们就可以根据状态去考虑如何根据子问题的转移从而得到整体的解。这道题的关键不是nums[i]的选与不选，而是nums[i]是加还是减，那么我们就可以将方程定义为：
+
+$$ dp[ i ][ j ] = dp[ i - 1 ][ j - nums[ i ] ] + dp[ i - 1 ][ j + nums[ i ] ] $$
+
+可以理解为nums[i]这个元素我可以执行加，还可以执行减，那么我$dp[i][j]$的结果值就是加/减之后对应位置的和。
+
+**dp数组的定义**
+
+一般背包问题的定义都是$dp[len][t+1]$。而我一开始基于这个出发就进入了一个误区。下图是我刚开始在本子上画的表格，在计算到第二行的时候就发现不对了，在取值 i=1也就是第二行的时候，很明显[1,1]会有两种得到0的方法，但是我根据上面的方程来算的话，这个$dp[1][0]$应该等于1才对，百思不得其解，后来我去官方题解确认了下我状态转移方程的正确性，发现并没有问题，我只能接着画图，思考这个多出来的1应该在哪儿？
+![image.png](截图/leetCode/557-image1.png)
+
+**打表格**
+
+后来前前后后又读了几遍题目，发现我上面那个表格只画了每个元素执行加法的部分，而忽略了执行减法的部分，整个表格区域应该是分为三部分：-/0/+。那么对应的表格的每一行的长度t就可以表示为：t=(sum*2)+1，其中一个sum表示nums中执行全部执行加/减能达到的数，而加的1显然是中间的0.具体表格如下图所示：
+
+![image.png](截图/leetCode/557-image2.png)
+
+么上面红色部分为什么得2也说的通了，因为忽略了负数部分的那个1，加上负数部分以后就可以得到正确的结果了。而绿色部分的表格值就是我们本题的解。dp表示为：$dp[len - 1][sum + s]$。
+
+**初始化**
+
+这道题有个坑的地方，就是nums[0]可能等于0，这样初始化dp数组第一行的时候很可能踩坑，因为如果nums[0]==0那么$dp[0][sum]$需要初始化为2，因为加减0都得0。具体代码如下：
+
+[^问题1]: 没懂，为什么要初始化为2
+
+
+
+```java
+    public static int findTargetSumWays(int[] nums, int s) {
+        int sum = 0;
+        for (int i = 0; i < nums.length; i++) {
+            sum += nums[i];
+        }
+        // 绝对值范围超过了sum的绝对值范围则无法得到
+        if (Math.abs(s) > Math.abs(sum)) return 0;
+
+        int len = nums.length;
+        // - 0 +
+        int t = sum * 2 + 1;
+        int[][] dp = new int[len][t];
+        // 初始化
+        if (nums[0] == 0) {
+            dp[0][sum] = 2;
+        } else {
+            dp[0][sum + nums[0]] = 1;
+            dp[0][sum - nums[0]] = 1;
+        }
+
+        for (int i = 1; i < len; i++) {
+            for (int j = 0; j < t; j++) {
+                // 边界
+                int l = (j - nums[i]) >= 0 ? j - nums[i] : 0;
+                int r = (j + nums[i]) < t ? j + nums[i] : 0;
+                dp[i][j] = dp[i - 1][l] + dp[i - 1][r];
+            }
+        }
+        return dp[len - 1][sum + s];
+    }
+
+
+
+作者：keepal
+链接：https://leetcode-cn.com/problems/target-sum/solution/dong-tai-gui-hua-si-kao-quan-guo-cheng-by-keepal/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
+
+
+
+
+
+
 # [557. 反转字符串中的单词 III](https://leetcode-cn.com/problems/reverse-words-in-a-string-iii/)
 
 给定一个字符串，你需要反转字符串中每个单词的字符顺序，同时仍保留空格和单词的初始顺序。
