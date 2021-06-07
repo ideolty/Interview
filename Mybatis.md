@@ -383,3 +383,7 @@ SimpleExecutor、ReuseExecutor、BatchExecutor。
 
 
 
+## Mybatis 接口 Mapper 内的方法为啥不能重载？
+
+原因：在投鞭断流时，Mybatis使用package+Mapper+method全限名作为key，去xml内寻找唯一sql来执行的。类似：key=x.y.UserMapper.getUserById，那么，重载方法时将导致矛盾。对于Mapper接口，Mybatis禁止方法重载（overLoad）。
+
