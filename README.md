@@ -22,7 +22,11 @@
   - [JVM](https://github.com/ideolty/Interview/blob/master/JVM.md)
 - [设计模式](https://github.com/ideolty/Interview/blob/master/设计模式.md)
 - [算法](https://github.com/ideolty/Interview/blob/master/算法.md)
-- [LeetCode]((https://github.com/ideolty/Interview/blob/master/LeetCode.md))
+- LeetCode
+  - [LeetCode1-49](((https://github.com/ideolty/Interview/blob/master/LeetCode1-49.md))
+  - [LeetCode50-99](https://github.com/ideolty/Interview/blob/master/LeetCode50-99.md)
+  - [LeetCode100-149](https://github.com/ideolty/Interview/blob/master/LeetCode100-149.md)
+  - [LeetCode150-](https://github.com/ideolty/Interview/blob/master/LeetCode150-.md)
 - [数据结构](https://github.com/ideolty/Interview/blob/master/数据结构.md)
 - [计算机网络基础](https://github.com/ideolty/Interview/blob/master/计算机网络基础.md)
 - 计算机安全
@@ -59,6 +63,8 @@
 - [分布式](https://github.com/ideolty/Interview/blob/master/分布式.md)
 - [Netflix-Archaius](https://github.com/ideolty/Interview/blob/master/Netflix-Archaius.md)
 - Linux
+  - [Linux](https://github.com/ideolty/Interview/blob/master/Linux.md)
+  - [Linux2](https://github.com/ideolty/Interview/blob/master/Linux2.md)
 - Tomcat
 - 大数据全家桶
   - Hdfs

@@ -3261,6 +3261,8 @@ struct zone {
 
 ### 物理内存的分配方式
 
+#### 整页的分配
+
 对于要分配比较大的内存，例如到分配页级别的，可以使用**伙伴系统**（Buddy System）。
 
 Linux 中的内存管理的“页”大小为 4KB。把所有的空闲页分组为 11 个页块链表，每个块链表分别包含很多个大小的页块，有 1、2、4、8、16、32、64、128、256、512 和 1024 个连续页的页块。最大可以申请 1024 个连续页，对应 4MB 大小的连续内存。每个页块的第一个页的物理地址是该页块大小的整数倍。
@@ -3407,256 +3409,476 @@ static inline void expand(struct zone *zone, struct page *page,
 
 
 
-
-
-
-
-
-
-# 常用命令
-
-## TOP
-
-> [linux top命令查看内存及多核CPU的使用讲述](https://www.cnblogs.com/dragonsuc/p/5512797.html)
-
-Linux top命令用于实时显示 process 的动态。
-
-**参数说明**：
-
-- d : 改变显示的更新速度，或是在交谈式指令列( interactive command)按 s
-- q : 没有任何延迟的显示速度，如果使用者是有 superuser 的权限，则 top 将会以最高的优先序执行
-- c : 切换显示模式，共有两种模式，一是只显示执行档的名称，另一种是显示完整的路径与名称
-- S : 累积模式，会将己完成或消失的子行程 ( dead child process ) 的 CPU time 累积起来
-- s : 安全模式，将交谈式指令取消, 避免潜在的危机
-- i : 不显示任何闲置 (idle) 或无用 (zombie) 的行程
-- n : 更新的次数，完成后将会退出 top
-- b : 批次档模式，搭配 "n" 参数一起使用，可以用来将 top 的结果输出到档案内
-- -p: 监控特定的PID，你可以用-p选项监控指定的PID。PID的值为0将被作为top命令自身的PID。
-
-
-
-例如：
-
-`top -c`在查看命令（最后一栏）那一栏可以看到完成的执行命令路径。
-
-`top -Hp 3033` 显示一个进程的线程运行信息列表。按下P,进程按照Cpu使用率排序
-
-
-
-
-
-## PS
-
-process status命令用于显示当前进程的状态，类似于 windows 的任务管理器。
-
-**参数说明**：
-
-- ps 的参数非常多, 在此仅列出几个常用的参数并大略介绍含义
-
-- -A 列出所有的进程
-
-- ps -e 此参数的效果和指定"A"参数相同
-
-- -w 显示加宽可以显示较多的资讯
-
-- -au 显示较详细的资讯
-
-- -aux 显示所有包含其他使用者的行程
-
-- -f 带有完整的命令行路径
-
-- au(x) 输出格式 :
-
-  ```
-  USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND
-  ```
-
-  - USER: 行程拥有者
-  - PID: pid
-  - %CPU: 占用的 CPU 使用率
-  - %MEM: 占用的记忆体使用率
-  - VSZ: 占用的虚拟记忆体大小
-  - RSS: 占用的记忆体大小
-  - TTY: 终端的次要装置号码 (minor device number of tty)
-  - STAT: 该行程的状态:
-    - D:  无法中断的休眠状态 (通常 IO 的进程)
-    - R: 正在执行中
-    - S: 静止状态
-    - T: 暂停执行
-    - Z: 不存在但暂时无法消除
-    - W: 没有足够的记忆体分页可分配
-    - <: 高优先序的行程
-    - N: 低优先序的行程
-    - L: 有记忆体分页分配并锁在记忆体内 (实时系统或捱A I/O)
-  - START: 行程开始时间
-  - TIME: 执行的时间
-  - COMMAND:所执行的指令
-
-  
-
-最常用的`ps -ef|grep keyword`：显示所有命令，连带命令行
-
-
-
-## 端口相关
-
-> [Linux 查看端口占用情况](https://www.runoob.com/w3cnote/linux-check-port-usage.html)
-
-### netstat
-
-Linux netstat 命令用于显示网络状态。
-
-**参数说明**：
-
-- -a或--all   显示所有连线中的Socket。
-- -A<网络类型>或--<网络类型>   列出该网络类型连线中的相关地址。
-- -c或--continuous   持续列出网络状态。
-- -C或--cache   显示路由器配置的快取信息。
-- -e或--extend   显示网络其他相关信息。
-- -F或--fib   显示路由缓存。
-- -g或--groups   显示多重广播功能群组组员名单。
-- -h或--help   在线帮助。
-- -i或--interfaces   显示网络界面信息表单。
-- -l或--listening   显示监控中的服务器的Socket。
-- -M或--masquerade   显示伪装的网络连线。
-- -n或--numeric   直接使用IP地址，而不通过域名服务器。
-- -N或--netlink或--symbolic   显示网络硬件外围设备的符号连接名称。
-- -o或--timers   显示计时器。
-- -p或--programs   显示正在使用Socket的程序识别码和程序名称。
-- -r或--route   显示Routing Table。
-- -s或--statistics   显示网络工作信息统计表。
-- -t或--tcp   显示TCP传输协议的连线状况。
-- -u或--udp   显示UDP传输协议的连线状况。
-- -v或--verbose   显示指令执行过程。
-- -V或--version   显示版本信息。
-- -w或--raw   显示RAW传输协议的连线状况。
-- -x或--unix   此参数的效果和指定"-A unix"参数相同。
-- --ip或--inet   此参数的效果和指定"-A inet"参数相同。
-
-
-
-`netstat -tunlp|grep port`：其实可以展示tcp的源和目标ip:port，然后grep去查找
-
-
-
-### lsof
-
-lsof(list open files)是一个列出当前系统打开文件的工具。
-
-**参数说明**：
-
--a 列出打开文件存在的进程
-
--c<进程名> 列出指定进程所打开的文件
-
--g 列出GID号进程详情
-
--d<文件号> 列出占用该文件号的进程
-
-+d<目录> 列出目录下被打开的文件
-
-+D<目录> 递归列出目录下被打开的文件
-
--n<目录> 列出使用NFS的文件
-
--i<条件> 列出符合条件的进程。（4、6、协议、:端口、 @ip ）
-
--p<进程号> 列出指定进程号所打开的文件
-
--u 列出UID号进程详情
-
--h 显示帮助信息
-
--v 显示版本信息
-
-
-
-`lsof -i:端口号`：lsof  查看端口占用
-
-```sh
-# lsof -i:8000
-COMMAND   PID USER   FD   TYPE   DEVICE SIZE/OFF NODE NAME
-nodejs  26993 root   10u  IPv4 37999514      0t0  TCP *:8000 (LISTEN)
+#### 小内存的分配
+
+如果遇到小的对象，会使用 slub 分配器进行分配。在创建进程的时候，会调用 dup_task_struct，它想要试图复制一个 task_struct 对象，需要先调用 alloc_task_struct_node，分配一个 task_struct 对象。
+
+从这段代码可以看出，它调用了 kmem_cache_alloc_node 函数，在 task_struct 的缓存区域 task_struct_cachep 分配了一块内存。
+
+```c
+static struct kmem_cache *task_struct_cachep;
+ 
+task_struct_cachep = kmem_cache_create("task_struct",
+			arch_task_struct_size, align,
+			SLAB_PANIC|SLAB_NOTRACK|SLAB_ACCOUNT, NULL);
+ 
+static inline struct task_struct *alloc_task_struct_node(int node)
+{
+	return kmem_cache_alloc_node(task_struct_cachep, GFP_KERNEL, node);
+}
+ 
+static inline void free_task_struct(struct task_struct *tsk)
+{
+	kmem_cache_free(task_struct_cachep, tsk);
+}
 ```
 
-lsof输出各列信息的意义如下：
+在系统初始化的时候，task_struct_cachep 会被 kmem_cache_create 函数创建。这个函数也比较容易看懂，专门用于分配 task_struct 对象的缓存。这个缓存区的名字就叫 task_struct。缓存区中每一块的大小正好等于 task_struct 的大小，也即 arch_task_struct_size。
 
-COMMAND：进程的名称 PID：进程标识符
+有了这个缓存区，每次创建 task_struct 的时候，我们不用到内存里面去分配，先在缓存里面看看有没有直接可用的，这就是**kmem_cache_alloc_node**的作用。
 
-USER：进程所有者
-
-FD：文件描述符，应用程序通过文件描述符识别该文件。如cwd、txt等 TYPE：文件类型，如DIR、REG等
-
-DEVICE：指定磁盘的名称
-
-SIZE：文件的大小
-
-NODE：索引节点（文件在磁盘上的标识）
-
-NAME：打开文件的确切名称
+当一个进程结束，task_struct 也不用直接被销毁，而是放回到缓存中，这就是**kmem_cache_free**的作用。这样，新进程创建的时候，我们就可以直接用现成的缓存中的 task_struct 了。
 
 
 
-## ip相关
+缓存区 struct kmem_cache 结构
 
-![img](截图/Linux/nettools vs iproute2.png)
+```c
+struct kmem_cache {
+	struct kmem_cache_cpu __percpu *cpu_slab;
+	/* Used for retriving partial slabs etc */
+	unsigned long flags;
+	unsigned long min_partial;
+	int size;		/* The size of an object including meta data */
+	int object_size;	/* The size of an object without meta data */
+	int offset;		/* Free pointer offset. */
+#ifdef CONFIG_SLUB_CPU_PARTIAL
+	int cpu_partial;	/* Number of per cpu partial objects to keep around */
+#endif
+	struct kmem_cache_order_objects oo;
+	/* Allocation and freeing of slabs */
+	struct kmem_cache_order_objects max;
+	struct kmem_cache_order_objects min;
+	gfp_t allocflags;	/* gfp flags to use on each alloc */
+	int refcount;		/* Refcount for slab cache destroy */
+	void (*ctor)(void *);
+......
+	const char *name;	/* Name (only for display!) */
+	struct list_head list;	/* List of slab caches */
+......
+	struct kmem_cache_node *node[MAX_NUMNODES];
+};
+```
 
-## df
+- struct list_head list 一个链表。对于操作系统来讲，要创建和管理的缓存绝对不止 task_struct。mm_struct 、fs_struct 都需要。因此，所有的缓存最后都会放在一个链表里面，也就是 LIST_HEAD(slab_caches)。
 
-disk free 命令用于显示目前在 Linux 系统上的文件系统磁盘使用情况统计。
+- 对于缓存来讲，其实就是分配了连续几页的大内存块，然后根据缓存对象的大小，切成小内存块。所以，我们这里有三个 kmem_cache_order_objects 类型的变量。这里面的 order，就是 2 的 order 次方个页面的大内存块，objects 就是能够存放的缓存对象的数量。
 
-**参数说明**：
+  最终，我们将大内存块切分成小内存块，样子就像下面这样。
 
-- 文件-a, --all 包含所有的具有 0 Blocks 的文件系统
-- 文件--block-size={SIZE} 使用 {SIZE} 大小的 Blocks
-- 文件-h, --human-readable 使用人类可读的格式(预设值是不加这个选项的...)
-- 文件-H, --si 很像 -h, 但是用 1000 为单位而不是用 1024
-- 文件-i, --inodes 列出 inode 资讯，不列出已使用 block
-- 文件-k, --kilobytes 就像是 --block-size=1024
-- 文件-l, --local 限制列出的文件结构
-- 文件-m, --megabytes 就像 --block-size=1048576
-- 文件--no-sync 取得资讯前不 sync (预设值)
-- 文件-P, --portability 使用 POSIX 输出格式
-- 文件--sync 在取得资讯前 sync
-- 文件-t, --type=TYPE 限制列出文件系统的 TYPE
-- 文件-T, --print-type 显示文件系统的形式
-- 文件-x, --exclude-type=TYPE 限制列出文件系统不要显示 TYPE
-- 文件-v (忽略)
-- 文件--help 显示这个帮手并且离开
-- 文件--version 输出版本资讯并且离开
+  <img src="截图/Linux/小块内存结构.jpeg" alt="下载" style="zoom:25%;" />
 
-`df -h`
+  每一项的结构都是缓存对象后面跟一个下一个空闲对象的指针，这样非常方便将所有的空闲对象链成一个链。其实，这就相当于咱们数据结构里面学的，用数组实现一个可随机插入和删除的链表。
+
+- 所以，这里面就有三个变量：size 是包含这个指针的大小，object_size 是纯对象的大小，offset 就是把下一个空闲对象的指针存放在这一项里的偏移量。
 
 
 
-## free
+那这些缓存对象哪些被分配了、哪些在空着，什么情况下整个大内存块都被分配完了，需要向伙伴系统申请几个页形成新的大内存块？这些信息该由谁来维护呢？
 
-free指令会显示内存的使用情况，包括实体内存，虚拟的交换文件内存，共享内存区段，以及系统核心使用的缓冲区等。
+接下来就是最重要的两个成员变量出场的时候了。kmem_cache_cpu 和 kmem_cache_node，它们都是每个 NUMA 节点上有一个，我们只需要看一个节点里面的情况。
 
-**参数说明**：
+<img src="截图/Linux/NUMA节点的kmem_cache.jpeg" alt="下载" style="zoom:25%;" />
 
-- -b 　以Byte为单位显示内存使用情况。
+在分配缓存块的时候，要分两种路径，**fast path**和**slow path**，也就是**快速通道**和**普通通道**。其中 kmem_cache_cpu 就是快速通道，kmem_cache_node 是普通通道。每次分配的时候，要先从 kmem_cache_cpu 进行分配。如果 kmem_cache_cpu 里面没有空闲的块，那就到 kmem_cache_node 中进行分配；如果还是没有空闲的块，才去伙伴系统分配新的页。
 
-- -k 　以KB为单位显示内存使用情况。
 
-- -m 　以MB为单位显示内存使用情况。
 
-- -h 　以合适的单位显示内存使用情况，最大为三位数，自动计算对应的单位值。单位有：
+**kmem_cache_cpu**
 
+```c
+struct kmem_cache_cpu {
+	void **freelist;	/* Pointer to next available object */
+	unsigned long tid;	/* Globally unique transaction id */
+	struct page *page;	/* The slab from which we are allocating */
+#ifdef CONFIG_SLUB_CPU_PARTIAL
+	struct page *partial;	/* Partially allocated frozen slabs */
+#endif
+......
+};
+```
+
+- 在这里，page 指向大内存块的第一个页，缓存块就是从里面分配的。freelist 指向大内存块里面第一个空闲的项。按照上面说的，这一项会有指针指向下一个空闲的项，最终所有空闲的项会形成一个链表。
+
+- partial 指向的也是大内存块的第一个页，之所以名字叫 partial（部分），就是因为它里面部分被分配出去了，部分是空的。这是一个备用列表，当 page 满了，就会从这里找。
+
+
+
+**kmem_cache_node**
+
+```c
+struct kmem_cache_node {
+	spinlock_t list_lock;
+......
+#ifdef CONFIG_SLUB
+	unsigned long nr_partial;
+	struct list_head partial;
+......
+#endif
+};
+```
+
+这里面也有一个 partial，是一个链表。这个链表里存放的是部分空闲的大内存块。这是 kmem_cache_cpu 里面的 partial 的备用列表，如果那里没有，就到这里来找。
+
+
+
+**具体的分配过程**
+
+kmem_cache_alloc_node 会调用 slab_alloc_node。
+
+```c
+/*
+ * Inlined fastpath so that allocation functions (kmalloc, kmem_cache_alloc)
+ * have the fastpath folded into their functions. So no function call
+ * overhead for requests that can be satisfied on the fastpath.
+ *
+ * The fastpath works by first checking if the lockless freelist can be used.
+ * If not then __slab_alloc is called for slow processing.
+ *
+ * Otherwise we can simply pick the next object from the lockless free list.
+ */
+static __always_inline void *slab_alloc_node(struct kmem_cache *s,
+		gfp_t gfpflags, int node, unsigned long addr)
+{
+	void *object;
+	struct kmem_cache_cpu *c;
+	struct page *page;
+	unsigned long tid;
+......
+	tid = this_cpu_read(s->cpu_slab->tid);
+	c = raw_cpu_ptr(s->cpu_slab);
+......
+	object = c->freelist;
+	page = c->page;
+	if (unlikely(!object || !node_match(page, node))) {
+		object = __slab_alloc(s, gfpflags, node, addr, c);
+		stat(s, ALLOC_SLOWPATH);
+	} 
+......
+	return object;
+}
+```
+
+快速通道很简单，取出 cpu_slab 也即 kmem_cache_cpu 的 freelist，这就是第一个空闲的项，可以直接返回了。如果没有空闲的了，则只好进入普通通道，调用 __slab_alloc。
+
+```c
+static void *___slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
+			  unsigned long addr, struct kmem_cache_cpu *c)
+{
+	void *freelist;
+	struct page *page;
+......
+redo:
+......
+	/* must check again c->freelist in case of cpu migration or IRQ */
+	freelist = c->freelist;
+	if (freelist)
+		goto load_freelist;
+ 
+ 
+	freelist = get_freelist(s, page);
+ 
+ 
+	if (!freelist) {
+		c->page = NULL;
+		stat(s, DEACTIVATE_BYPASS);
+		goto new_slab;
+	}
+ 
+ 
+load_freelist:
+	c->freelist = get_freepointer(s, freelist);
+	c->tid = next_tid(c->tid);
+	return freelist;
+ 
+ 
+new_slab:
+ 
+ 
+	if (slub_percpu_partial(c)) {
+		page = c->page = slub_percpu_partial(c);
+		slub_set_percpu_partial(c, page);
+		stat(s, CPU_PARTIAL_ALLOC);
+		goto redo;
+	}
+ 
+ 
+	freelist = new_slab_objects(s, gfpflags, node, &c);
+......
+	return freeli
+ 
+```
+
+- 首先再次尝试一下 kmem_cache_cpu 的 freelist。为什么呢？万一当前进程被中断，等回来的时候，别人已经释放了一些缓存，说不定又有空间了呢。如果找到了，就跳到 load_freelist，在这里将 freelist 指向下一个空闲项，返回就可以了。
+
+- 如果 freelist 还是没有，则跳到 new_slab 里面去。这里面我们先去 kmem_cache_cpu 的 partial 里面看。如果 partial 不是空的，那就将 kmem_cache_cpu 的 page，也就是快速通道的那一大块内存，**替换为 partial 里面的大块内存**。然后 redo，重新试下。这次应该就可以成功了。
+
+- 如果真的还不行，那就要到 new_slab_objects 了。
+
+```c
+static inline void *new_slab_objects(struct kmem_cache *s, gfp_t flags,
+			int node, struct kmem_cache_cpu **pc)
+{
+	void *freelist;
+	struct kmem_cache_cpu *c = *pc;
+	struct page *page;
+ 
+ 
+	freelist = get_partial(s, flags, node, c);
+ 
+ 
+	if (freelist)
+		return freelist;
+ 
+ 
+	page = new_slab(s, flags, node);
+	if (page) {
+		c = raw_cpu_ptr(s->cpu_slab);
+		if (c->page)
+			flush_slab(s, c);
+ 
+ 
+		freelist = page->freelist;
+		page->freelist = NULL;
+ 
+ 
+		stat(s, ALLOC_SLAB);
+		c->page = page;
+		*pc = c;
+	} else
+		freelist = NULL;
+ 
+ 
+	return freelis
+```
+
+在这里面，get_partial 会根据 node id，找到相应的 kmem_cache_node，然后调用 get_partial_node，开始在这个节点进行分配。
+
+```c
+/*
+ * Try to allocate a partial slab from a specific node.
+ */
+static void *get_partial_node(struct kmem_cache *s, struct kmem_cache_node *n,
+				struct kmem_cache_cpu *c, gfp_t flags)
+{
+	struct page *page, *page2;
+	void *object = NULL;
+	int available = 0;
+	int objects;
+......
+	list_for_each_entry_safe(page, page2, &n->partial, lru) {
+		void *t;
+ 
+ 
+		t = acquire_slab(s, n, page, object == NULL, &objects);
+		if (!t)
+			break;
+ 
+ 
+		available += objects;
+		if (!object) {
+			c->page = page;
+			stat(s, ALLOC_FROM_PARTIAL);
+			object = t;
+		} else {
+			put_cpu_partial(s, page, 0);
+			stat(s, CPU_PARTIAL_NODE);
+		}
+		if (!kmem_cache_has_cpu_partial(s)
+			|| available > slub_cpu_partial(s) / 2)
+			break;
+	}
+......
+	return object;
+```
+
+- acquire_slab 会从 kmem_cache_node 的 partial 链表中拿下一大块内存来，并且将 freelist，也就是第一块空闲的缓存块，赋值给 t。并且当第一轮循环的时候，将 kmem_cache_cpu 的 page 指向取下来的这一大块内存，返回的 object 就是这块内存里面的第一个缓存块 t。如果 kmem_cache_cpu 也有一个 partial，就会进行第二轮，再次取下一大块内存来，这次调用 put_cpu_partial，放到 kmem_cache_cpu 的 partial 里面。
+
+- 如果 kmem_cache_node 里面也没有空闲的内存，这就说明原来分配的页里面都放满了，就要回到 new_slab_objects 函数，里面 new_slab 函数会调用 allocate_slab。
+
+```c
+static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
+{
+	struct page *page;
+	struct kmem_cache_order_objects oo = s->oo;
+	gfp_t alloc_gfp;
+	void *start, *p;
+	int idx, order;
+	bool shuffle;
+ 
+ 
+	flags &= gfp_allowed_mask;
+......
+	page = alloc_slab_page(s, alloc_gfp, node, oo);
+	if (unlikely(!page)) {
+		oo = s->min;
+		alloc_gfp = flags;
+		/*
+		 * Allocation may have failed due to fragmentation.
+		 * Try a lower order alloc if possible
+		 */
+		page = alloc_slab_page(s, alloc_gfp, node, oo);
+		if (unlikely(!page))
+			goto out;
+		stat(s, ORDER_FALLBACK);
+	}
+......
+	return page;
+}
+```
+
+在这里，我们看到了 alloc_slab_page 分配页面。分配的时候，要按 kmem_cache_order_objects 里面的 order 来。如果第一次分配不成功，说明内存已经很紧张了，那就换成 min 版本的 kmem_cache_order_objects。
+
+
+
+### 页面换出
+
+每个进程都有自己的虚拟地址空间，无论是 32 位还是 64 位，虚拟地址空间都非常大，物理内存不可能有这么多的空间放得下。所以，一般情况下，页面只有在被使用的时候，才会放在物理内存中。如果过了一段时间不被使用，即便用户进程并没有释放它，物理内存管理也有责任做一定的干预。例如，将这些物理内存中的页面换出到硬盘上去；将空出的物理内存，交给活跃的进程去使用。
+
+
+
+**触发时间**
+
+- 最常见的情况就是，分配内存的时候，发现没有地方了，就试图回收一下。例如，咱们解析申请一个页面的时候，会调用 get_page_from_freelist，接下来的调用链为 get_page_from_freelist->node_reclaim->__node_reclaim->shrink_node，通过这个调用链可以看出，页面换出也是以内存节点为单位的。
+
+- 还有一种情况，就是作为内存管理系统应该主动去做的，而不能等真的出了事儿再做，这就是内核线程**kswapd**。这个内核线程，在系统初始化的时候就被创建。这样它会进入一个无限循环，直到系统停止。在这个循环中，如果内存使用没有那么紧张，那它就可以放心睡大觉；如果内存紧张了，就需要去检查一下内存，看看是否需要换出一些内存页。
+
+  ```c
+  /*
+   * The background pageout daemon, started as a kernel thread
+   * from the init process.
+   *
+   * This basically trickles out pages so that we have _some_
+   * free memory available even if there is no other activity
+   * that frees anything up. This is needed for things like routing
+   * etc, where we otherwise might have all activity going on in
+   * asynchronous contexts that cannot page things out.
+   *
+   * If there are applications that are active memory-allocators
+   * (most normal use), this basically shouldn't matter.
+   */
+  static int kswapd(void *p)
+  {
+  	unsigned int alloc_order, reclaim_order;
+  	unsigned int classzone_idx = MAX_NR_ZONES - 1;
+  	pg_data_t *pgdat = (pg_data_t*)p;
+  	struct task_struct *tsk = current;
+   
+   
+      for ( ; ; ) {
+  ......
+          kswapd_try_to_sleep(pgdat, alloc_order, reclaim_order,
+  					classzone_idx);
+  ......
+          reclaim_order = balance_pgdat(pgdat, alloc_order, classzone_idx);
+  ......
+      }
+  }
   ```
-  B = bytes
-  K = kilos
-  M = megas
-  G = gigas
-  T = teras
+
+  这里的调用链是 balance_pgdat->kswapd_shrink_node->shrink_node，是以内存节点为单位的，最后也是调用 shrink_node。
+
+  shrink_node 会调用 shrink_node_memcg。这里面有一个循环处理页面的列表，看这个函数的注释，其实和上面我们想表达的内存换出是一样的。
+
+  ```c
+  /*
+   * This is a basic per-node page freer.  Used by both kswapd and direct reclaim.
+   */
+  static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memcg,
+  			      struct scan_control *sc, unsigned long *lru_pages)
+  {
+  ......
+  	unsigned long nr[NR_LRU_LISTS];
+  	enum lru_list lru;
+  ......
+  	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_FILE] ||
+  					nr[LRU_INACTIVE_FILE]) {
+  		unsigned long nr_anon, nr_file, percentage;
+  		unsigned long nr_scanned;
+   
+   
+  		for_each_evictable_lru(lru) {
+  			if (nr[lru]) {
+  				nr_to_scan = min(nr[lru], SWAP_CLUSTER_MAX);
+  				nr[lru] -= nr_to_scan;
+   
+   
+  				nr_reclaimed += shrink_list(lru, nr_to_scan,
+  							    lruvec, memcg, sc);
+  			}
+  		}
+  ......
+  	}
+  ......
   ```
 
-- -o 　不显示缓冲区调节列。
+  这里面有个 lru 列表。从下面的定义，我们可以想象，所有的页面都被挂在 LRU 列表中。LRU 是 Least Recent Use，也就是最近最少使用。也就是说，这个列表里面会按照活跃程度进行排序，这样就容易把不怎么用的内存页拿出来做处理。
 
-- -s<间隔秒数> 　持续观察内存使用状况。
+  内存页总共分两类，一类是**匿名页**，和虚拟地址空间进行关联；一类是**内存映射**，不但和虚拟地址空间关联，还和文件管理关联。
 
-- -t 　显示内存总和列。
+  它们每一类都有两个列表，一个是 active，一个是 inactive。顾名思义，active 就是比较活跃的，inactive 就是不怎么活跃的。这两个里面的页会变化，过一段时间，活跃的可能变为不活跃，不活跃的可能变为活跃。如果要换出内存，那就是从不活跃的列表中找出最不活跃的，换出到硬盘上。
 
-- -V 　显示版本信息。
+  ```c
+  enum lru_list {
+  	LRU_INACTIVE_ANON = LRU_BASE,
+  	LRU_ACTIVE_ANON = LRU_BASE + LRU_ACTIVE,
+  	LRU_INACTIVE_FILE = LRU_BASE + LRU_FILE,
+  	LRU_ACTIVE_FILE = LRU_BASE + LRU_FILE + LRU_ACTIVE,
+  	LRU_UNEVICTABLE,
+  	NR_LRU_LISTS
+  };
+   
+   
+  #define for_each_evictable_lru(lru) for (lru = 0; lru <= LRU_ACTIVE_FILE; lru++)
+   
+   
+  static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
+  				 struct lruvec *lruvec, struct mem_cgroup *memcg,
+  				 struct scan_control *sc)
+  {
+  	if (is_active_lru(lru)) {
+  		if (inactive_list_is_low(lruvec, is_file_lru(lru),
+  					 memcg, sc, true))
+  			shrink_active_list(nr_to_scan, lruvec, sc, lru);
+  		return 0;
+  	}
+   
+   
+  	return shrink_inactive_list(nr_to_scan, lruvec, sc, lru);
+  ```
 
-`free -h`
+  从上面的代码可以看出，shrink_list 会先缩减活跃页面列表，再压缩不活跃的页面列表。对于不活跃列表的缩减，shrink_inactive_list 就需要对页面进行回收；对于匿名页来讲，需要分配 swap，将内存页写入文件系统；对于内存映射关联了文件的，我们需要将在内存中对于文件的修改写回到文件中。
+
+
+
+> #### 总结
+
+对于物理内存来讲，从下层到上层的关系及分配模式如下：
+
+- 物理内存分 NUMA 节点，分别进行管理；
+- 每个 NUMA 节点分成多个内存区域；
+- 每个内存区域分成多个物理页面；
+- 伙伴系统将多个连续的页面作为一个大的内存块分配给上层；
+- kswapd 负责物理页面的换入换出；
+- Slub Allocator 将从伙伴系统申请的大内存块切成小块，分配给其他系统。
+
+<img src="截图/Linux/物理内存分配模式.jpeg" alt="下载" style="zoom:25%;" />
+
+
+
+
+
+
+
+
+
