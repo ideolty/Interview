@@ -3285,6 +3285,130 @@ struct free_area	free_area[MAX_ORDER];
 
 上面这个过程，我们可以在分配页的函数 alloc_pages 中看到。
 
+```c
+static inline struct page *
+alloc_pages(gfp_t gfp_mask, unsigned int order)
+{
+	return alloc_pages_current(gfp_mask, order);
+}
+ 
+ 
+/**
+ * 	alloc_pages_current - Allocate pages.
+ *
+ *	@gfp:
+ *				%GFP_USER   user allocation,
+ *      	%GFP_KERNEL kernel allocation,
+ *      	%GFP_HIGHMEM highmem allocation,
+ *      	%GFP_FS     don't call back into a file system.
+ *      	%GFP_ATOMIC don't sleep.
+ *	@order: Power of two of allocation size in pages. 0 is a single page.
+ *
+ *	Allocate a page from the kernel page pool.  When not in
+ *	interrupt context and apply the current process NUMA policy.
+ *	Returns NULL when no page can be allocated.
+ */
+struct page *alloc_pages_current(gfp_t gfp, unsigned order)
+{
+	struct mempolicy *pol = &default_policy;
+	struct page *page;
+......
+	page = __alloc_pages_nodemask(gfp, order,
+				policy_node(gfp, pol, numa_node_id()),
+				policy_nodemask(gfp, pol));
+......
+	return page;
+}
+```
+
+alloc_pages 会调用 alloc_pages_current，gfp 表示希望在哪个区域中分配这个内存：
+
+- GFP_USER 用于分配一个页映射到用户进程的虚拟地址空间，并且希望直接被内核或者硬件访问，主要用于一个用户进程希望通过内存映射的方式，访问某些硬件的缓存，例如显卡缓存；
+- GFP_KERNEL 用于内核中分配页，主要分配 ZONE_NORMAL 区域，也即直接映射区；
+- GFP_HIGHMEM，顾名思义就是主要分配高端区域的内存。
+
+另一个参数 order，就是表示分配 2 的 order 次方个页。
+
+接下来调用 __alloc_pages_nodemask。这是伙伴系统的核心方法。它会调用 get_page_from_freelist。这里面的逻辑也很容易理解，就是在一个循环中先看当前节点的 zone。如果找不到空闲页，则再看备用节点的 zone。
+
+```c
+static struct page *
+get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
+						const struct alloc_context *ac)
+{
+......
+	for_next_zone_zonelist_nodemask(zone, z, ac->zonelist, ac->high_zoneidx, ac->nodemask) {
+		struct page *page;
+......
+		page = rmqueue(ac->preferred_zoneref->zone, zone, order,
+				gfp_mask, alloc_flags, ac->migratetype);
+......
+}
+```
+
+每一个 zone，都有伙伴系统维护的各种大小的队列，就像上面伙伴系统原理里讲的那样。这里调用 rmqueue 就很好理解了，就是找到合适大小的那个队列，把页面取下来。
+
+接下来的调用链是 `rmqueue->__rmqueue->__rmqueue_smallest`。在这里，我们能清楚看到伙伴系统的逻辑。
+
+```c
+static inline
+struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
+						int migratetype)
+{
+	unsigned int current_order;
+	struct free_area *area;
+	struct page *page;
+ 
+ 
+	/* Find a page of the appropriate size in the preferred list */
+	for (current_order = order; current_order < MAX_ORDER; ++current_order) {
+		area = &(zone->free_area[current_order]);
+		page = list_first_entry_or_null(&area->free_list[migratetype],
+							struct page, lru);
+		if (!page)
+			continue;
+		list_del(&page->lru);
+		rmv_page_order(page);
+		area->nr_free--;
+		expand(zone, page, order, current_order, area, migratetype);
+		set_pcppage_migratetype(page, migratetype);
+		return page;
+	}
+ 
+ 
+	return NULL;
+```
+
+从当前的 order，也即指数开始，在伙伴系统的 free_area 找 2^order 大小的页块。如果链表的第一个不为空，就找到了；如果为空，就到更大的 order 的页块链表里面去找。找到以后，除了将页块从链表中取下来，我们还要把多余的的部分放到其他页块链表里面。
+
+expand 就是干这个事情的。area–就是伙伴系统那个表里面的前一项，前一项里面的页块大小是当前项的页块大小除以 2，size 右移一位也就是除以 2，list_add 就是加到链表上，nr_free++ 就是计数加 1。
+
+```c
+static inline void expand(struct zone *zone, struct page *page,
+	int low, int high, struct free_area *area,
+	int migratetype)
+{
+	unsigned long size = 1 << high;
+ 
+ 
+	while (high > low) {
+		area--;
+		high--;
+		size >>= 1;
+......
+		list_add(&page[size].lru, &area->free_list[migratetype]);
+		area->nr_free++;
+		set_page_order(&page[size], high);
+	}
+}
+```
+
+
+
+
+
+
+
 
 
 
