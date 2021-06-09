@@ -23,7 +23,7 @@
 - [设计模式](https://github.com/ideolty/Interview/blob/master/设计模式.md)
 - [算法](https://github.com/ideolty/Interview/blob/master/算法.md)
 - LeetCode
-  - [LeetCode1-49](((https://github.com/ideolty/Interview/blob/master/LeetCode1-49.md))
+  - [LeetCode1-49](https://github.com/ideolty/Interview/blob/master/LeetCode1-49.md)
   - [LeetCode50-99](https://github.com/ideolty/Interview/blob/master/LeetCode50-99.md)
   - [LeetCode100-149](https://github.com/ideolty/Interview/blob/master/LeetCode100-149.md)
   - [LeetCode150-](https://github.com/ideolty/Interview/blob/master/LeetCode150-.md)
