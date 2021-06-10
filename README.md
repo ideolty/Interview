@@ -17,6 +17,8 @@
   - [Java 基础](https://github.com/ideolty/Interview/blob/master/Java基础.md)
   - [JDK](https://github.com/ideolty/Interview/blob/master/JDK.md)
   - [JVM](https://github.com/ideolty/Interview/blob/master/JVM.md)
+  - [多线程](https://github.com/ideolty/Interview/blob/master/多线程.md)
+- Go
 - [设计模式](https://github.com/ideolty/Interview/blob/master/设计模式.md)
 - [算法](https://github.com/ideolty/Interview/blob/master/算法.md)
 - LeetCode
@@ -27,7 +29,8 @@
 - [剑指offer](https://github.com/ideolty/Interview/blob/master/剑指offer.md)
 - [数据结构](https://github.com/ideolty/Interview/blob/master/数据结构.md)
 - [计算机网络基础](https://github.com/ideolty/Interview/blob/master/计算机网络基础.md)
-- 计算机组成原理
+- [操作系统](https://github.com/ideolty/Interview/blob/master/操作系统.md)
+- [计算机组成原理](https://github.com/ideolty/Interview/blob/master/计算机组成原理.md)
 - 计算机安全
 - Spring 全家桶
   - [Spring Core](https://github.com/ideolty/Interview/blob/master/SpringCore.md)
@@ -40,8 +43,10 @@
     - Ribbon
     - Spring GateWay
     - Zuul1
-- ~~Spring Data JPA~~
-- ~~Spring Security~~
+  - ~~Spring Data JPA~~
+  - ~~Spring Security~~
+- Server Mesh
+  - Istio
 - Netty
 - [Mybatis](https://github.com/ideolty/Interview/blob/master/Mybatis.md)
 - [Maven](https://github.com/ideolty/Interview/blob/master/Maven.md)
@@ -49,7 +54,9 @@
 - 容器化
   - Docker
   - K8s
-- Skywalking
+- 监控
+  - Skywalking
+  - Prometheus
 - [Nginx](https://github.com/ideolty/Interview/blob/master/Nginx.md)
 - [消息中间件](https://github.com/ideolty/Interview/blob/master/消息中间件.md)
   - [RabbitMQ](https://github.com/ideolty/Interview/blob/master/RabbitMQ.md)
@@ -66,7 +73,7 @@
   - [Linux2](https://github.com/ideolty/Interview/blob/master/Linux2.md)
 - Tomcat
 - 大数据全家桶
-  - Hdfs
+  - HDFS
   - Yarn
   - MapReduce
   - Hbase
