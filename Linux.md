@@ -3882,3 +3882,187 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 
 
 
+## 内存映射原理
+
+### mmap
+
+每一个进程都有一个列表 vm_area_struct，指向虚拟地址空间的不同的内存块，这个变量的名字叫**mmap**。
+
+[^vm_area_struct]: 回顾 用户态内存布局 一节。从 task_struct -> mm_struct -> vm_area_struct
+
+```c
+struct mm_struct {
+	struct vm_area_struct *mmap;		/* list of VMAs */
+......
+}
+ 
+ 
+struct vm_area_struct {
+	/*
+	 * For areas with an address space and backing store,
+	 * linkage into the address_space->i_mmap interval tree.
+	 */
+	struct {
+		struct rb_node rb;
+		unsigned long rb_subtree_last;
+	} shared;
+ 
+ 
+ 
+ 
+	/*
+	 * A file's MAP_PRIVATE vma can be in both i_mmap tree and anon_vma
+	 * list, after a COW of one of the file pages.	A MAP_SHARED vma
+	 * can only be in the i_mmap tree.  An anonymous MAP_PRIVATE, stack
+	 * or brk vma (with NULL file) can only be in an anon_vma list.
+	 */
+	struct list_head anon_vma_chain; /* Serialized by mmap_sem &
+					  * page_table_lock */
+	struct anon_vma *anon_vma;	/* Serialized by page_table_lock */
+ 
+ 
+ 
+ 
+	/* Function pointers to deal with this struct. */
+	const struct vm_operations_struct *vm_ops;
+	/* Information about our backing store: */
+	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
+					   units */
+	struct file * vm_file;		/* File we map to (can be NULL). */
+	void * vm_private_data;		/* was vm_pte (shared mem) */
+```
+
+内存映射不仅仅是物理内存和虚拟内存之间的映射，还包括将文件中的内容映射到虚拟内存空间。这个时候，访问内存空间就能够访问到文件里面的数据。而仅有物理内存和虚拟内存的映射，是一种特殊情况。
+
+如果我们要申请小块内存，就用 brk。如果申请一大块内存，就要用 mmap。对于堆的申请来讲，mmap 是映射内存空间到物理内存。另外，如果一个进程想映射一个文件到自己的虚拟内存空间，也要通过 mmap 系统调用。这个时候 mmap 是映射内存空间到物理内存再到文件。可见 mmap 这个系统调用是核心，我们现在来看 mmap 这个系统调用。
+
+```c
+SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,
+                unsigned long, prot, unsigned long, flags,
+                unsigned long, fd, unsigned long, off)
+{
+......
+        error = sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
+......
+}
+ 
+ 
+SYSCALL_DEFINE6(mmap_pgoff, unsigned long, addr, unsigned long, len,
+		unsigned long, prot, unsigned long, flags,
+		unsigned long, fd, unsigned long, pgoff)
+{
+	struct file *file = NULL;
+......
+	file = fget(fd);
+......
+	retval = vm_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	return retval;
+}
+```
+
+如果要映射到文件，fd 会传进来一个文件描述符，并且 mmap_pgoff 里面通过 fget 函数，根据文件描述符获得 struct file。struct file 表示打开的一个文件。
+
+接下来的调用链是 vm_mmap_pgoff->do_mmap_pgoff->do_mmap。这里面主要干了两件事情：
+
+- 调用 get_unmapped_area 找到一个没有映射的区域；
+- 调用 mmap_region 映射这个区域。
+
+
+
+**get_unmapped_area**
+
+```c
+unsigned long
+get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
+		unsigned long pgoff, unsigned long flags)
+{
+	unsigned long (*get_area)(struct file *, unsigned long,
+				  unsigned long, unsigned long, unsigned long);
+......
+	get_area = current->mm->get_unmapped_area;
+	if (file) {
+		if (file->f_op->get_unmapped_area)
+			get_area = file->f_op->get_unmapped_area;
+	} 
+......
+}
+```
+
+- 这里面如果是匿名映射，则调用 mm_struct 里面的 get_unmapped_area 函数。这个函数其实是 arch_get_unmapped_area。它会调用 find_vma_prev，在表示虚拟内存区域的 vm_area_struct 红黑树上找到相应的位置。之所以叫 prev，是说这个时候虚拟内存区域还没有建立，找到前一个 vm_area_struct。
+- 如果不是匿名映射，而是映射到一个文件，这样在 Linux 里面，每个打开的文件都有一个 struct file 结构，里面有一个 file_operations，用来表示和这个文件相关的操作。如果是我们熟知的 ext4 文件系统，调用的是 thp_get_unmapped_area。如果我们仔细看这个函数，最终还是调用 mm_struct 里面的 get_unmapped_area 函数。殊途同归。
+
+
+
+**mmap_region映射虚拟内存区域**
+
+```c
+unsigned long mmap_region(struct file *file, unsigned long addr,
+		unsigned long len, vm_flags_t vm_flags, unsigned long pgoff,
+		struct list_head *uf)
+{
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma, *prev;
+	struct rb_node **rb_link, *rb_parent;
+ 
+ 
+	/*
+	 * Can we just expand an old mapping?
+	 */
+	vma = vma_merge(mm, prev, addr, addr + len, vm_flags,
+			NULL, file, pgoff, NULL, NULL_VM_UFFD_CTX);
+	if (vma)
+		goto out;
+ 
+ 
+	/*
+	 * Determine the object being mapped and call the appropriate
+	 * specific mapper. the address has already been validated, but
+	 * not unmapped, but the maps are removed from the list.
+	 */
+	vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);
+	if (!vma) {
+		error = -ENOMEM;
+		goto unacct_error;
+	}
+ 
+ 
+	vma->vm_mm = mm;
+	vma->vm_start = addr;
+	vma->vm_end = addr + len;
+	vma->vm_flags = vm_flags;
+	vma->vm_page_prot = vm_get_page_prot(vm_flags);
+	vma->vm_pgoff = pgoff;
+	INIT_LIST_HEAD(&vma->anon_vma_chain);
+ 
+ 
+	if (file) {
+		vma->vm_file = get_file(file);
+		error = call_mmap(file, vma);
+		addr = vma->vm_start;
+		vm_flags = vma->vm_flags;
+	} 
+......
+	vma_link(mm, vma, prev, rb_link, rb_parent);
+	return addr;
+.....
+```
+
+- 之前找到了虚拟内存区域的前一个 vm_area_struct，我们首先要看，是否能够基于它进行扩展，也即调用 vma_merge，和前一个 vm_area_struct 合并到一起。
+
+- 如果不能，就需要调用 kmem_cache_zalloc，在 Slub 里面创建一个新的 vm_area_struct 对象，设置起始和结束位置，将它加入队列。如果是映射到文件，则设置 vm_file 为目标文件，调用 call_mmap。其实就是调用 file_operations 的 mmap 函数。对于 ext4 文件系统，调用的是 ext4_file_mmap。从这个函数的参数可以看出，这一刻文件和内存开始发生关系了。这里我们将 vm_area_struct 的内存操作设置为文件系统操作，也就是说，读写内存其实就是读写文件系统。
+- 最终，vma_link 函数将新创建的 vm_area_struct 挂在了 mm_struct 里面的红黑树上。
+
+
+
+这个时候，从内存到文件的映射关系，至少在逻辑层面建立起来。那从文件到内存的映射关系呢？vma_link 还做了另外一件事情，就是 __vma_link_file。这个东西要用于建立这层映射关系。
+
+对于打开的文件，会有一个结构 struct file 来表示。它有个成员指向 struct address_space 结构，这里面有棵变量名为 i_mmap 的红黑树，vm_area_struct 就挂在这棵树上。
+
+
+
+到这里，内存映射的内容告一段落了。目前好像还没和物理内存发生任何关系，还是在虚拟内存里面。我们还没有开始真正访问内存，这个时候，内存管理并不直接分配物理内存，因为物理内存相对于虚拟地址空间太宝贵了，只有等真正用的那一刻才会开始分配。
+
+
+
+
+
