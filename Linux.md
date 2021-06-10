@@ -4066,3 +4066,309 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 
 
 
+
+
+### 用户态缺页异常
+
+一旦开始访问虚拟内存的某个地址，如果发现并没有对应的物理页，那就触发缺页中断，调用 do_page_fault。
+
+[^注释1]: 这里是没有对应的物理页，有可能是页表里从来没建过；也有可能是页表里有，但是页面换出到硬盘了。
+
+```c
+dotraplinkage void notrace
+do_page_fault(struct pt_regs *regs, unsigned long error_code)
+{
+	unsigned long address = read_cr2(); /* Get the faulting address */
+......
+	__do_page_fault(regs, error_code, address);
+......
+}
+ 
+ 
+/*
+ * This routine handles page faults.  It determines the address,
+ * and the problem, and then passes it off to one of the appropriate
+ * routines.
+ */
+static noinline void
+__do_page_fault(struct pt_regs *regs, unsigned long error_code,
+		unsigned long address)
+{
+	struct vm_area_struct *vma;
+	struct task_struct *tsk;
+	struct mm_struct *mm;
+	tsk = current;
+	mm = tsk->mm;
+ 
+ 
+	if (unlikely(fault_in_kernel_space(address))) {
+		if (vmalloc_fault(address) >= 0)
+			return;
+	}
+......
+	vma = find_vma(mm, address);
+......
+	fault = handle_mm_fault(vma, address, flags);
+......
+```
+
+在 __do_page_fault 里面
+
+- 先要判断缺页中断是否发生在内核。如果发生在内核则调用 vmalloc_fault，这就和咱们前面学过的虚拟内存的布局对应上了。在内核里面，vmalloc 区域需要内核页表映射到物理页。咱们这里把内核的这部分放放。
+
+- 如果在用户空间里面，找到你访问的那个地址所在的区域 vm_area_struct，然后调用 handle_mm_fault 来映射这个区域。
+
+
+
+```c
+static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
+		unsigned int flags)
+{
+	struct vm_fault vmf = {
+		.vma = vma,
+		.address = address & PAGE_MASK,
+		.flags = flags,
+		.pgoff = linear_page_index(vma, address),
+		.gfp_mask = __get_fault_gfp_mask(vma),
+	};
+	struct mm_struct *mm = vma->vm_mm;
+	pgd_t *pgd;
+	p4d_t *p4d;
+	int ret;
+ 
+ 
+	pgd = pgd_offset(mm, address);
+	p4d = p4d_alloc(mm, pgd, address);
+......
+	vmf.pud = pud_alloc(mm, p4d, address);
+......
+	vmf.pmd = pmd_alloc(mm, vmf.pud, address);
+......
+	return handle_pte_fault(&vmf);
+}
+```
+
+到这里，终于看到了我们熟悉的 PGD、P4G、PUD、PMD、PTE，这就是前面讲页表的时候，讲述的四级页表的概念，因为暂且不考虑五级页表，我们暂时忽略 P4G。pgd_t 用于全局页目录项，pud_t 用于上层页目录项，pmd_t 用于中间页目录项，pte_t 用于直接页表项。
+
+**每个进程都有独立的地址空间，为了这个进程独立完成映射，每个进程都有独立的进程页表，这个页表的最顶级的 pgd 存放在 task_struct 中的 mm_struct 的 pgd 变量里面**。
+
+
+
+在一个进程新创建的时候，会调用 fork，对于内存的部分会调用 copy_mm，里面调用 dup_mm。
+
+在这里，除了创建一个新的 mm_struct，并且通过 memcpy 将它和父进程的弄成一模一样之外，我们还需要调用 mm_init 进行初始化。接下来，mm_init 调用 mm_alloc_pgd，分配全局页目录项，赋值给 mm_struct 的 pdg 成员变量。在mm_alloc_pgd 中调用了 pgd_alloc， pgd_alloc 里面除了分配 PDG 之外，还做了很重要的一个事情，就是调用 pgd_ctor。pgd_ctor 拷贝了对于 swapper_pg_dir 的引用。swapper_pg_dir 是内核页表的最顶级的全局页目录。
+
+一个进程的虚拟地址空间包含用户态和内核态两部分。为了从虚拟地址空间映射到物理页面，页表也分为用户地址空间的页表和内核页表，这就和上面遇到的 vmalloc 有关系了。在内核里面，映射靠内核页表，这里内核页表会拷贝一份到进程的页表。
+
+至此，一个进程 fork 完毕之后，有了内核页表，有了自己顶级的 pgd，但是对于用户地址空间来讲，还完全没有映射过。这需要等到这个进程在某个 CPU 上运行，并且对内存访问的那一刻了。
+
+当这个进程被调度到某个 CPU 上运行的时候，要调用 context_switch 进行上下文切换。对于内存方面的切换会调用 switch_mm_irqs_off，这里面会调用 load_new_mm_cr3。cr3 是 CPU 的一个寄存器，它会指向当前进程的顶级 pgd。如果 CPU 的指令要访问进程的虚拟内存，它就会自动从 cr3 里面得到 pgd 在物理内存的地址，然后根据里面的页表解析虚拟内存的地址为物理内存，从而访问真正的物理内存上的数据。这里需要注意两点：
+
+- 第一点，cr3 里面存放当前进程的顶级 pgd，这个是硬件的要求。cr3 里面需要存放 pgd 在物理内存的地址，不能是虚拟地址。因而 load_new_mm_cr3 里面会使用 __pa，将 mm_struct 里面的成员变量 pdg（mm_struct 里面存的都是虚拟地址）变为物理地址，才能加载到 cr3 里面去。
+- 第二点，用户进程在运行的过程中，访问虚拟内存中的数据，会被 cr3 里面指向的页表转换为物理地址后，才在物理内存中访问数据，这个过程都是在用户态运行的，地址转换的过程无需进入内核态。
+
+
+
+只有访问虚拟内存的时候，**发现没有映射过物理内存，页表也没有创建过，才触发缺页异常**。进入内核调用 do_page_fault，一直调用到 `__handle_mm_fault`，这才有了上面解析到这个函数的时候，我们看到的代码。既然原来没有创建过页表，那只好补上这一课。于是，`__handle_mm_fault` 调用 pud_alloc 和 pmd_alloc，来创建相应的页目录项，最后调用 handle_pte_fault 来创建页表项。
+
+
+
+**handle_pte_fault**
+
+```c
+static int handle_pte_fault(struct vm_fault *vmf)
+{
+	pte_t entry;
+......
+	vmf->pte = pte_offset_map(vmf->pmd, vmf->address);
+	vmf->orig_pte = *vmf->pte;
+......
+	if (!vmf->pte) {
+		if (vma_is_anonymous(vmf->vma))
+			return do_anonymous_page(vmf);
+		else
+			return do_fault(vmf);
+	}
+ 
+ 
+	if (!pte_present(vmf->orig_pte))
+		return do_swap_page(vmf);
+......
+}
+```
+
+这里面总的来说分了三种情况。
+
+- 如果 PTE，也就是页表项，从来没有出现过，那就是新映射的页。
+  - 如果是匿名页，就是第一种情况，应该映射到一个物理内存页，在这里调用的是 `do_anonymous_page`。
+  - 如果是映射到文件，调用的就是 `do_fault`，这是第二种情况
+- 如果 PTE 原来出现过，说明原来页面在物理内存中，后来换出到硬盘了，现在应该换回来，调用的是 `do_swap_page`。
+
+
+
+**do_anonymous_page**
+
+```c
+static int do_anonymous_page(struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	struct mem_cgroup *memcg;
+	struct page *page;
+	int ret = 0;
+	pte_t entry;
+......
+	if (pte_alloc(vma->vm_mm, vmf->pmd, vmf->address))
+		return VM_FAULT_OOM;
+......
+	page = alloc_zeroed_user_highpage_movable(vma, vmf->address);
+......
+	entry = mk_pte(page, vma->vm_page_prot);
+	if (vma->vm_flags & VM_WRITE)
+		entry = pte_mkwrite(pte_mkdirty(entry));
+ 
+ 
+	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
+			&vmf->ptl);
+......
+	set_pte_at(vma->vm_mm, vmf->address, vmf->pte, entry);
+......
+}
+```
+
+对于匿名页的映射，我们需要先通过 pte_alloc 分配一个页表项，然后通过 alloc_zeroed_user_highpage_movable 分配一个页。之后它会调用 alloc_pages_vma，并最终调用 `__alloc_pages_nodemask`。`__alloc_pages_nodemask `是伙伴系统的核心函数，专门用来分配物理页面的。
+
+do_anonymous_page 接下来要调用 mk_pte，将页表项指向新分配的物理页，set_pte_at 会将页表项塞到页表里面。
+
+
+
+**do_fault**
+
+第二种情况映射到文件 do_fault，最终会调用 __do_fault。
+
+```c
+static int __do_fault(struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	int ret;
+......
+	ret = vma->vm_ops->fault(vmf);
+......
+	return ret;
+}
+```
+
+这里调用了 struct vm_operations_struct vm_ops 的 fault 函数。还记得咱们上面用 mmap 映射文件的时候，对于 ext4 文件系统，vm_ops 指向了 ext4_file_vm_ops，也就是调用了 ext4_filemap_fault。
+
+```c
+static const struct vm_operations_struct ext4_file_vm_ops = {
+	.fault		= ext4_filemap_fault,
+	.map_pages	= filemap_map_pages,
+	.page_mkwrite   = ext4_page_mkwrite,
+};
+ 
+ 
+int ext4_filemap_fault(struct vm_fault *vmf)
+{
+	struct inode *inode = file_inode(vmf->vma->vm_file);
+......
+	err = filemap_fault(vmf);
+......
+	return err;
+}
+```
+
+ext4_filemap_fault 里面的逻辑我们很容易就能读懂。vm_file 就是咱们当时 mmap 的时候映射的那个文件，然后我们需要调用 filemap_fault。对于文件映射来说，一般这个文件会在物理内存里面有页面作为它的缓存，find_get_page 就是找那个页。如果找到了，就调用 do_async_mmap_readahead，预读一些数据到内存里面；如果没有，就跳到 no_cached_page。
+
+```c
+int filemap_fault(struct vm_fault *vmf)
+{
+	int error;
+	struct file *file = vmf->vma->vm_file;
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
+	pgoff_t offset = vmf->pgoff;
+	struct page *page;
+	int ret = 0;
+......
+	page = find_get_page(mapping, offset);
+	if (likely(page) && !(vmf->flags & FAULT_FLAG_TRIED)) {
+		do_async_mmap_readahead(vmf->vma, ra, file, page, offset);
+	} else if (!page) {
+		goto no_cached_page;
+	}
+......
+	vmf->page = page;
+	return ret | VM_FAULT_LOCKED;
+no_cached_page:
+	error = page_cache_read(file, offset, vmf->gfp_mask);
+......
+}
+```
+
+如果没有物理内存中的缓存页，那就调用 page_cache_read。在这里显示分配一个缓存页，将这一页加到 lru 表里面，然后在 address_space 中调用 address_space_operations 的 readpage 函数，将文件内容读到内存中。address_space 的作用咱们上面也介绍过了。readpage 调用的其实是 ext4_readpage，最后会调用 ext4_read_inline_page，这里面有部分逻辑和内存映射。
+
+在 ext4_read_inline_page 函数里，我们需要先调用 kmap_atomic，将物理内存映射到内核的虚拟地址空间，得到内核中的地址 kaddr。 我们在前面提到过 kmap_atomic，它是用来做临时内核映射的。本来把物理内存映射到用户虚拟地址空间，不需要在内核里面映射一把。但是，现在因为要从文件里面读取数据并写入这个物理页面，又不能使用物理地址，我们只能使用虚拟地址，这就需要在内核里面临时映射一把。临时映射后，ext4_read_inline_data 读取文件到这个虚拟地址。读取完毕后，我们取消这个临时映射 kunmap_atomic 就行了。
+
+
+
+**do_swap_page**
+
+之前我们讲过物理内存管理。如果长时间不用，就要换出到硬盘，也就是 swap，现在这部分数据又要访问了，我们还得想办法再次读到内存中来。
+
+```c
+nt do_swap_page(struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	struct page *page, *swapcache;
+	struct mem_cgroup *memcg;
+	swp_entry_t entry;
+	pte_t pte;
+......
+	entry = pte_to_swp_entry(vmf->orig_pte);
+......
+	page = lookup_swap_cache(entry);
+	if (!page) {
+		page = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE, vma,
+					vmf->address);
+......
+	} 
+......
+	swapcache = page;
+......
+	pte = mk_pte(page, vma->vm_page_prot);
+......
+	set_pte_at(vma->vm_mm, vmf->address, vmf->pte, pte);
+	vmf->orig_pte = pte;
+......
+	swap_free(entry);
+......
+}
+```
+
+函数会先查找 swap 文件有没有缓存页。如果没有，就调用 swapin_readahead，将 swap 文件读到内存中来，形成内存页，并通过 mk_pte 生成页表项。set_pte_at 将页表项插入页表，swap_free 将 swap 文件清理。因为重新加载回内存了，不再需要 swap 文件了。
+
+swapin_readahead 会最终调用 swap_readpage，在这里，我们看到了熟悉的 readpage 函数，也就是说读取普通文件和读取 swap 文件，过程是一样的，同样需要用 kmap_atomic 做临时映射。
+
+
+
+通过上面复杂的过程，用户态缺页异常处理完毕了。物理内存中有了页面，页表也建立好了映射。接下来，用户程序在虚拟内存空间里面，可以通过虚拟地址顺利经过页表映射的访问物理页面上的数据了。
+
+为了加快映射速度，我们不需要每次从虚拟地址到物理地址的转换都走一遍页表。
+
+页表一般都很大，只能存放在内存中。操作系统每次访问内存都要折腾两步，先通过查询页表得到物理地址，然后访问该物理地址读取指令、数据。
+
+为了提高映射速度，我们引入了**TLB**（Translation Lookaside Buffer），我们经常称为**快表**，专门用来做地址映射的硬件设备。它不在内存中，可存储的数据比较少，但是比内存要快。所以，我们可以想象，TLB 就是页表的 Cache，其中存储了当前最可能被访问到的页表项，其内容是部分页表项的一个副本。
+
+有了 TLB 之后，地址映射的过程就像图中画的。我们先查块表，块表中有映射关系，然后直接转换为物理地址。如果在 TLB 查不到映射关系时，才会到内存中查询页表。
+
+
+
+> #### 总结
+
+用户态的内存映射机制包含以下几个部分。
+
+- 用户态内存映射函数 mmap，包括用它来做匿名映射和文件映射。
+- 用户态的页表结构，存储位置在 mm_struct 中。
+- 在用户态访问没有映射的内存会引发缺页异常，分配物理页表、补齐页表。如果是匿名映射则分配物理内存；如果是 swap，则将 swap 文件读入；如果是文件映射，则将文件读入。
+
+![下载](截图/Linux/内存映射整体流程.jpeg)
