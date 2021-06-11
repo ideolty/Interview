@@ -3884,7 +3884,9 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 
 ## 内存映射原理
 
-### mmap
+### 用户态内存映射
+
+#### mmap
 
 每一个进程都有一个列表 vm_area_struct，指向虚拟地址空间的不同的内存块，这个变量的名字叫**mmap**。
 
@@ -4068,7 +4070,7 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 
 
 
-### 用户态缺页异常
+#### 用户态缺页异常
 
 一旦开始访问虚拟内存的某个地址，如果发现并没有对应的物理页，那就触发缺页中断，调用 do_page_fault。
 
@@ -4372,3 +4374,163 @@ swapin_readahead 会最终调用 swap_readpage，在这里，我们看到了熟�
 - 在用户态访问没有映射的内存会引发缺页异常，分配物理页表、补齐页表。如果是匿名映射则分配物理内存；如果是 swap，则将 swap 文件读入；如果是文件映射，则将文件读入。
 
 ![下载](截图/Linux/内存映射整体流程.jpeg)
+
+
+
+### 内核态内存映射
+
+- 内核态内存映射函数 vmalloc、kmap_atomic 是如何工作的；
+- 内核态页表是放在哪里的，如何工作的？swapper_pg_dir 是怎么回事；
+- 出现了内核态缺页异常应该怎么办？
+
+
+
+#### 内核页表
+
+和用户态页表不同，在系统初始化的时候，就要创建内核页表了。
+
+从内核页表的根 swapper_pg_dir 开始找线索，swapper_pg_dir 指向内核最顶级的目录 pgd，同时出现的还有几个页表目录。64 位系统的虚拟地址空间的布局，其中 XXX_ident_pgt 对应的是直接映射区，XXX_kernel_pgt 对应的是内核代码区，XXX_fixmap_pgt 对应的是固定映射区。它们是在汇编语言的文件里面的 arch\x86\kernel\head_64.S 进行的初始化。
+
+*……省略一大段初始化流程*
+
+
+
+用户态进程页表，会有 mm_struct 指向进程顶级目录 pgd，对于内核来讲，也定义了一个 mm_struct，指向 swapper_pg_dir。
+
+```c
+struct mm_struct init_mm = {
+	.mm_rb		= RB_ROOT,
+	.pgd		= swapper_pg_dir,
+	.mm_users	= ATOMIC_INIT(2),
+	.mm_count	= ATOMIC_INIT(1),
+	.mmap_sem	= __RWSEM_INITIALIZER(init_mm.mmap_sem),
+	.page_table_lock =  __SPIN_LOCK_UNLOCKED(init_mm.page_table_lock),
+	.mmlist		= LIST_HEAD_INIT(init_mm.mmlist),
+	.user_ns	= &init_user_ns,
+	INIT_MM_CONTEXT(init_mm)
+};
+```
+
+定义完了内核页表，接下来是初始化内核页表，在系统启动的时候 start_kernel 会调用 setup_arch。
+
+```c
+void __init setup_arch(char **cmdline_p)
+{
+	/*
+	 * copy kernel address range established so far and switch
+	 * to the proper swapper page table
+	 */
+	clone_pgd_range(swapper_pg_dir     + KERNEL_PGD_BOUNDARY,
+			initial_page_table + KERNEL_PGD_BOUNDARY,
+			KERNEL_PGD_PTRS);
+ 
+ 
+	load_cr3(swapper_pg_dir);
+	__flush_tlb_all();
+......
+	init_mm.start_code = (unsigned long) _text;
+	init_mm.end_code = (unsigned long) _etext;
+	init_mm.end_data = (unsigned long) _edata;
+	init_mm.brk = _brk_end;
+......
+	init_mem_mapping();
+......
+}
+```
+
+在 setup_arch 中，load_cr3(swapper_pg_dir) 说明内核页表要开始起作用了，并且刷新了 TLB，初始化 init_mm 的成员变量，最重要的就是 init_mem_mapping。最终它会调用 kernel_physical_mapping_init。在 kernel_physical_mapping_init 里，我们先通过 __va 将物理地址转换为虚拟地址，然后在创建虚拟地址和物理地址的映射页表。
+
+
+
+#### vmalloc 和 kmap_atomic 原理
+
+在用户态可以通过 malloc 函数分配内存，当然 malloc 在分配比较大的内存的时候，底层调用的是 mmap，当然也可以直接通过 mmap 做内存映射，在内核里面也有相应的函数。
+
+在虚拟地址空间里面，有个 vmalloc 区域，从 VMALLOC_START 开始到 VMALLOC_END，可以用于映射一段物理内存。
+
+```c
+/**
+ *	vmalloc  -  allocate virtually contiguous memory
+ *	@size:		allocation size
+ *	Allocate enough pages to cover @size from the page level
+ *	allocator and map them into contiguous kernel virtual space.
+ *
+ *	For tight control over page level allocator and protection flags
+ *	use __vmalloc() instead.
+ */
+void *vmalloc(unsigned long size)
+{
+	return __vmalloc_node_flags(size, NUMA_NO_NODE,
+				    GFP_KERNEL);
+}
+ 
+ 
+static void *__vmalloc_node(unsigned long size, unsigned long align,
+			    gfp_t gfp_mask, pgprot_t prot,
+			    int node, const void *caller)
+{
+	return __vmalloc_node_range(size, align, VMALLOC_START, VMALLOC_END,
+				gfp_mask, prot, 0, node, caller);
+}
+```
+
+
+
+再来看内核的临时映射函数 kmap_atomic 的实现。从下面的代码我们可以看出，如果是 32 位有高端地址的，就需要调用 set_pte 通过内核页表进行临时映射；如果是 64 位没有高端地址的，就调用 page_address，里面会调用 lowmem_page_address。其实低端内存的映射，会直接使用 __va 进行临时映射。
+
+```c
+void *kmap_atomic_prot(struct page *page, pgprot_t prot)
+{
+......
+	if (!PageHighMem(page))
+		return page_address(page);
+......
+	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
+	set_pte(kmap_pte-idx, mk_pte(page, prot));
+......
+	return (void *)vaddr;
+}
+ 
+ 
+void *kmap_atomic(struct page *page)
+{
+	return kmap_atomic_prot(page, kmap_prot);
+}
+ 
+ 
+static __always_inline void *lowmem_page_address(const struct page *page)
+{
+	return page_to_virt(page);
+}
+ 
+ 
+#define page_to_virt(x)	__va(PFN_PHYS(page_to_pfn(x)
+```
+
+
+
+#### 内核态缺页异常
+
+kmap_atomic 和 vmalloc 不同。kmap_atomic 发现，没有页表的时候，就直接创建页表进行映射了。而 vmalloc 没有，它只分配了内核的虚拟地址。所以，访问它的时候，会产生缺页异常。
+
+内核态的缺页异常还是会调用 do_page_fault，但是会走到用户态缺页异常中没有解析的那部分 vmalloc_fault。这个函数并不复杂，主要用于关联内核页表项。
+
+
+
+## 总结
+
+整个内存管理的体系串起来。
+
+- 物理内存根据 NUMA 架构分节点。每个节点里面再分区域。每个区域里面再分页。
+
+- 物理页面通过伙伴系统进行分配。分配的物理页面要变成虚拟地址让上层可以访问，kswapd 可以根据物理页面的使用情况对页面进行换入换出。
+
+- 对于内存的分配需求，可能来自内核态，也可能来自用户态。
+- 对于内核态，kmalloc 在分配大内存的时候，以及 vmalloc 分配不连续物理页的时候，直接使用伙伴系统，分配后转换为虚拟地址，访问的时候需要通过内核页表进行映射。
+- 对于 kmem_cache 以及 kmalloc 分配小内存，则使用 slub 分配器，将伙伴系统分配出来的大块内存切成一小块一小块进行分配。
+- kmem_cache 和 kmalloc 的部分不会被换出，因为用这两个函数分配的内存多用于保持内核关键的数据结构。内核态中 vmalloc 分配的部分会被换出，因而当访问的时候，发现不在，就会调用 do_page_fault。
+  - 对于用户态的内存分配，或者直接调用 mmap 系统调用分配，或者调用 malloc。调用 malloc 的时候，如果分配小的内存，就用 sys_brk 系统调用；如果分配大的内存，还是用 sys_mmap 系统调用。正常情况下，用户态的内存都是可以换出的，因而一旦发现内存中不存在，就会调用 do_page_fault。
+
+
+
+![下载](截图/Linux/内存总结图.png)
