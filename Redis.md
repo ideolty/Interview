@@ -578,7 +578,9 @@ redis中当内存超过限制时，按照配置的策略，淘汰掉相应的key
 3. volatile-random：从已设置过期时间的数据集（server.db[i].expires）中任意选择数据淘汰
 4. allkeys-lru：从数据集（server.db[i].dict）中挑选最近最少使用的数据淘汰
 5. allkeys-random：从数据集（server.db[i].dict）中任意选择数据淘汰
-6. no-enviction：禁止淘汰数据， 不移除任何key，只是返回一个写错误 ，默认选项
+6. no-enviction：禁止淘汰数据， 不移除任何key，只是返回一个写错误 ，**默认选项**
+
+[^问题]: 内存淘汰，是直接把数据删除，还是把这块数据置换到硬盘？感觉应该是直接删除
 
 
 

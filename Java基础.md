@@ -139,7 +139,7 @@ Java类实现interface使用implements关键词，继承abstract class则是使�
 
 
 
-### 以字节为单位的输入流
+**以字节为单位的输入流**
 
 ![以字节为单位的输入流的框架图](截图/Java基础/以字节为单位的输入流的框架图.jpg)
 
@@ -158,7 +158,7 @@ Java类实现interface使用implements关键词，继承abstract class则是使�
 
 
 
-### 以字节为单位的输出流
+**以字节为单位的输出流**
 
 ![以字节为单位的输出流](截图/Java基础/以字节为单位的输出流.jpg)
 
@@ -185,7 +185,7 @@ Java类实现interface使用implements关键词，继承abstract class则是使�
 
 
 
-### 以字符为单位的输入流
+**以字符为单位的输入流**
 
 ![以字符为单位的输入流框架图](截图/Java基础/以字符为单位的输入流框架图.jpg)
 
@@ -208,7 +208,7 @@ Java类实现interface使用implements关键词，继承abstract class则是使�
 
 
 
-### 以字符为单位的输出流
+**以字符为单位的输出流**
 
 ![以字符为单位的输出流的框架图](截图/Java基础/以字符为单位的输出流的框架图.jpg)
 
@@ -276,7 +276,7 @@ Java类实现interface使用implements关键词，继承abstract class则是使�
 
 
 
-在Linux中，首先可以创建一个socket，可以拿到对应的文件描述符fd号，之后代用 `bind(fd,port)` 把这个socket绑定到具体的端口上，之后再调用listen方法，对端口进行监听，之后调用accept方法，尝试拿到客户端的fd，此时是堵塞在这里的。当有客户端连上来之后，可以拿到客户端的fd，之后尝试从fd6中读取他的输出流，recvfrom也是堵塞的，此时如果有另外的一个客户端尝试连接，那么是无法连上来的
+在Linux中，首先可以创建一个socket，可以拿到对应的文件描述符fd号，之后调用 `bind(fd,port)` 把这个socket绑定到具体的端口上，之后再调用listen方法，对端口进行监听，之后调用accept方法，尝试拿到客户端的fd，此时是堵塞在这里的。当有客户端连上来之后，可以拿到客户端的fd，之后尝试从fd6中读取他的输出流，recvfrom也是堵塞的，此时如果有另外的一个客户端尝试连接，那么是无法连上来的
 
 <img src="截图/Java基础/BI模型.png" alt="image-20210507204544683" style="zoom:67%;" />
 
@@ -484,7 +484,7 @@ MappedByteBuffer：它将文件按照指定大小直接映射为内存区域，�
 
 
 
-**数垃圾收集**：
+**垃圾收集**：
 
 - 大多数垃圾收集过程中，都不会主动收集Direct Buffer，它的垃圾收集过程，就是基于Cleaner（一个内部实现）和幻象引用 （PhantomReference）机制，其本身不是public类型，内部实现了一个Deallocator负责销毁的逻辑。对它的销毁往往要拖到full GC的时候，所以使用不当很容易导致OutOfMemoryError。 
 - 对于Direct Buffer的回收，有几个建议： 
@@ -516,6 +516,27 @@ jcmd <pid> VM.native_memory detail.dif
 
 ## 零拷贝
 
+零拷贝是指避免在用户态(User-space) 与内核态(Kernel-space) 之间来回拷贝数据的技术。
+
+<img src="截图/Java基础/传统网络io模型.png" alt="640?wx_fmt=gif" style="zoom: 100%;" />
+
+1. read()调用导致上下文从用户态切换到内核态。内核通过sys_read()（或等价的方法）从文件读取数据。DMA引擎执行第一次拷贝：从文件读取数据并存储到内核空间的缓冲区。
+2. 请求的数据从内核的读缓冲区拷贝到用户缓冲区，然后read()方法返回。read()方法返回导致上下文从内核态切换到用户态。现在待读取的数据已经存储在用户空间内的缓冲区。至此，完成了一次IO的读取过程。
+3. send()调用导致上下文从用户态切换到内核态。第三次拷贝数据从用户空间重新拷贝到内核空间缓冲区。但是，这一次，数据被写入一个不同的缓冲区，一个与目标套接字相关联的缓冲区。
+4. send()系统调用返回导致第四次上下文切换。当DMA引擎将数据从内核缓冲区传输到协议引擎缓冲区时，第四次拷贝是独立且异步的。
+   
+
+![640?wx_fmt=gif](截图/Java基础/io零拷贝流程.png)
+
+NIO的零拷贝由transferTo方法实现。transferTo方法将数据从FileChannel对象传送到可写的字节通道（如Socket Channel等）。在transferTo方法内部实现中，由native方法transferTo0来实现，它依赖底层操作系统的支持。在UNIX和Linux系统中，调用这个方法会引起sendfile()系统调用，实现了数据直接从内核的读缓冲区传输到套接字缓冲区，避免了用户态(User-space) 与内核态(Kernel-space) 之间的数据拷贝。
+
+使用NIO零拷贝，流程简化为两步：
+
+1. transferTo方法调用触发DMA引擎将文件上下文信息拷贝到内核读缓冲区，接着内核将数据从内核缓冲区拷贝到与套接字相关联的缓冲区。
+2. DMA引擎将数据从内核套接字缓冲区传输到协议引擎（第三次数据拷贝）。
+
+
+
 > #### Java有几种文件拷贝方式？
 
 - 利用java.io类库，直接为源文件构建一个FileInputStream读取，然后再为目标文件构建一个FileOutputStream，完成写入工作。
@@ -525,6 +546,20 @@ jcmd <pid> VM.native_memory detail.dif
 - 利用java.nio类库提供的transferTo或transferFrom方法实现。
 
   在Linux和Unix上，则会使用到零拷贝技术，数据传输并不需要用户态参与，省去了上下文切换的开销和不必要的内存拷贝，进而可能提高应用 拷贝性能。
+
+
+
+# 直接内存映射
+
+Linux提供的mmap系统调用, 它可以将一段用户空间内存映射到内核空间, 当映射成功后, 用户对这段内存区域的修改可以直接反映到内核空间；同样地， 内核空间对这段区域的修改也直接反映用户空间。正因为有这样的映射关系, 就不需要在用户态(User-space)与内核态(Kernel-space) 之间拷贝数据， 提高了数据传输的效率，这就是内存直接映射技术。
+
+
+
+**NIO的直接内存映射**
+
+JDK1.4加入了NIO机制和直接内存，目的是**防止Java堆和Native堆之间数据复制**带来的性能损耗，此后NIO可以使用Native的方式直接在 Native堆分配内存。
+
+
 
 
 
