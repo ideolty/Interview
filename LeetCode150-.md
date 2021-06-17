@@ -756,6 +756,38 @@ class Solution {
 
 
 
+# [203. 移除链表元素](https://leetcode-cn.com/problems/remove-linked-list-elements/)
+
+给你一个链表的头节点 `head` 和一个整数 `val` ，请你删除链表中所有满足 `Node.val == val` 的节点，并返回 **新的头节点** 。
+
+非常标准的简单题，链表操作上手。
+
+
+
+```java
+class Solution {
+    public ListNode removeElements(ListNode head, int val) {
+        if (head == null) return null;
+        ListNode first = new ListNode();
+        first.next = head;
+
+        ListNode pre = first;
+        ListNode cur = head;
+        while (cur != null){
+            if (cur.val == val){
+                pre.next = cur.next;
+            }else {
+                pre = cur;
+            }
+            cur = cur.next;
+        }
+        return first.next;
+    }
+}
+执行用时：1 ms, 在所有 Java 提交中击败了99.70% 的用户
+内存消耗：39.4 MB, 在所有 Java 提交中击败了29.45% 的用户
+```
+
 
 
 
