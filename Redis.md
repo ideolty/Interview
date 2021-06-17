@@ -969,6 +969,79 @@ AOF缓存区的同步文件策略由参数appendfsync控制，各个值的含义
 
 
 
+### slots 迁移过程
+
+将一个Redis节点上指定的slot下的所有key迁移到其他redis节点上，需要两步：
+
+1. 先获取这个slot下所有的key
+2. 对每个key发送迁移命令
+
+Redis cluster直接使用 **migrate 命令**进行key的迁移，这个命令是**同步阻塞**的，redis是单线程的，当migrate过程耗时太久（比如网络慢、迁移bigkey）时，会导致主线程无法处理用户请求。
+
+
+
+**slot迁移的难点**
+
+- 如使用同步阻塞的方式，bigkey或网络慢，会阻塞主线程正常服务
+- 对bigkey迁移需要特殊处理，否则bigkey的序列号、发送、反序列号时，都可能导致源redis实例和目标redis实例主线程阻塞。
+- 单个key的迁移过程需要保证原子性，即要么一个key全部迁移成功，要么全部迁移失败，不能存在中间状态
+- 对迁移中slot的读写出出力，即一个slot如果正处于迁移过程中，其中的key（已经迁移走、迁移中、或等待迁移）是否可以被正常读写。
+
+
+
+> #### Redis Cluster的slot迁移实现
+
+**slot分配**
+
+redis-cluster为了支持slot迁移，改造引擎加入了key和slot的映射关系。Redis-cluster使用rax树来维护key和slot的映射关系。因此在新建集群、集群扩缩容的时候，都会涉及到slot分配、删除等操作，这些操作通过以下命令实现：
+
+- cluster addslots [slot …] 将一个或多个槽（slot）指派（assign）给当前节点。
+- cluster delslots [slot …] 移除一个或多个槽对当前节点的指派。
+- cluster flushslots 移除指派给当前节点的所有槽，让当前节点变成一个没有指派任何槽的节点。
+- cluster setslot node <node_id> 将槽 slot 指派给 node_id 指定的节点，如果槽已经指派给另一个节点，那么先让另一个节点删除该槽>，然后再进行指派。
+  
+
+**key-slot操作**
+
+一旦key和slot的映射关系建立好，就可以执行key相关的slot命令，redis-cluster提供了以下命令：
+
+- cluster slot 计算键 key 应该被放置在哪个槽上。
+- cluster countkeysinslot 返回槽 slot 目前包含的键值对数量。
+- cluster getkeysinslot 返回 count 个 slot 槽中的键。
+
+
+
+**slot的迁移流程**
+
+- 对目标节点发送 cluster setslot importing 命令，让目标节点准备导入槽的数据。
+- 对源节点发送 cluster setslot migrating 命令，让源节点准备迁出槽的数据。
+- 源节点循环执行 cluster getkeysinslot 命令，获取count个属于槽slot的键。
+- 在源节点上执行 migrate “” 0 keys <keys…> 命令，把获取的键通过流水线（pipeline）机制批量迁移到目标节点。
+- 重复执行步骤3和步骤4直到槽下所有的键值数据迁移到目标节点。
+- 向集群内所有主节点发送cluster setslot node 命令，通知槽分配给目标节点。为了保证槽节点映射变更及时传播，需要遍历发送给所有主节点更新被迁移的槽指向新节点。
+  
+
+**key迁移的原子性**
+
+由于migrate命令是同步阻塞的（同步发送同步接收），迁移过程中**会阻塞该引擎上的所有key的读写**，只有在迁移响应成功之后，才会将本地的key删除，因此在redis cluster中**迁移是原子的**。
+
+
+
+**迁移过程中的读写冲突**
+
+因为migrate命令是同步阻塞的，因此不会存在一个key正在被迁移又同时被读写的情况，但由于一个slot下可能有部分key被迁移完成，部分key正在等待迁移的情况，因此如果读写的key所属的slot正在被迁移，redis-cluster做如下处理：
+
+- 客户端根据本地slots缓存发送命令到源节点，如果存在键对象则直接指向并返回结果给客户端。
+- 如果key对象不存在，但key所在的slot属于本节点，则可能存在于目标节点，这时源节点会回复ASK重定向异常。例如如：error）ASK :。
+- 客户端从ASK重定向异常提取出目标节点的信息，发送asking命令到目标节点打开客户端连接标识，再执行key命令。如果存在则执行，不存在则返回不存在信息。
+- 如果key所在的slot不属于本节点，则返回MOVE重定向。格式如下：（error）ASK :。
+- 客户端从ASK重定向异常提取出目标节点信息，发送asking命令到目标节点打开客户端连接标识，再执行键命令。如果存在则执行，不存在则返回不存在信息
+  
+
+
+
+
+
 ### 节点通信机制
 
 **端口**
@@ -1150,7 +1223,7 @@ Redis将所有数据放在内存中，内存的响应时长大约为100纳秒，
 
   - 列出前100名高分选手
 - 列出某用户当前的全球排名
-  
+
 直接使用ZSET`  ZADD leaderboard  <score>  <username> `
 
 
