@@ -4893,13 +4893,23 @@ jdk11
 
 > #### ThreadLocal 内存泄露问题 / 为什么ThreadLocal中的entry是一个软引用？
 
+这里需要明白的是 ThreadLocalMap 底层是一个 Entry 数组，Entry 里面存储了key 和 value。
+
 假如Entry是一个强引用，那么由于在ThreadLocalMap对象中ThreadLocal对象是作为一个key存在的，一直保持着这个引用，那么你gc一直都无法回收，哪怕你把ThreadLocal对象设置为了null，直到这个ThreadLocalMap不再使用，而ThreadLocalMap与线程对象绑定，并不是所有的线程都有stop的时候，有的守护线程会一直运行，这样就会导致内存泄露。
 
 如果使用弱引用，当你想要清除ThreadLocal时，直接给ThreadLocal对象赋值null，gc来了之后，发现弱引用就会直接干掉。
 
+
+
 **那为什么会内存泄露呢？**
 
-因为当弱引entry的 key 被gc 之后，之前的key就变成了null，那么你的value就再也访问不到了，就泄露了。所以用完就需要remove
+因为当弱引entry的 key 被gc 之后，之前的key就变成了null，那么你的value就再也访问不到了，
+
+但如果当前线程再迟迟不结束的话，这些key为null的Entry的value就会一直存在一条强引用链：
+
+`Thread Ref -> Thread -> ThreaLocalMap -> Entry -> value`
+
+就泄露了。所以用完就需要remove
 
 
 
