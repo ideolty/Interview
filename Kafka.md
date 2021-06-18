@@ -168,7 +168,25 @@ ISR 副本集合。ISR 中的副本都是与 Leader 同步的副本，相反，�
 
 
 
+## log 结构
 
+![下载](截图/Kafka/kafka 结构图.jpg)
+
+- 每个 topic 由很多个 partition 组成，由 key hash 值分配到不同的 partition，每个 partition 拥有多个副本 replica 做主从，确保数据的安全性。
+
+- 每个 partition 或者 replica 由 log 存储数据，log 由 logsegment 组成，每个 logsegment 由索引文件和数据文件组成。
+
+  ![下载](截图/Kafka/LogManager.jpg)
+
+  ![下载](截图/Kafka/logsegment.jpg)
+
+- 当在 Log 中需要查找获取一条消息时，会根据偏移首先定位到处于哪个 logsegment 文件，再根据索引文件定位，Logsegment 是由跳跃表组成的，便于搜索，再从数据文件读取消息；
+
+  ![下载](截图/Kafka/logSegment跳表.jpg)
+
+- 索引文件由 K,V 组成，K 是相对文件中第几条消息，V 是文件中的绝对位置，索引文件可以用来做二分查找，从索引文件中找到位置之后，再从数据文件中顺序查找，具体那条消息数据，为了避免索引文件太大，会相隔一定字节才写入一条索引；
+
+- 每个 partition 会有多个 replica 进行同步，一个 Leader 多个 follower，这些副本主从地位是由 leader  controller 负责处理，只有 leader replica 才能处理请求，其它 follower 同步数据。
 
 
 
