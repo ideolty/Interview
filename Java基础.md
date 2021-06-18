@@ -916,7 +916,7 @@ public MethodAccessor newMethodAccessor(Method var1) {
 }
 ```
 
-动态实现和本地实现相比，其运行效率要快上 20 倍 。这是因为动态实现无需经过 Java 到 C++ 再到 Java 的切换。
+动态实现和本地实现相比，其运行效率要快上 20 倍 。这是因为**动态实现无需经过 Java 到 C++ 再到 Java 的切换**。
 
 但由于生成字节码十分耗时，仅调用一次的话，反而是本地实现要快 上 3 到 4 倍 [3]。 考虑到许多反射调用仅会执行一次，Java 虚拟机设置了一个阈值 15（可以通过 - Dsun.reflect.inflationThreshold= 来调整），当某个反射调用的调用次数在 15 之下时，采用本地实现；当达到 15 时，便开始动态生成字节码，并将委派实现的委派对象切换至动态实现， 这个过程我们称之为 Inflation。
 
@@ -953,7 +953,7 @@ Method.invoke
 
 
 
-## Class.forName 与ClassLoader区别
+## Class.forName 与 ClassLoader区别
 
 在java中Class.forName()和ClassLoader都可以对类进行加载。ClassLoader就是遵循**双亲委派模型**最终调用启动类加载器的类加载器，实现的功能是“通过一个类的全限定名来获取描述此类的二进制字节流”，获取到二进制流后放到JVM中。Class.forName()方法实际上也是调用的CLassLoader来实现的。
 
