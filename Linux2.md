@@ -1564,11 +1564,197 @@ frame 的类型是 rt_sigframe。frame 的意思是帧。这个 frame 就是一�
 
 
 
-
-
-
-
 ## 管道
+
+### **匿名管道**
+
+管道的创建，需要通过 `int pipe(int fd[2])` 这个系统调用。这里创建了一个管道 pipe，返回了两个文件描述符，这表示管道的两端，一个是管道的读取端描述符 fd[0]，另一个是管道的写入端描述符 fd[1]。
+
+在内核中，主要的逻辑在 pipe2 系统调用中。
+
+```c
+SYSCALL_DEFINE1(pipe, int __user *, fildes)
+{
+	return sys_pipe2(fildes, 0);
+}
+ 
+SYSCALL_DEFINE2(pipe2, int __user *, fildes, int, flags)
+{
+	struct file *files[2];
+	int fd[2];
+	int error;
+ 
+	error = __do_pipe_flags(fd, files, flags);
+	if (!error) {
+		if (unlikely(copy_to_user(fildes, fd, sizeof(fd)))) {
+......
+			error = -EFAULT;
+		} else {
+			fd_install(fd[0], files[0]);
+			fd_install(fd[1], files[1]);
+		}
+	}
+	return error;
+}
+```
+
+这里面要创建一个数组 files，用来存放管道的两端的打开文件，另一个数组 fd 存放管道的两端的文件描述符。如果调用 __do_pipe_flags 没有错误，那就调用 fd_install，**将两个 fd 和两个 struct file 关联起来**。这一点和打开一个文件的过程很像了。`__do_pipe_flags`。这里面调用了 create_pipe_files，然后生成了两个 fd。fd[0] 是用于读的，fd[1] 是用于写的。
+
+```c
+static int __do_pipe_flags(int *fd, struct file **files, int flags)
+{
+	int error;
+	int fdw, fdr;
+......
+	error = create_pipe_files(files, flags);
+......
+	error = get_unused_fd_flags(flags);
+......
+	fdr = error;
+ 
+	error = get_unused_fd_flags(flags);
+......
+	fdw = error;
+ 
+	fd[0] = fdr;
+	fd[1] = fdw;
+	return 0;
+......
+}
+```
+
+创建一个管道，大部分的逻辑其实都是在 create_pipe_files 函数里面实现的。命名管道是创建在文件系统上的，从这里我们可以看出，匿名管道，也是创建在文件系统上的，只不过是一种特殊的文件系统，**创建一个特殊的文件，对应一个特殊的 inode，**就是这里面的 get_pipe_inode。
+
+```c
+int create_pipe_files(struct file **res, int flags)
+{
+	int err;
+	struct inode *inode = get_pipe_inode();
+	struct file *f;
+	struct path path;
+......
+	path.dentry = d_alloc_pseudo(pipe_mnt->mnt_sb, &empty_name);
+......
+	path.mnt = mntget(pipe_mnt);
+ 
+	d_instantiate(path.dentry, inode);
+ 
+	f = alloc_file(&path, FMODE_WRITE, &pipefifo_fops);
+......
+	f->f_flags = O_WRONLY | (flags & (O_NONBLOCK | O_DIRECT));
+	f->private_data = inode->i_pipe;
+ 
+	res[0] = alloc_file(&path, FMODE_READ, &pipefifo_fops);
+......
+	path_get(&path);
+	res[0]->private_data = inode->i_pipe;
+	res[0]->f_flags = O_RDONLY | (flags & O_NONBLOCK);
+	res[1] = f;
+	return 0;
+......
+}
+```
+
+
+
+```c
+static struct file_system_type pipe_fs_type = {
+	.name		= "pipefs",
+	.mount		= pipefs_mount,
+	.kill_sb	= kill_anon_super,
+};
+ 
+static int __init init_pipe_fs(void)
+{
+	int err = register_filesystem(&pipe_fs_type);
+ 
+	if (!err) {
+		pipe_mnt = kern_mount(&pipe_fs_type);
+	}
+......
+}
+ 
+static struct inode * get_pipe_inode(void)
+{
+	struct inode *inode = new_inode_pseudo(pipe_mnt->mnt_sb);
+	struct pipe_inode_info *pipe;
+......
+	inode->i_ino = get_next_ino();
+ 
+	pipe = alloc_pipe_info();
+......
+	inode->i_pipe = pipe;
+	pipe->files = 2;
+	pipe->readers = pipe->writers = 1;
+	inode->i_fop = &pipefifo_fops;
+	inode->i_state = I_DIRTY;
+	inode->i_mode = S_IFIFO | S_IRUSR | S_IWUSR;
+	inode->i_uid = current_fsuid();
+	inode->i_gid = current_fsgid();
+	inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(inode);
+ 
+	return inode;
+......
+}
+```
+
+从 get_pipe_inode 的实现，我们可以看出，匿名管道来自一个特殊的文件系统 pipefs。这个文件系统被挂载后，我们就得到了 `struct vfsmount *pipe_mnt`。然后挂载的文件系统的 superblock 就变成了：`pipe_mnt->mnt_sb`。我们从 new_inode_pseudo 函数创建一个 inode。这里面开始填写 Inode 的成员，这里和文件系统的很像。这里值得注意的是 struct pipe_inode_info，这个结构里面有个成员是 struct pipe_buffer *bufs。我们可以知道，**所谓的匿名管道，其实就是内核里面的一串缓存**。
+
+另外一个需要注意的是 pipefifo_fops，将来我们对于文件描述符的操作，在内核里面都是对应这里面的操作。
+
+```c
+const struct file_operations pipefifo_fops = {
+	.open		= fifo_open,
+	.llseek		= no_llseek,
+	.read_iter	= pipe_read,
+	.write_iter	= pipe_write,
+	.poll		= pipe_poll,
+	.unlocked_ioctl	= pipe_ioctl,
+	.release	= pipe_release,
+	.fasync		= pipe_fasync,
+};
+```
+
+
+
+------
+
+回到 create_pipe_files 函数，创建完了 inode，还需创建一个 dentry 和他对应。dentry 和 inode 对应好了，我们就要开始创建 struct file 对象了。先创建用于写入的，对应的操作为 pipefifo_fops；再创建读取的，对应的操作也为 pipefifo_fops。然后把 private_data 设置为 pipe_inode_info。这样从 struct file 这个层级上，就能直接操作底层的读写操作。
+
+至此，一个匿名管道就创建成功了。如果对于 fd[1] 写入，调用的是 pipe_write，向 pipe_buffer 里面写入数据；如果对于 fd[0] 的读入，调用的是 pipe_read，也就是从 pipe_buffer 里面读取数据。
+
+但是这个时候，两个文件描述符都是在一个进程里面的，并没有起到进程间通信的作用，怎么样才能使得管道是跨两个进程的呢？还记得创建进程调用的 fork 吗？在这里面，创建的子进程会复制父进程的 struct files_struct，在这里面 fd 的数组会复制一份，但是 **fd 指向的 struct file 对于同一个文件还是只有一份**，这样就做到了，**两个进程各有两个 fd 指向同一个 struct file 的模式**，两个进程就可以通过各自的 fd 写入和读取同一个管道文件实现跨进程通信了。
+
+<img src="截图/Linux/父子进程匿名管道.png" alt="下载" style="zoom: 33%;" />
+
+由于管道只能一端写入，另一端读出，所以上面的这种模式会造成混乱，因为父进程和子进程都可以写入，也都可以读出，通常的方法是父进程关闭读取的 fd，只保留写入的 fd，而子进程关闭写入的 fd，只保留读取的 fd，如果需要双向通行，则应该创建两个管道。
+
+------
+
+在 shell 里面的不是这样的。在 shell 里面运行 A|B 的时候，A 进程和 B 进程都是 shell 创建出来的子进程，A 和 B 之间不存在父子关系。
+
+我们首先从 shell 创建子进程 A，然后在 shell 和 A 之间建立一个管道，其中 shell 保留读取端，A 进程保留写入端，然后 shell 再创建子进程 B。这又是一次 fork，所以，shell 里面保留的读取端的 fd 也被复制到了子进程 B 里面。这个时候，相当于 shell 和 B 都保留读取端，只要 shell 主动关闭读取端，就变成了一管道，写入端在 A 进程，读取端在 B 进程。
+
+接下来要做的事情就是，将这个管道的两端和输入输出关联起来。这就要用到 dup2 系统调用了。
+
+```c
+int dup2(int oldfd, int newfd);
+```
+
+这个系统调用，将老的文件描述符赋值给新的文件描述符，让 newfd 的值和 oldfd 一样。在 files_struct 里面，有这样一个表，下标是 fd，内容指向一个打开的文件 struct file。在这个表里面，前三项是定下来的，其中第零项 STDIN_FILENO 表示标准输入，第一项 STDOUT_FILENO 表示标准输出，第三项 STDERR_FILENO 表示错误输出。
+
+- 在 A 进程中，写入端可以做这样的操作：dup2(fd[1],STDOUT_FILENO)，将 STDOUT_FILENO（也即第一项）不再指向标准输出，而是指向创建的管道文件，那么以后往标准输出写入的任何东西，都会写入管道文件。
+- 在 B 进程中，读取端可以做这样的操作，dup2(fd[0],STDIN_FILENO)，将 STDIN_FILENO 也即第零项不再指向标准输入，而是指向创建的管道文件，那么以后从标准输入读取的任何东西，都来自于管道文件。
+
+至此，我们才将 A|B 的功能完成。
+
+<img src="截图/Linux/匿名管道原理图.png" alt="下载" style="zoom:25%;" />
+
+
+
+### 命名管道
+
+
 
 
 
