@@ -1754,7 +1754,33 @@ int dup2(int oldfd, int newfd);
 
 ### 命名管道
 
+命名管道需要事先通过命令 mkfifo，进行创建。如果是通过代码创建命名管道，也有一个函数，但是这不是一个系统调用，而是 Glibc 提供的函数。Glibc 的 mkfifo 函数会调用 mknodat 系统调用，还记得咱们学字符设备的时候，创建一个字符设备的时候，也是调用的 mknod。这里命名管道也是一个设备，因而我们也用 mknod。
 
+mknod 先是通过 user_path_create 对于这个管道文件创建一个 dentry，然后因为是 S_IFIFO，所以调用 vfs_mknod。由于这个管道文件是创建在一个普通文件系统上的，假设是在 ext4 文件上，于是 vfs_mknod 会调用 ext4_dir_inode_operations 的 mknod，也即会调用 ext4_mknod。在 ext4_mknod 中，ext4_new_inode_start_handle 会调用 __ext4_new_inode，在 ext4 文件系统上真的创建一个文件，但是会调用 init_special_inode，创建一个内存中特殊的 inode，这个函数我们在字符设备文件中也遇到过，只不过当时 inode 的 i_fop 指向的是 def_chr_fops，这次换成管道文件了，inode 的 i_fop 变成指向 pipefifo_fops，这一点和匿名管道是一样的。
+
+这样，管道文件就创建完毕了。
+
+------
+
+要打开这个管道文件，我们还是会调用文件系统的 open 函数。还是沿着文件系统的调用方式，一路调用到 pipefifo_fops 的 open 函数，也就是 fifo_open。
+
+在 fifo_open 里面，创建 pipe_inode_info，这一点和匿名管道也是一样的。这个结构里面有个成员是 struct pipe_buffer *bufs。我们可以知道，**所谓的命名管道，其实是也是内核里面的一串缓存。**
+
+接下来，对于命名管道的写入，我们还是会调用 pipefifo_fops 的 pipe_write 函数，向 pipe_buffer 里面写入数据。对于命名管道的读入，我们还是会调用 pipefifo_fops 的 pipe_read，也就是从 pipe_buffer 里面读取数据。
+
+
+
+### 总结
+
+- 无论是匿名管道，还是命名管道，在内核都是一个文件。只要是文件就要有一个 inode。这里我们又用到了特殊 inode、字符设备、块设备，其实都是这种特殊的 inode。
+
+- 在这种特殊的 inode 里面，file_operations 指向管道特殊的 pipefifo_fops，这个 inode 对应内存里面的缓存。
+
+- 当我们用文件的 open 函数打开这个管道设备文件的时候，会调用 pipefifo_fops 里面的方法创建 struct file 结构，他的 inode 指向特殊的 inode，也对应内存里面的缓存，file_operations 也指向管道特殊的 pipefifo_fops。
+
+- 写入一个 pipe 就是从 struct file 结构找到缓存写入，读取一个 pipe 就是从 struct file 结构找到缓存读出。
+
+<img src="截图/Linux/管道整体流程图.png" alt="下载" style="zoom: 25%;" />
 
 
 
