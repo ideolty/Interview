@@ -1786,6 +1786,90 @@ mknod 先是通过 user_path_create 对于这个管道文件创建一个 dentry�
 
 ## IPC
 
+IPC （Inter-Process Communication，进程间通信）
+
+> #### 共享内存
+
+先来看里面对于共享内存的操作。
+
+首先，创建之前，要有一个 key 来唯一标识这个共享内存。这个 key 可以根据文件系统上的一个文件的 inode 随机生成。
+
+然后，我们需要创建一个共享内存，就像创建一个消息队列差不多，都是使用 xxxget 来创建。其中，创建共享内存使用的是下面这个函数：
+
+```c
+int shmget(key_t key, size_t size, int shmflag);
+```
+
+其中，key 就是前面生成的那个 key，shmflag 如果为 IPC_CREAT，就表示新创建，还可以指定读写权限 0777。
+
+对于共享内存，需要指定一个大小 size，这个一般要申请多大呢？一个最佳实践是，将多个进程需要共享的数据放在一个 struct 里面，然后这里的 size 就应该是这个 struct 的大小。这样每一个进程得到这块内存后，只要强制将类型转换为这个 struct 类型，就能够访问里面的共享数据了。
+
+生成了共享内存以后，接下来就是将这个共享内存映射到进程的虚拟地址空间中。使用下面这个函数来进行操作。
+
+```c
+void *shmat(int  shm_id, const  void *addr, int shmflg);
+```
+
+这里面的 shm_id，就是上面创建的共享内存的 id，addr 就是指定映射在某个地方。如果不指定，则内核会自动选择一个地址，作为返回值返回。得到了返回地址以后，我们需要将指针强制类型转换。
+
+当共享内存使用完毕，我们可以通过 shmdt 解除它到虚拟内存的映射。
+
+```c
+int shmdt(const  void *shmaddr)；
+```
+
+
+
+> #### 信号量
+
+看完了共享内存，接下来我们再来看信号量。信号量以集合的形式存在的。
+
+首先，创建之前，我们同样需要有一个 key，来唯一标识这个信号量集合。这个 key 同样可以根据文件系统上的一个文件的 inode 随机生成。
+
+然后，我们需要创建一个信号量集合，同样也是使用 xxxget 来创建，其中创建信号量集合使用的是下面这个函数。
+
+```c
+int semget(key_t key, int nsems, int semflg);
+```
+
+这里面的 key，就是前面生成的那个 key，shmflag 如果为 IPC_CREAT，就表示新创建，还可以指定读写权限 0777。这里，nsems 表示这个信号量集合里面有几个信号量，最简单的情况下，设置为 1。
+
+信号量往往代表某种资源的数量，如果用信号量做互斥，那往往将信号量设置为 1。对于信号量，往往要定义两种操作，P 操作和 V 操作。我们可以用这个信号量，来保护共享内存中的 struct shm_data，使得同时只有一个进程可以操作这个结构。
+
+
+
+通过程序创建的共享内存和信号量集合，我们可以通过命令 ipcs 查看。当然，我们也可以通过 ipcrm 进行删除。
+
+```
+# ipcs
+------ Message Queues --------
+key        msqid      owner      perms      used-bytes   messages    
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status      
+0x00016988 32768      root       777        516        0             
+------ Semaphore Arrays --------
+key        semid      owner      perms      nsems     
+0x00016989 32768      root       777        1 
+```
+
+
+
+**总结**
+
+- 无论是共享内存还是信号量，创建与初始化都遵循同样流程，通过 ftok 得到 key，通过 xxxget 创建对象并生成 id；
+- 生产者和消费者都通过 shmat 将共享内存映射到各自的内存空间，在不同的进程里面映射的位置不同；
+- 为了访问共享内存，需要信号量进行保护，信号量需要通过 semctl 初始化为某个值；
+- 接下来生产者和消费者要通过 semop(-1) 来竞争信号量，如果生产者抢到信号量则写入，然后通过 semop(+1) 释放信号量，如果消费者抢到信号量则读出，然后通过 semop(+1) 释放信号量；
+- 共享内存使用完毕，可以通过 shmdt 来解除映射。
+
+<img src="截图/Linux/IPC流程图.png" alt="下载" style="zoom: 25%;" />
+
+
+
+
+
+
+
 
 
 ## Socket
