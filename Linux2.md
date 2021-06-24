@@ -1874,7 +1874,7 @@ key        semid      owner      perms      nsems
 
 ## Socket
 
-### 使用
+> #### 使用
 
 socket 接口大多数情况下操作的是传输层，更底层的协议不用它来操心。在传输层有两个主流的协议 TCP 和 UDP，所以 socket 程序设计也是主要操作这两个协议。
 
@@ -1915,7 +1915,7 @@ socket 函数有三个参数。
 
 
 
-#### TCP编程
+> #### TCP编程
 
 <img src="截图/Linux/socket_tcp.png" alt="下载" style="zoom:25%;" />
 
@@ -1968,13 +1968,180 @@ socket 函数有三个参数。
 
 
 
-#### UDP编程
+> #### UDP编程
 
 <img src="截图/Linux/socket_udp.png" alt="下载" style="zoom: 33%;" />
 
 - UDP 是没有连接的，所以不需要三次握手，也就不需要调用 listen 和 connect，但是 UDP 的交互仍然需要 IP 地址和端口号，因而也需要 bind。
 
 - 对于 UDP 来讲，没有所谓的连接维护，也没有所谓的连接的发起方和接收方，甚至都不存在客户端和服务端的概念，大家就都是客户端，也同时都是服务端。只要有一个 socket，多台机器就可以任意通信，不存在哪两台机器是属于一个连接的概念。因此，每一个 UDP 的 socket 都需要 bind。每次通信时，调用 sendto 和 recvfrom，都要传入 IP 地址和端口。
+
+
+
+### socket 函数
+
+从 Socket 系统调用开始
+
+```c
+SYSCALL_DEFINE3(socket, int family, int type, int protocol)
+{
+	int retval;
+	struct socket *sock;
+	int flags;
+......
+	if (SOCK_NONBLOCK != O_NONBLOCK && (flags & SOCK_NONBLOCK))
+		flags = (flags & ~SOCK_NONBLOCK) | O_NONBLOCK;
+ 
+	retval = sock_create(family, type, protocol, &sock);
+......
+	retval = sock_map_fd(sock, flags & (O_CLOEXEC | O_NONBLOCK));
+......
+	return retval;
+}
+```
+
+Socket 系统调用会调用 sock_create 创建一个 struct socket 结构，然后通过 sock_map_fd 和文件描述符对应起来。
+
+在创建 Socket 的时候，有三个参数：
+
+- 一个是**family**，表示地址族。不是所有的 Socket 都要通过 IP 进行通信，还有其他的通信方式。domain sockets 就是通过本地文件进行通信的，不需要 IP 地址。只不过，通过 IP 地址只是最常用的模式，所以着重分析这种模式。
+
+- 第二个参数是**type**，也即 Socket 的类型。类型是比较少的。
+
+  常用的 Socket 类型有三种，分别是 SOCK_STREAM、SOCK_DGRAM 和 SOCK_RAW。
+
+  - SOCK_STREAM 是面向数据流的，协议 IPPROTO_TCP 属于这种类型。
+  - SOCK_DGRAM 是面向数据报的，协议 IPPROTO_UDP 属于这种类型。如果在内核里面看的话，IPPROTO_ICMP 也属于这种类型。
+  - SOCK_RAW 是原始的 IP 包，IPPROTO_IP 属于这种类型。
+
+- 第三个参数是**protocol**，是协议。协议数目是比较多的，也就是说，多个协议会属于同一种类型。
+
+
+
+主要考察流式的tcp协议。
+
+
+
+sock_create 它会调用 __sock_create。
+
+```c
+int __sock_create(struct net *net, int family, int type, int protocol,
+			 struct socket **res, int kern)
+{
+	int err;
+	struct socket *sock;
+	const struct net_proto_family *pf;
+......
+	sock = sock_alloc();
+......
+	sock->type = type;
+......
+	pf = rcu_dereference(net_families[family]);
+......
+	err = pf->create(net, sock, protocol, kern);
+......
+	*res = sock;
+ 
+	return 0;
+}
+```
+
+先是分配了一个 struct socket 结构。这里有一个 net_families 数组，我们可以以 family 参数为下标，找到对应的 struct net_proto_family。
+
+我们可以找到 net_families 的定义。每一个地址族在这个数组里面都有一项，里面的内容是 net_proto_family。每一种地址族都有自己的 net_proto_family，IP 地址族的 net_proto_family 定义如下，里面最重要的就是，create 函数指向 inet_create。
+
+```c
+//net/ipv4/af_inet.c
+static const struct net_proto_family inet_family_ops = {
+	.family = PF_INET,
+	.create = inet_create,// 这个用于 socket 系统调用创建
+......
+}
+```
+
+
+
+接下来，在这里面，这个 inet_create 会被调用。
+
+[^解释]: 应该是pf->create(net, sock, protocol, kern);这一句，实际调用的是inet_create方法
+
+```c
+static int inet_create(struct net *net, struct socket *sock, int protocol, int kern)
+{
+	struct sock *sk;
+	struct inet_protosw *answer;
+	struct inet_sock *inet;
+	struct proto *answer_prot;
+	unsigned char answer_flags;
+	int try_loading_module = 0;
+	int err;
+ 
+	/* Look for the requested type/protocol pair. */
+lookup_protocol:
+	list_for_each_entry_rcu(answer, &inetsw[sock->type], list) {
+		err = 0;
+		/* Check the non-wild match. */
+		if (protocol == answer->protocol) {
+			if (protocol != IPPROTO_IP)
+				break;
+		} else {
+			/* Check for the two wild cases. */
+			if (IPPROTO_IP == protocol) {
+				protocol = answer->protocol;
+				break;
+			}
+			if (IPPROTO_IP == answer->protocol)
+				break;
+		}
+		err = -EPROTONOSUPPORT;
+	}
+......
+	sock->ops = answer->ops;
+	answer_prot = answer->prot;
+	answer_flags = answer->flags;
+......
+	sk = sk_alloc(net, PF_INET, GFP_KERNEL, answer_prot, kern);
+......
+	inet = inet_sk(sk);
+	inet->nodefrag = 0;
+	if (SOCK_RAW == sock->type) {
+		inet->inet_num = protocol;
+		if (IPPROTO_RAW == protocol)
+			inet->hdrincl = 1;
+	}
+	inet->inet_id = 0;
+	sock_init_data(sock, sk);
+ 
+	sk->sk_destruct	   = inet_sock_destruct;
+	sk->sk_protocol	   = protocol;
+	sk->sk_backlog_rcv = sk->sk_prot->backlog_rcv;
+ 
+	inet->uc_ttl	= -1;
+	inet->mc_loop	= 1;
+	inet->mc_ttl	= 1;
+	inet->mc_all	= 1;
+	inet->mc_index	= 0;
+	inet->mc_list	= NULL;
+	inet->rcv_tos	= 0;
+ 
+	if (inet->inet_num) {
+		inet->inet_sport = htons(inet->inet_num);
+		/* Add to protocol hash chains. */
+		err = sk->sk_prot->hash(sk);
+	}
+ 
+	if (sk->sk_prot->init) {
+		err = sk->sk_prot->init(sk);
+	}
+......
+}
+```
+
+
+
+
+
+
 
 
 
