@@ -2137,11 +2137,230 @@ lookup_protocol:
 }
 ```
 
+在 inet_create 中，先会看到一个循环 list_for_each_entry_rcu。这里的 inetsw 也是一个数组，type 作为下标，里面的内容是 struct inet_protosw，是协议，也即 inetsw 数组对于每个类型有一项，这一项里面是属于这个类型的协议。
+
+inetsw 数组是在系统初始化的时候初始化的
+
+```c
+static struct list_head inetsw[SOCK_MAX];
+ 
+static int __init inet_init(void)
+{
+......
+	/* Register the socket-side information for inet_create. */
+	for (r = &inetsw[0]; r < &inetsw[SOCK_MAX]; ++r)
+		INIT_LIST_HEAD(r);
+	for (q = inetsw_array; q < &inetsw_array[INETSW_ARRAY_LEN]; ++q)
+		inet_register_protosw(q);
+......
+}
+```
+
+- 首先，一个循环会将 inetsw 数组的每一项，都初始化为一个链表。一个 type 类型会包含多个 protocol，因而需要一个链表。
+- 接下来一个循环，是将 inetsw_array 注册到 inetsw 数组里面去。
+
+inetsw_array 的定义如下，这个数组里面的内容很重要。
+
+```c
+static struct inet_protosw inetsw_array[] =
+{
+	{
+		.type =       SOCK_STREAM,
+		.protocol =   IPPROTO_TCP,
+		.prot =       &tcp_prot,
+		.ops =        &inet_stream_ops,
+		.flags =      INET_PROTOSW_PERMANENT |
+			      INET_PROTOSW_ICSK,
+	},
+	{
+		.type =       SOCK_DGRAM,
+		.protocol =   IPPROTO_UDP,
+		.prot =       &udp_prot,
+		.ops =        &inet_dgram_ops,
+		.flags =      INET_PROTOSW_PERMANENT,
+     },
+     {
+		.type =       SOCK_DGRAM,
+		.protocol =   IPPROTO_ICMP,
+		.prot =       &ping_prot,
+		.ops =        &inet_sockraw_ops,
+		.flags =      INET_PROTOSW_REUSE,
+     },
+     {
+        .type =       SOCK_RAW,
+	    .protocol =   IPPROTO_IP,	/* wild card */
+	    .prot =       &raw_prot,
+	    .ops =        &inet_sockraw_ops,
+	    .flags =      INET_PROTOSW_REUSE,
+     }
+}
+```
 
 
 
+回到 inet_create 的 list_for_each_entry_rcu 循环中。
+
+- 到这里就好理解了，这是在 inetsw 数组中，根据 type 找到属于这个类型的列表，然后依次比较列表中的 struct inet_protosw 的 protocol 是不是用户指定的 protocol；如果是，就得到了符合用户指定的 family->type->protocol 的 struct inet_protosw *answer 对象。
+
+- 接下来，struct socket *sock 的 ops 成员变量，被赋值为 answer 的 ops。对于 TCP 来讲，就是 inet_stream_ops。后面任何用户对于这个 socket 的操作，都是通过 inet_stream_ops 进行的。
+
+- 接下来，我们创建一个 struct sock *sk 对象。这里比较让人困惑。socket 和 sock 看起来几乎一样，容易让人混淆，这里需要说明一下
+  - socket 是用于负责对上给用户提供接口，并且和文件系统关联。
+  -  sock，负责向下对接内核网络协议栈。
+
+- 在 sk_alloc 函数中，struct inet_protosw *answer 结构的 tcp_prot 赋值给了 struct sock *sk 的 sk_prot 成员。tcp_prot 的定义如下，里面定义了很多的函数，都是 sock 之下内核协议栈的动作。
+
+  ```c
+  struct proto tcp_prot = {
+  	.name			= "TCP",
+  	.owner			= THIS_MODULE,
+  	.close			= tcp_close,
+  	.connect		= tcp_v4_connect,
+  	.disconnect		= tcp_disconnect,
+  	.accept			= inet_csk_accept,
+  	.ioctl			= tcp_ioctl,
+  	.init			= tcp_v4_init_sock,
+  	.destroy		= tcp_v4_destroy_sock,
+  	.shutdown		= tcp_shutdown,
+  	.setsockopt		= tcp_setsockopt,
+  	.getsockopt		= tcp_getsockopt,
+  	.keepalive		= tcp_set_keepalive,
+  	.recvmsg		= tcp_recvmsg,
+  	.sendmsg		= tcp_sendmsg,
+  	.sendpage		= tcp_sendpage,
+  	.backlog_rcv		= tcp_v4_do_rcv,
+  	.release_cb		= tcp_release_cb,
+  	.hash			= inet_hash,
+      .get_port		= inet_csk_get_port,
+  ......
+  }
+  ```
+
+  [^注释]: 感觉像是DDD的编程路子，先定义好处理方法，然后动态的进行绑定
+
+在 inet_create 函数中，接下来创建一个 struct inet_sock 结构，这个结构一开始就是 struct sock，然后扩展了一些其他的信息，剩下的代码就填充这些信息。这一幕我们会经常看到，将一个结构放在另一个结构的开始位置，然后扩展一些成员，通过对于指针的强制类型转换，来访问这些成员。
+
+socket 的创建至此结束。
 
 
+
+### bind 函数
+
+```c
+SYSCALL_DEFINE3(bind, int, fd, struct sockaddr __user *, umyaddr, int, addrlen)
+{
+	struct socket *sock;
+	struct sockaddr_storage address;
+	int err, fput_needed;
+ 
+	sock = sockfd_lookup_light(fd, &err, &fput_needed);
+	if (sock) {
+		err = move_addr_to_kernel(umyaddr, addrlen, &address);
+		if (err >= 0) {
+			err = sock->ops->bind(sock,
+						      (struct sockaddr *)
+						      &address, addrlen);
+		}
+		fput_light(sock->file, fput_needed);
+	}
+	return err;
+}
+```
+
+在 bind 中，sockfd_lookup_light 会根据 fd 文件描述符，找到 struct socket 结构。然后将 sockaddr 从用户态拷贝到内核态，然后调用 struct socket 结构里面 ops 的 bind 函数。根据前面创建 socket 的时候的设定，调用的是 inet_stream_ops 的 bind 函数，也即调用 inet_bind。
+
+```c
+int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+{
+	struct sockaddr_in *addr = (struct sockaddr_in *)uaddr;
+	struct sock *sk = sock->sk;
+	struct inet_sock *inet = inet_sk(sk);
+	struct net *net = sock_net(sk);
+	unsigned short snum;
+......
+	snum = ntohs(addr->sin_port);
+......
+	inet->inet_rcv_saddr = inet->inet_saddr = addr->sin_addr.s_addr;
+	/* Make sure we are allowed to bind here. */
+	if ((snum || !inet->bind_address_no_port) &&
+	    sk->sk_prot->get_port(sk, snum)) {
+......
+	}
+	inet->inet_sport = htons(inet->inet_num);
+	inet->inet_daddr = 0;
+	inet->inet_dport = 0;
+	sk_dst_reset(sk);
+}
+```
+
+bind 里面会调用 sk_prot 的 get_port 函数，也即 inet_csk_get_port 来检查端口是否冲突，是否可以绑定。如果允许，则会设置 struct inet_sock 的本方的地址 inet_saddr 和本方的端口 inet_sport，对方的地址 inet_daddr 和对方的端口 inet_dport 都初始化为 0。
+
+bind 的逻辑相对比较简单，就到这里了。
+
+
+
+### listen 函数
+
+```c
+SYSCALL_DEFINE2(listen, int, fd, int, backlog)
+{
+	struct socket *sock;
+	int err, fput_needed;
+	int somaxconn;
+ 
+	sock = sockfd_lookup_light(fd, &err, &fput_needed);
+	if (sock) {
+		somaxconn = sock_net(sock->sk)->core.sysctl_somaxconn;
+		if ((unsigned int)backlog > somaxconn)
+			backlog = somaxconn;
+		err = sock->ops->listen(sock, backlog);
+		fput_light(sock->file, fput_needed);
+	}
+	return err;
+}
+```
+
+在 listen 中，还是通过 sockfd_lookup_light，根据 fd 文件描述符，找到 struct socket 结构。接着，调用 struct socket 结构里面 ops 的 listen 函数。根据前面创建 socket 的时候的设定，调用的是 inet_stream_ops 的 listen 函数，也即调用 inet_listen。
+
+```c
+int inet_listen(struct socket *sock, int backlog)
+{
+	struct sock *sk = sock->sk;
+	unsigned char old_state;
+	int err;
+	old_state = sk->sk_state;
+	/* Really, if the socket is already in listen state
+	 * we can only allow the backlog to be adjusted.
+	 */
+	if (old_state != TCP_LISTEN) {
+		err = inet_csk_listen_start(sk, backlog);
+	}
+	sk->sk_max_ack_backlog = backlog;
+}
+```
+
+如果这个 socket 还不在 TCP_LISTEN 状态，会调用 inet_csk_listen_start 进入监听状态。
+
+```c
+int inet_csk_listen_start(struct sock *sk, int backlog)
+{
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	struct inet_sock *inet = inet_sk(sk);
+	int err = -EADDRINUSE;
+ 
+	reqsk_queue_alloc(&icsk->icsk_accept_queue);
+ 
+	sk->sk_max_ack_backlog = backlog;
+	sk->sk_ack_backlog = 0;
+	inet_csk_delack_init(sk);
+ 
+	sk_state_store(sk, TCP_LISTEN);
+	if (!sk->sk_prot->get_port(sk, inet->inet_num)) {
+......
+	}
+......
+}
+```
 
 
 
