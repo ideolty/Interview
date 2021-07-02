@@ -2362,7 +2362,88 @@ int inet_csk_listen_start(struct sock *sk, int backlog)
 }
 ```
 
+这里面建立了一个新的结构 inet_connection_sock，这个结构一开始是 struct inet_sock，inet_csk 其实做了一次强制类型转换，扩大了结构。
 
+**struct inet_connection_sock 结构**比较复杂。如果打开它，你能看到处于各种状态的队列，各种超时时间、拥塞控制等字眼。我们说 TCP 是面向连接的，就是客户端和服务端都是有一个结构维护连接的状态，就是指这个结构。我们这里先不详细分析里面的变量，因为太多了，后面我们遇到一个分析一个。
+
+- 首先，我们遇到的是 icsk_accept_queue。
+
+  在 TCP 的状态里面，有一个 listen 状态，当调用 listen 函数之后，就会进入这个状态，虽然我们写程序的时候，一般要等待服务端调用 accept 后，等待在哪里的时候，让客户端就发起连接。其实服务端一旦处于 listen 状态，不用 accept，客户端也能发起连接。其实 TCP 的状态中，没有一个是否被 accept 的状态，那 accept 函数的作用是什么呢？
+
+  在内核中，为每个 Socket 维护两个队列。一个是已经建立了连接的队列，这时候连接三次握手已经完毕，处于 established 状态；一个是还没有完全建立连接的队列，这个时候三次握手还没完成，处于 syn_rcvd 的状态。
+
+  服务端调用 accept 函数，其实是在第一个队列中拿出一个已经完成的连接进行处理。如果还没有完成就阻塞等待。这里的 icsk_accept_queue 就是第一个队列。
+
+  初始化完之后，将 TCP 的状态设置为 TCP_LISTEN，再次调用 get_port 判断端口是否冲突。
+
+至此，listen 的逻辑就结束了。
+
+
+
+### accept 函数
+
+```c
+SYSCALL_DEFINE3(accept, int, fd, struct sockaddr __user *, upeer_sockaddr,
+		int __user *, upeer_addrlen)
+{
+	return sys_accept4(fd, upeer_sockaddr, upeer_addrlen, 0);
+}
+ 
+SYSCALL_DEFINE4(accept4, int, fd, struct sockaddr __user *, upeer_sockaddr,
+		int __user *, upeer_addrlen, int, flags)
+{
+	struct socket *sock, *newsock;
+	struct file *newfile;
+	int err, len, newfd, fput_needed;
+	struct sockaddr_storage address;
+......
+	sock = sockfd_lookup_light(fd, &err, &fput_needed);
+	newsock = sock_alloc();
+	newsock->type = sock->type;
+	newsock->ops = sock->ops;
+	newfd = get_unused_fd_flags(flags);
+	newfile = sock_alloc_file(newsock, flags, sock->sk->sk_prot_creator->name);
+	err = sock->ops->accept(sock, newsock, sock->file->f_flags, false);
+	if (upeer_sockaddr) {
+		if (newsock->ops->getname(newsock, (struct sockaddr *)&address, &len, 2) < 0) {
+		}
+		err = move_addr_to_user(&address,
+					len, upeer_sockaddr, upeer_addrlen);
+	}
+	fd_install(newfd, newfile);
+......
+}
+```
+
+accept 函数的实现，印证了 socket 的原理中说的那样，原来的 socket 是监听 socket，这里我们会找到原来的 struct socket，并基于它去创建一个新的 newsock。这才是连接 socket。除此之外，我们还会创建一个新的 struct file 和 fd，并关联到 socket。
+
+这里面还会调用 struct socket 的 sock->ops->accept，也即会调用 inet_stream_ops 的 accept 函数，也即 inet_accept。
+
+```c
+int inet_accept(struct socket *sock, struct socket *newsock, int flags, bool kern)
+{
+	struct sock *sk1 = sock->sk;
+	int err = -EINVAL;
+	struct sock *sk2 = sk1->sk_prot->accept(sk1, flags, &err, kern);
+	sock_rps_record_flow(sk2);
+	sock_graft(sk2, newsock);
+	newsock->state = SS_CONNECTED;
+}
+```
+
+inet_accept 会调用 struct sock 的 sk1->sk_prot->accept，也即 tcp_prot 的 accept 函数，inet_csk_accept 函数。
+
+
+
+inet_csk_accept 的实现，印证了上面讲的两个队列的逻辑。如果 icsk_accept_queue 为空，则调用 inet_csk_wait_for_connect 进行等待；等待的时候，调用 schedule_timeout，让出 CPU，并且将进程状态设置为 TASK_INTERRUPTIBLE。
+
+如果再次 CPU 醒来，我们会接着判断 icsk_accept_queue 是否为空，同时也会调用 signal_pending 看有没有信号可以处理。一旦 icsk_accept_queue 不为空，就从 inet_csk_wait_for_connect 中返回，在队列中取出一个 struct sock 对象赋值给 newsk。
+
+
+
+### connect 函数
+
+// todo
 
 
 
