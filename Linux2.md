@@ -2447,6 +2447,20 @@ inet_csk_accept 的实现，印证了上面讲的两个队列的逻辑。如果 
 
 
 
+# 虚拟机
+
+Virtualbox 在虚拟化层，有三种虚拟化的方式
+
+- 完全虚拟化
+- 硬件辅助虚拟化（Hardware-Assisted Virtualization）
+- 半虚拟化
+
+
+
+# 容器
+
+
+
 # 常用命令
 
 // todo 文章后面的留下的问题中还有大量的命令需要积累。
