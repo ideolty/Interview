@@ -2469,7 +2469,179 @@ Virtualbox 在虚拟化层，有三种虚拟化的方式
 
 
 
+## Namespace
 
+为了隔离不同类型的资源，Linux 内核里面实现了以下几种不同类型的 namespace。
+
+- UTS，对应的宏为 CLONE_NEWUTS，表示不同的 namespace 可以配置不同的 hostname。
+- User，对应的宏为 CLONE_NEWUSER，表示不同的 namespace 可以配置不同的用户和组。
+- Mount，对应的宏为 CLONE_NEWNS，表示不同的 namespace 的文件系统挂载点是隔离的
+- PID，对应的宏为 CLONE_NEWPID，表示不同的 namespace 有完全独立的 pid，也即一个 namespace 的进程和另一个 namespace 的进程，pid 可以是一样的，但是代表不同的进程。
+- Network，对应的宏为 CLONE_NEWNET，表示不同的 namespace 有独立的网络协议栈。
+
+
+
+我们可以通过函数操作 namespace。
+
+- 第一个函数是**clone**，也就是创建一个新的进程，并把它放到新的 namespace 中。
+
+  ```c
+  int clone(int (*fn)(void *), void *child_stack, int flags, void *arg);
+  ```
+
+  这里面有一个参数 flags。其实它可以设置为 CLONE_NEWUTS、CLONE_NEWUSER、CLONE_NEWNS、CLONE_NEWPID。CLONE_NEWNET 会将 clone 出来的新进程放到新的 namespace 中。
+
+  
+
+- 第二个函数是**setns**，用于将当前进程加入到已有的 namespace 中。
+
+  ```c
+  int setns(int fd, int nstype);
+  ```
+
+  其中，fd 指向 /proc/[pid]/ns/ 目录里相应 namespace 对应的文件，表示要加入哪个 namespace。nstype 用来指定 namespace 的类型，可以设置为 CLONE_NEWUTS、CLONE_NEWUSER、CLONE_NEWNS、CLONE_NEWPID 和 CLONE_NEWNET。
+
+  
+
+- 第三个函数是**unshare**，它可以使当前进程退出当前的 namespace，并加入到新创建的 namespace。
+
+  ```c
+  int unshare(int flags);
+  ```
+
+  其中，flags 用于指定一个或者多个上面的 CLONE_NEWUTS、CLONE_NEWUSER、CLONE_NEWNS、CLONE_NEWPID 和 CLONE_NEWNET。
+
+
+
+clone 和 unshare 的区别是，unshare 是使当前进程加入新的 namespace；clone 是创建一个新的子进程，然后让子进程加入新的 namespace，而当前进程保持不变。
+
+
+
+### clone
+
+clone 系统调用我们在'"进程的创建"那一节解析过，当时我们没有看关于 namespace 的代码，现在我们就来看一看，namespace 在内核做了哪些事情。
+
+在内核里面，clone 会调用 `_do_fork->copy_process->copy_namespaces`，也就是说，在创建子进程的时候，有一个机会可以复制和设置 namespace。
+
+namespace 是在哪里定义的呢？在每一个进程的 task_struct 里面，有一个指向 namespace 结构体的指针 nsproxy。
+
+```c
+struct task_struct {
+......
+	/* Namespaces: */
+	struct nsproxy			*nsproxy;
+......
+}
+ 
+/*
+ * A structure to contain pointers to all per-process
+ * namespaces - fs (mount), uts, network, sysvipc, etc.
+ *
+ * The pid namespace is an exception -- it's accessed using
+ * task_active_pid_ns.  The pid namespace here is the
+ * namespace that children will use.
+ */
+struct nsproxy {
+	atomic_t count;
+	struct uts_namespace *uts_ns;
+	struct ipc_namespace *ipc_ns;
+	struct mnt_namespace *mnt_ns;
+	struct pid_namespace *pid_ns_for_children;
+	struct net 	     *net_ns;
+	struct cgroup_namespace *cgroup_ns;
+};
+```
+
+可以看到在 struct nsproxy 结构里面，有我们上面的各种 namespace。在系统初始化的时候，有一个默认的 init_nsproxy。
+
+```c
+struct nsproxy init_nsproxy = {
+	.count			= ATOMIC_INIT(1),
+	.uts_ns			= &init_uts_ns,
+#if defined(CONFIG_POSIX_MQUEUE) || defined(CONFIG_SYSVIPC)
+	.ipc_ns			= &init_ipc_ns,
+#endif
+	.mnt_ns			= NULL,
+	.pid_ns_for_children	= &init_pid_ns,
+#ifdef CONFIG_NET
+	.net_ns			= &init_net,
+#endif
+#ifdef CONFIG_CGROUPS
+	.cgroup_ns		= &init_cgroup_ns,
+#endif
+};
+```
+
+
+
+下面，我们来看 copy_namespaces 的实现。
+
+```c
+/*
+ * called from clone.  This now handles copy for nsproxy and all
+ * namespaces therein.
+ */
+int copy_namespaces(unsigned long flags, struct task_struct *tsk)
+{
+	struct nsproxy *old_ns = tsk->nsproxy;
+	struct user_namespace *user_ns = task_cred_xxx(tsk, user_ns);
+	struct nsproxy *new_ns;
+ 
+	if (likely(!(flags & (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC |
+			      CLONE_NEWPID | CLONE_NEWNET |
+			      CLONE_NEWCGROUP)))) {
+		get_nsproxy(old_ns);
+		return 0;
+	}
+ 
+	if (!ns_capable(user_ns, CAP_SYS_ADMIN))
+		return -EPERM;
+......
+	new_ns = create_new_namespaces(flags, tsk, user_ns, tsk->fs);
+ 
+	tsk->nsproxy = new_ns;
+	return 0;
+}
+```
+
+如果 clone 的参数里面没有 CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC | CLONE_NEWPID | CLONE_NEWNET | CLONE_NEWCGROUP，就返回原来的 namespace，调用 get_nsproxy。
+
+接着，我们调用 create_new_namespaces。
+
+```c
+/*
+ * Create new nsproxy and all of its the associated namespaces.
+ * Return the newly created nsproxy.  Do not attach this to the task,
+ * leave it to the caller to do proper locking and attach it to task.
+ */
+static struct nsproxy *create_new_namespaces(unsigned long flags,
+	struct task_struct *tsk, struct user_namespace *user_ns,
+	struct fs_struct *new_fs)
+{
+	struct nsproxy *new_nsp;
+ 
+	new_nsp = create_nsproxy();
+......
+	new_nsp->mnt_ns = copy_mnt_ns(flags, tsk->nsproxy->mnt_ns, user_ns, new_fs);
+......
+	new_nsp->uts_ns = copy_utsname(flags, user_ns, tsk->nsproxy->uts_ns);
+......
+	new_nsp->ipc_ns = copy_ipcs(flags, user_ns, tsk->nsproxy->ipc_ns);
+......
+	new_nsp->pid_ns_for_children =
+		copy_pid_ns(flags, user_ns, tsk->nsproxy->pid_ns_for_children);
+......
+	new_nsp->cgroup_ns = copy_cgroup_ns(flags, user_ns,
+					    tsk->nsproxy->cgroup_ns);
+......
+	new_nsp->net_ns = copy_net_ns(flags, user_ns, tsk->nsproxy->net_ns);
+......
+	return new_nsp;
+......
+}
+```
+
+在 create_new_namespaces 中，我们可以看到对于各种 namespace 的复制。
 
 
 
