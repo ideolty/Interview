@@ -1773,6 +1773,20 @@ Agent需要打包成一个jar包，在ManiFest属性中指定“Premain-Class”
 
 
 
+## 应用 - IDE debug调试
+
+注意到启动的命令行参数
+
+`-agentlib:jdwp=transport=dt_socket,suspend=y,address=localhost:3333`
+
+idea 和eclipse 本质上是通过jdwp 建立一个socket 通信做的debug调试。VM 是通过主动的方式检查执行的每行代码是否有断点需要处理,并不会字节码植入到class中.
+
+
+
+> https://mp.weixin.qq.com/s/O2DxCqXPicI9I0UID51JCg
+
+
+
 # Java基本类型
 
  > #### boolean

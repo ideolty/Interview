@@ -2645,6 +2645,107 @@ static struct nsproxy *create_new_namespaces(unsigned long flags,
 
 
 
+## CGroup
+
+cgroups 定义了下面的一系列子系统，每个子系统用于控制某一类资源。
+
+- cpu 子系统，主要限制进程的 cpu 使用率。
+- cpuacct 子系统，可以统计 cgroups 中的进程的 cpu 使用报告。
+- cpuset 子系统，可以为 cgroups 中的进程分配单独的 cpu 节点或者内存节点。
+- memory 子系统，可以限制进程的 memory 使用量。
+- blkio 子系统，可以限制进程的块设备 io。
+- devices 子系统，可以控制进程能够访问某些设备。
+- net_cls 子系统，可以标记 cgroups 中进程的网络数据包，然后可以使用 tc 模块（traffic control）对数据包进行控制。
+- freezer 子系统，可以挂起或者恢复 cgroups 中的进程。
+
+最常用的是对于 CPU 和内存的控制。
+
+
+
+在 Linux 上，为了操作 Cgroup，有一个专门的 Cgroup 文件系统，运行 mount 命令可以查看，cgroup 文件系统多挂载到 /sys/fs/cgroup 下。
+
+cgroup 对于 Docker 资源的控制，在用户态的表现方式如下图
+
+![下载](截图/Linux/cgroup.png)
+
+
+
+内核中cgroup 的实现
+
+首先，在系统初始化的时候，cgroup 也会进行初始化，在 start_kernel 中，cgroup_init_early 和 cgroup_init 都会进行初始化。在 cgroup_init_early 和 cgroup_init 中，会有下面的循环。
+
+```c
+for_each_subsys(ss, i) {
+	ss->id = i;
+	ss->name = cgroup_subsys_name[i];
+......
+	cgroup_init_subsys(ss, true);
+}
+ 
+#define for_each_subsys(ss, ssid)					\
+	for ((ssid) = 0; (ssid) < CGROUP_SUBSYS_COUNT &&		\
+	     (((ss) = cgroup_subsys[ssid]) || true); (ssid)++)
+```
+
+这个 cgroup_subsys 数组，在SUBSYS 这个宏中定义的，数组中的项定义在 cgroup_subsys.h 头文件中。
+
+在 for_each_subsys 的循环里面，cgroup_subsys[] 数组中的每一个 cgroup_subsys，都会调用 cgroup_init_subsys，对 cgroup_subsys 初始化。
+
+```c
+static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
+{
+	struct cgroup_subsys_state *css;
+......
+	idr_init(&ss->css_idr);
+	INIT_LIST_HEAD(&ss->cfts);
+ 
+	/* Create the root cgroup state for this subsystem */
+	ss->root = &cgrp_dfl_root;
+	css = ss->css_alloc(cgroup_css(&cgrp_dfl_root.cgrp, ss));
+......
+	init_and_link_css(css, ss, &cgrp_dfl_root.cgrp);
+......
+	css->id = cgroup_idr_alloc(&ss->css_idr, css, 1, 2, GFP_KERNEL);
+	init_css_set.subsys[ss->id] = css;
+......
+	BUG_ON(online_css(css));
+......
+}
+```
+
+cgroup_init_subsys 里面会做两件事情
+
+- 一个是调用 cgroup_subsys 的 css_alloc 函数创建一个 cgroup_subsys_state；
+- 另外就是调用 online_css，也即调用 cgroup_subsys 的 css_online 函数，激活这个 cgroup。
+
+对于 CPU 来讲，css_alloc 函数就是 cpu_cgroup_css_alloc。这里面会调用 sched_create_group 创建一个 struct task_group。在这个结构中，第一项就是 cgroup_subsys_state，也就是说，task_group 是 cgroup_subsys_state 的一个扩展，最终返回的是指向 cgroup_subsys_state 结构的指针，可以通过强制类型转换变为 task_group。
+
+
+
+……
+
+
+
+
+
+总结
+
+![下载](截图/Linux/cgroup原理.png)
+
+第一步，系统初始化的时候，初始化 cgroup 的各个子系统的操作函数，分配各个子系统的数据结构。
+
+第二步，mount cgroup 文件系统，创建文件系统的树形结构，以及操作函数。
+
+第三步，写入 cgroup 文件，设置 cpu 或者 memory 的相关参数，这个时候文件系统的操作函数会调用到 cgroup 子系统的操作函数，从而将参数设置到 cgroup 子系统的数据结构中。
+
+第四步，写入 tasks 文件，将进程交给某个 cgroup 进行管理，因为 tasks 文件也是一个 cgroup 文件，统一会调用文件系统的操作函数进而调用 cgroup 子系统的操作函数，将 cgroup 子系统的数据结构和进程关联起来。
+
+第五步，对于 cpu 来讲，会修改 scheduled entity，放入相应的队列里面去，从而下次调度的时候就起作用了。对于内存的 cgroup 设定，只有在申请内存的时候才起作用。
+
+
+
+
+
 
 
 # 常用命令
