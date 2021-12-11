@@ -12,7 +12,62 @@ git只需要了解基本原理和基本操作，知道每个操作的不同即�
 
 # 常用命令
 
-**本地CRUD和查看历史记录操作**
+**配置**
+
+```shell
+git config --global user.name 'your_name'
+git config --list --global
+
+# 直接看一下命令手册
+usage: git config [<options>]
+
+Config file location
+    --global              use global config file
+    --system              use system config file
+    --local               use repository config file
+    --worktree            use per-worktree config file
+    -f, --file <file>     use given config file
+    --blob <blob-id>      read config from given blob object
+
+Action
+    --get                 get value: name [value-regex]
+    --get-all             get all values: key [value-regex]
+    --get-regexp          get values for regexp: name-regex [value-regex]
+    --get-urlmatch        get value specific for the URL: section[.var] URL
+    --replace-all         replace all matching variables: name value [value_regex]
+    --add                 add a new variable: name value
+    --unset               remove a variable: name [value-regex]
+    --unset-all           remove all matches: name [value-regex]
+    --rename-section      rename section: old-name new-name
+    --remove-section      remove a section: name
+    -l, --list            list all
+    -e, --edit            open an editor
+    --get-color           find the color configured: slot [default]
+    --get-colorbool       find the color setting: slot [stdout-is-tty]
+
+Type
+    -t, --type <>         value is given this type
+    --bool                value is "true" or "false"
+    --int                 value is decimal number
+    --bool-or-int         value is --bool or --int
+    --path                value is a path (file or directory name)
+    --expiry-date         value is an expiry date
+
+Other
+    -z, --null            terminate values with NUL byte
+    --name-only           show variable names only
+    --includes            respect include directives on lookup
+    --show-origin         show origin of config (file, standard input, blob, command line)
+    --default <value>     with --get, use default value when missing entry
+```
+
+
+
+对于任意的git命令，可以后面加--help，查看参数文档
+
+
+
+**本地CRUD**
 
 - `git init`
 
@@ -43,6 +98,12 @@ git只需要了解基本原理和基本操作，知道每个操作的不同即�
 - `git rm`
 
   删除一个文件。之后需要`git commit`把改动提交到仓库。
+  
+- `git mv sourceName targetName`
+
+  重命名，好处是git帮你完成了，不会生成一个删掉的提交与一个新增的提交，直接帮你合并了
+
+
 
 
 
@@ -70,10 +131,6 @@ git只需要了解基本原理和基本操作，知道每个操作的不同即�
 
 
 
-- `git log`
-
-  查看提交历史。
-
 - `git reset`
 
   命令用于将当前`HEAD`复位到指定状态。一般用于撤消之前的一些操作(如：`git add`,`git commit`等)。在Git中，用`HEAD`表示当前版本，上一个版本就是`HEAD^`，上上一个版本就是`HEAD^^`，往上100个版本写成`HEAD~100`。
@@ -81,6 +138,17 @@ git只需要了解基本原理和基本操作，知道每个操作的不同即�
 - `git reflog`
 
   查看命令历史。
+
+
+
+**查看日志**
+
+- `git log`
+
+  查看提交历史。后面可以带点参数。
+
+  - `git log -n4 --oneline` ：查看最近的4次提交，一行显示。
+  - `git log --all --graph` ：把所有分支的提交打出来并图形化
 
 
 
@@ -95,6 +163,8 @@ git只需要了解基本原理和基本操作，知道每个操作的不同即�
   `$ git checkout dev`，切换到`dev`分支。
 
   `$ git branch -d dev`，删除dev分支。
+
+  `git branch -help` ，直接查看参数文档
 
 - `git merge`
 
