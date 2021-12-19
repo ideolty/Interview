@@ -208,6 +208,57 @@ Other
 
 
 
+# 目录结构
+
+.git文件夹中比较重要的有3个目录HEAD、objects、refs
+
+```shel
+-rw-r--r--   1 iven  staff    9 12 11 20:22 COMMIT_EDITMSG
+-rw-r--r--   1 iven  staff   23 12 19 16:39 HEAD
+drwxr-xr-x   2 iven  staff   64 12 11 19:49 branches/
+-rw-r--r--   1 iven  staff  137 12 11 19:49 config
+-rw-r--r--   1 iven  staff   73 12 11 19:49 description
+drwxr-xr-x  13 iven  staff  416 12 11 19:49 hooks/
+-rw-r--r--   1 iven  staff  217 12 19 16:39 index
+drwxr-xr-x   3 iven  staff   96 12 11 19:49 info/
+drwxr-xr-x   4 iven  staff  128 12 11 19:52 logs/
+drwxr-xr-x  18 iven  staff  576 12 11 20:22 objects/
+drwxr-xr-x   4 iven  staff  128 12 11 19:49 refs/
+```
+
+- HEAD中记录了当前工作的分支。
+- objects里面存储commit/tree/blob对象
+- refs记录了分支与tag信息
+
+
+
+
+
+# 对象结构
+
+git 常用3个对象：commit、tree和blob，他们三个对象之间的关系如下图
+
+![image-20211219182726331](截图/Git/git对象.png)
+
+- commit是指一次提交。
+- tree可以理解位文件夹的一个快照。一次提交必定会挂在某个树下面
+- blob映射到一个具体的文件，git认为文件内容相同，就是同一个文件，文件名是无所谓的。
+
+```she
+# 可一件使用cat-file命令查看对象的具体内容
+git cat-file -p 9fe71058e29391e7
+```
+
+
+
+在一个空项目中，创建一个文件夹，在文件夹中再新加一个吻文件，提交，会创建4个对象。会给文件夹也创建一个tree对象，同时一个具体的文件会有两个对象，一个指向具体内容的tree与一个存储内容的blob。
+
+![image-20211219184119109](截图/Git/how_many_tree.png)
+
+
+
+
+
 # 常见面试题
 
 1. 什么是 Git 复刻（fork）？复刻（fork）、分支（branch）和克隆（clone）之间有什么区别？
