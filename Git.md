@@ -246,6 +246,23 @@ drwxr-xr-x   4 iven  staff  128 12 11 19:49 refs/
 
 
 
+# 常用操作
+
+多人同时修改了一个文件，提交的时候被远端拒绝了，要求你先拉取，但是拉取的时候又要求你把提交先提上去，导致pull下不上也push不上去。
+
+一个branch会在本有有两个对应的分支
+
+```shel
+* master                dfba64c rename
+  temp                  c886e76 temp add
+  remotes/origin/master dfba64c rename
+  remotes/origin/temp   c886e76 temp add
+```
+
+这种情况下可以先git fetch remotes/origin/temp，把本地的remotes/origin/temp与远端的同步。之后再git merge remotes/origin/temp 解决冲突，最后再push上去。
+
+
+
 
 
 # 对象结构
